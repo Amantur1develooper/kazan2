@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Организации{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h1><i class="bi bi-diagram-3 me-2 text-primary"></i>Организации</h1>
+  <a href="{% url 'org_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Добавить
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if orgs %}
+<div class="data-table">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Организация</th>
+          <th class="text-center">ЖК</th>
+          <th class="text-end">Плановые расходы</th>
+          <th class="text-end">Фактические расходы</th>
+          <th class="text-end">Отклонение</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for org in orgs %}
+        <tr>
+          <td>
+            <a href="{% url 'org_detail' org.pk %}" class="fw-semibold text-decoration-none text-dark">
+              <i class="bi bi-diagram-3 me-1 text-primary"></i>{{ org.name }}
+            </a>
+            {% if org.description %}<br><small class="text-muted">{{ org.description|truncatechars:60 }}</small>{% endif %}
+          </td>
+          <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ org.complexes_count }}</span></td>
+          <td class="text-end text-money">{{ org.total_planned_expenses|currency }}</td>
+          <td class="text-end text-money">{{ org.total_actual_expenses|currency }}</td>
+          <td class="text-end text-money {{ org.total_actual_expenses|add:org.total_planned_expenses|currency|length }}">
+            {% with dev=org.total_actual_expenses %}
+            <span class="{{ dev|deviation_class }}">
+              {% if dev > 0 %}+{% endif %}{{ dev|currency }}
+            </span>
+            {% endwith %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'org_detail' org.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+              <a href="{% url 'org_update' org.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+              <a href="{% url 'org_delete' org.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-diagram-3 fs-1 d-block mb-3"></i>
+  <h5>Организаций пока нет</h5>
+  <a href="{% url 'org_create' %}" class="btn btn-primary mt-2"><i class="bi bi-plus-lg me-1"></i>Создать первую</a>
+</div>
+{% endif %}
+{% endblock %}

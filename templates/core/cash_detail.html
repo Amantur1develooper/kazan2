@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Главная касса{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h1><i class="bi bi-cash-stack me-2 text-primary"></i>Главная касса</h1>
+  <a href="{% url 'transaction_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Добавить операцию
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Всего приход</div>
+          <div class="value text-money text-success">{{ cash.total_income|currency }}</div>
+        </div>
+        <div class="icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-down-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Всего расход</div>
+          <div class="value text-money text-danger">{{ cash.total_expense|currency }}</div>
+        </div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Остаток</div>
+          <div class="value text-money {{ cash.current_balance|profit_class }}">{{ cash.current_balance|currency }}</div>
+        </div>
+        <div class="icon {% if cash.current_balance >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+          <i class="bi bi-wallet2"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transactions -->
+<div class="data-table">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">История операций</span>
+    <a href="{% url 'transaction_create' %}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </a>
+  </div>
+  {% if transactions %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Тип</th>
+          <th>Описание</th>
+          <th class="text-end">Сумма</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="text-muted small">{{ t.date|date:"d.m.Y" }}</td>
+          <td>
+            {% if t.transaction_type == 'income' %}
+            <span class="badge bg-success bg-opacity-15 text-success">
+              <i class="bi bi-arrow-down me-1"></i>Приход
+            </span>
+            {% else %}
+            <span class="badge bg-danger bg-opacity-15 text-danger">
+              <i class="bi bi-arrow-up me-1"></i>Расход
+            </span>
+            {% endif %}
+          </td>
+          <td>{{ t.description }}</td>
+          <td class="text-end text-money fw-semibold {% if t.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+            {% if t.transaction_type == 'income' %}+{% else %}−{% endif %}{{ t.amount|currency }}
+          </td>
+          <td>
+            <form method="post" action="{% url 'transaction_delete' t.pk %}" class="d-inline"
+                  onsubmit="return confirm('Удалить транзакцию?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-cash fs-1 d-block mb-2"></i>
+    Операций пока нет.
+    <a href="{% url 'transaction_create' %}">Добавить первую операцию</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

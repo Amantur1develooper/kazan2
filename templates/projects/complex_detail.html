@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ complex.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1" style="font-size:.8rem">
+        <li class="breadcrumb-item"><a href="{% url 'complex_list' %}">ЖК</a></li>
+        <li class="breadcrumb-item active">{{ complex.name }}</li>
+      </ol>
+    </nav>
+    <h1>
+      <i class="bi bi-building me-2 text-primary"></i>{{ complex.name }}
+      <span class="badge badge-status bg-{{ complex.get_status_color }} bg-opacity-15 text-{{ complex.get_status_color }} ms-2" style="font-size:.7rem">
+        {{ complex.get_status_display }}
+      </span>
+    </h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'block_create' complex.pk %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Добавить блок
+    </a>
+    <a href="{% url 'complex_update' complex.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Изменить
+    </a>
+    <a href="{% url 'complex_delete' complex.pk %}" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash"></i>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Стоимость реализации</div>
+          <div class="value text-money">{{ complex.total_planned_cost|currency }}</div>
+        </div>
+        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-buildings"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Смета (план)</div>
+          <div class="value text-money">{{ total_planned|currency }}</div>
+        </div>
+        <div class="icon bg-info bg-opacity-10 text-info"><i class="bi bi-clipboard-check"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Расходы (факт)</div>
+          <div class="value text-money">{{ total_actual|currency }}</div>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Прибыль / убыток</div>
+          <div class="value text-money {{ complex.profit|profit_class }}">{{ complex.profit|currency }}</div>
+        </div>
+        <div class="icon {% if complex.profit >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+          <i class="bi bi-{% if complex.profit >= 0 %}graph-up-arrow{% else %}graph-down-arrow{% endif %}"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Blocks Table -->
+  <div class="col-xl-7">
+    <div class="data-table">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="section-title">Блоки</span>
+        <a href="{% url 'block_create' complex.pk %}" class="btn btn-sm btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>Блок
+        </a>
+      </div>
+      {% if block_stats %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Блок</th>
+              <th class="text-end">Бюджет</th>
+              <th class="text-end">Plan</th>
+              <th class="text-end">Факт</th>
+              <th class="text-end">Δ</th>
+              <th class="text-center">Этапов</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in block_stats %}
+            <tr>
+              <td>
+                <a href="{% url 'block_detail' item.block.pk %}" class="fw-semibold text-decoration-none text-dark">
+                  Блок {{ item.block.name }}
+                </a>
+              </td>
+              <td class="text-end text-money text-muted small">{{ item.block.total_budget|currency }}</td>
+              <td class="text-end text-money">{{ item.planned|currency }}</td>
+              <td class="text-end text-money">{{ item.actual|currency }}</td>
+              <td class="text-end text-money {{ item.deviation|deviation_class }}">
+                {% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.stages_count }}</span>
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{% url 'block_detail' item.block.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'block_update' item.block.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                  <a href="{% url 'block_delete' item.block.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="2" class="fw-bold">Итого</td>
+              <td class="text-end fw-bold text-money">{{ total_planned|currency }}</td>
+              <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+              <td class="text-end fw-bold text-money {{ total_deviation|deviation_class }}">
+                {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-4 text-muted">
+        <i class="bi bi-layers fs-2 d-block mb-2"></i>
+        Блоков пока нет.
+        <a href="{% url 'block_create' complex.pk %}">Добавить первый блок</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="col-xl-5">
+    <div class="card-section p-4 h-100">
+      <div class="section-title mb-3">Plan vs Факт по блокам</div>
+      {% if block_stats %}
+      <canvas id="blockChart"></canvas>
+      {% else %}
+      <div class="text-center text-muted py-4">Нет данных для графика</div>
+      {% endif %}
+
+      {% if complex.description %}
+      <hr>
+      <div class="small text-muted">{{ complex.description }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if block_stats %}
+<script>
+new Chart(document.getElementById('blockChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [
+      {
+        label: 'План',
+        data: {{ chart_planned|safe }},
+        backgroundColor: 'rgba(37,99,235,0.2)',
+        borderColor: 'rgba(37,99,235,0.8)',
+        borderWidth: 1.5, borderRadius: 4,
+      },
+      {
+        label: 'Факт',
+        data: {{ chart_actual|safe }},
+        backgroundColor: 'rgba(239,68,68,0.2)',
+        borderColor: 'rgba(239,68,68,0.8)',
+        borderWidth: 1.5, borderRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + new Intl.NumberFormat('ru-RU').format(c.parsed.y) + ' сом' } }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => new Intl.NumberFormat('ru-RU', {notation:'compact'}).format(v) + ' сом' }, grid: { color: '#f1f5f9' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

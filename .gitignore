@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+*.log
+
+# Environment variables — NEVER commit real secrets
+.env
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Excel files with real data
+*.xls
+*.xlsx
+
+# Coverage
+.coverage
+htmlcov/

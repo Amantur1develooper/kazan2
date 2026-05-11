@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Удалить этап{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h1><i class="bi bi-trash text-danger me-2"></i>Удалить этап</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card-section p-4 text-center">
+      <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px">
+        <i class="bi bi-exclamation-triangle text-danger fs-3"></i>
+      </div>
+      <h5 class="fw-bold">Удалить этап «{{ stage.name }}»?</h5>
+      <p class="text-muted">
+        Блок: <strong>{{ stage.block }}</strong><br>
+        Плановые расходы: {{ stage.planned_expenses|currency }}<br>
+        Фактические расходы: {{ stage.actual_expenses|currency }}
+      </p>
+      <form method="post" class="d-flex gap-2 justify-content-center">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger px-4"><i class="bi bi-trash me-1"></i>Удалить</button>
+        <a href="{% url 'block_detail' stage.block.pk %}" class="btn btn-outline-secondary px-4">Отмена</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

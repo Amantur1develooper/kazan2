@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт из 1С{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'import_list' %}">Импорт</a></li>
+      <li class="breadcrumb-item active">{% if step == '2' %}Загрузка файла{% else %}Выбор этажа{% endif %}</li>
+    </ol></nav>
+    <h1><i class="bi bi-upload me-2 text-success"></i>Импорт из 1С</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Progress steps -->
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div class="d-flex align-items-center gap-2">
+    <div class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+         style="width:32px;height:32px;background:{% if step == '2' %}#16a34a{% else %}#2563eb{% endif %};color:#fff;font-size:.85rem">1</div>
+    <span class="fw-semibold {% if step == '2' %}text-success{% endif %}">Выбор этажа</span>
+  </div>
+  <div class="flex-grow-1" style="height:2px;background:{% if step == '2' %}#16a34a{% else %}#e2e8f0{% endif %}"></div>
+  <div class="d-flex align-items-center gap-2">
+    <div class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+         style="width:32px;height:32px;background:{% if step == '2' %}#2563eb{% else %}#e2e8f0{% endif %};color:{% if step == '2' %}#fff{% else %}#94a3b8{% endif %};font-size:.85rem">2</div>
+    <span class="{% if step != '2' %}text-muted{% else %}fw-semibold{% endif %}">Файл и настройки</span>
+  </div>
+  <div class="flex-grow-1" style="height:2px;background:#e2e8f0"></div>
+  <div class="d-flex align-items-center gap-2">
+    <div class="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+         style="width:32px;height:32px;background:#e2e8f0;color:#94a3b8;font-size:.85rem">3</div>
+    <span class="text-muted">Предпросмотр</span>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+{% if step == '2' %}
+    <!-- ─── Step 2: file upload ─────────────────────────────────── -->
+    <div class="card-section p-4 mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <div class="bg-success bg-opacity-10 rounded p-2 flex-shrink-0"><i class="bi bi-layers text-success fs-5"></i></div>
+        <div>
+          <div class="label mb-1">Целевой этаж</div>
+          <div class="fw-semibold">{{ floor.display_name }}</div>
+          <div class="text-muted small">
+            {{ floor.stage.block.residential_complex.organization.name }}
+            <i class="bi bi-chevron-right mx-1" style="font-size:.65rem"></i>
+            {{ floor.stage.block.residential_complex.name }}
+            <i class="bi bi-chevron-right mx-1" style="font-size:.65rem"></i>
+            Блок {{ floor.stage.block.name }}
+            <i class="bi bi-chevron-right mx-1" style="font-size:.65rem"></i>
+            {{ floor.stage.name }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="step" value="2">
+        {% for field in file_form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-success px-4"><i class="bi bi-eye me-1"></i>Предпросмотр</button>
+          <a href="{{ back_url|default:'/complexes/import/' }}" class="btn btn-outline-secondary">Назад</a>
+        </div>
+      </form>
+    </div>
+
+{% else %}
+    <!-- ─── Step 1: floor selection ────────────────────────────────── -->
+    <div class="card-section p-4">
+      <p class="text-muted mb-4">Укажите этаж, на который будут загружены расходы из файла 1С.</p>
+      <form method="post" novalidate id="floorSelectForm">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="1">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.organization.label }}</label>
+          {{ floor_form.organization }}
+          {% for e in floor_form.organization.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.complex.label }}</label>
+          <select name="complex" id="id_complex" class="form-select" disabled>
+            <option value="">— сначала выберите организацию —</option>
+            {% for opt in floor_form.complex %}{{ opt }}{% endfor %}
+          </select>
+          {% for e in floor_form.complex.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.block.label }}</label>
+          <select name="block" id="id_block" class="form-select" disabled>
+            <option value="">— сначала выберите ЖК —</option>
+            {% for opt in floor_form.block %}{{ opt }}{% endfor %}
+          </select>
+          {% for e in floor_form.block.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.stage.label }}</label>
+          <select name="stage" id="id_stage" class="form-select" disabled>
+            <option value="">— сначала выберите блок —</option>
+            {% for opt in floor_form.stage %}{{ opt }}{% endfor %}
+          </select>
+          {% for e in floor_form.stage.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <hr class="my-3">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.floor.label }}</label>
+          <select name="floor" id="id_floor" class="form-select" disabled>
+            <option value="">— сначала выберите этап —</option>
+            {% for opt in floor_form.floor %}{{ opt }}{% endfor %}
+          </select>
+          {% for e in floor_form.floor.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="text-center text-muted small my-2">— или —</div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ floor_form.new_floor_number.label }}</label>
+          {{ floor_form.new_floor_number }}
+          <div class="form-text">Если этажа ещё нет в системе, введите его номер для создания</div>
+          {% for e in floor_form.new_floor_number.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary px-4"><i class="bi bi-arrow-right me-1"></i>Далее</button>
+          <a href="{% url 'import_list' %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3">
+      <div class="section-title mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Поддерживаемые форматы</div>
+      <ul class="list-unstyled small text-muted mb-0">
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i><strong>Перемещение запасов</strong> — стандартная выгрузка 1С (.xls)</li>
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i><strong>Приход на склад</strong> — с ценой и суммой (.xlsx/.xls)</li>
+        <li><i class="bi bi-check-circle text-success me-2"></i><strong>Произвольная таблица</strong> — с авто-определением столбцов</li>
+      </ul>
+    </div>
+{% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if step != '2' %}
+<script>
+(function () {
+  const orgSel   = document.getElementById('id_org');
+  const cxSel    = document.getElementById('id_complex');
+  const blSel    = document.getElementById('id_block');
+  const stSel    = document.getElementById('id_stage');
+  const flSel    = document.getElementById('id_floor');
+
+  function setOptions(sel, items, emptyLabel, enable) {
+    sel.innerHTML = '<option value="">' + emptyLabel + '</option>';
+    items.forEach(function(item) {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = item.name;
+      sel.appendChild(opt);
+    });
+    sel.disabled = !enable;
+  }
+
+  function resetFrom(sel, emptyLabel) {
+    sel.innerHTML = '<option value="">' + emptyLabel + '</option>';
+    sel.disabled = true;
+  }
+
+  orgSel && orgSel.addEventListener('change', function() {
+    const orgId = this.value;
+    resetFrom(cxSel,  '— выберите ЖК —');
+    resetFrom(blSel,  '— выберите блок —');
+    resetFrom(stSel,  '— выберите этап —');
+    resetFrom(flSel,  '— выберите этаж —');
+    if (!orgId) return;
+    fetch('{% url "ajax_complexes" %}?org_id=' + orgId)
+      .then(r => r.json())
+      .then(data => setOptions(cxSel, data, '— выберите ЖК —', true));
+  });
+
+  cxSel && cxSel.addEventListener('change', function() {
+    const cxId = this.value;
+    resetFrom(blSel,  '— выберите блок —');
+    resetFrom(stSel,  '— выберите этап —');
+    resetFrom(flSel,  '— выберите этаж —');
+    if (!cxId) return;
+    fetch('{% url "ajax_blocks" %}?complex_id=' + cxId)
+      .then(r => r.json())
+      .then(data => setOptions(blSel, data, '— выберите блок —', true));
+  });
+
+  blSel && blSel.addEventListener('change', function() {
+    const blId = this.value;
+    resetFrom(stSel,  '— выберите этап —');
+    resetFrom(flSel,  '— выберите этаж —');
+    if (!blId) return;
+    fetch('{% url "ajax_stages" %}?block_id=' + blId)
+      .then(r => r.json())
+      .then(data => setOptions(stSel, data, '— выберите этап —', true));
+  });
+
+  stSel && stSel.addEventListener('change', function() {
+    const stId = this.value;
+    resetFrom(flSel, '— нет этажей —');
+    if (!stId) return;
+    fetch('{% url "ajax_floors" %}?stage_id=' + stId)
+      .then(r => r.json())
+      .then(data => setOptions(flSel, data, '— выберите этаж —', true));
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

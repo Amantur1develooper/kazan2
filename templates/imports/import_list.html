@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Импорт данных{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-file-earmark-excel me-2 text-success"></i>Импорт из 1С</h1>
+    <small class="text-muted">Загрузка данных через Excel-файлы</small>
+  </div>
+  <a href="{% url 'import_upload' %}" class="btn btn-success">
+    <i class="bi bi-upload me-1"></i>Загрузить файл
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Info banner -->
+<div class="card-section p-3 mb-4 d-flex align-items-start gap-3">
+  <div class="text-primary fs-4 mt-1"><i class="bi bi-info-circle"></i></div>
+  <div>
+    <div class="fw-semibold mb-1">Как импортировать данные из 1С</div>
+    <ol class="mb-0 small text-muted ps-3">
+      <li>Выгрузите отчёт из 1С в формат Excel (.xlsx)</li>
+      <li>Загрузите файл через кнопку «Загрузить файл»</li>
+      <li>Проверьте предпросмотр и настройте маппинг столбцов</li>
+      <li>Подтвердите импорт — данные автоматически распределятся по ЖК/блокам/этапам</li>
+    </ol>
+    <div class="mt-2 small">
+      <strong>Поддерживаемый формат столбцов:</strong>
+      <code class="ms-1">ЖК | Блок | Этап | Сумма план | Сумма факт</code>
+    </div>
+  </div>
+</div>
+
+{% if imports %}
+<div class="data-table">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Файл</th>
+          <th>Статус</th>
+          <th class="text-center">Строк всего</th>
+          <th class="text-center">Обработано</th>
+          <th class="text-center">Ошибок</th>
+          <th>Дата загрузки</th>
+          <th>Обработан</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for imp in imports %}
+        <tr>
+          <td>
+            <a href="{% url 'import_detail' imp.pk %}" class="text-decoration-none fw-semibold text-dark">
+              <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i>
+              {{ imp.original_filename }}
+            </a>
+          </td>
+          <td>
+            <span class="badge badge-status bg-{{ imp.get_status_color }} bg-opacity-15 text-{{ imp.get_status_color }}">
+              {{ imp.get_status_display }}
+            </span>
+          </td>
+          <td class="text-center">{{ imp.rows_total }}</td>
+          <td class="text-center text-success">{{ imp.rows_processed }}</td>
+          <td class="text-center {% if imp.rows_error > 0 %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+            {{ imp.rows_error }}
+          </td>
+          <td class="text-muted small">{{ imp.uploaded_at|date:"d.m.Y H:i" }}</td>
+          <td class="text-muted small">
+            {% if imp.processed_at %}{{ imp.processed_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'import_detail' imp.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-file-earmark-excel fs-1 d-block mb-3"></i>
+  <h5>Импортов ещё нет</h5>
+  <p>Загрузите первый Excel-файл из 1С.</p>
+  <a href="{% url 'import_upload' %}" class="btn btn-success">
+    <i class="bi bi-upload me-1"></i>Загрузить файл
+  </a>
+</div>
+{% endif %}
+{% endblock %}

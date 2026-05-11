@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ stage.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'complex_list' %}">ЖК</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'complex_detail' stage.block.residential_complex.pk %}">{{ stage.block.residential_complex.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'block_detail' stage.block.pk %}">Блок {{ stage.block.name }}</a></li>
+      <li class="breadcrumb-item active">{{ stage.name }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-list-check me-2 text-primary"></i>{{ stage.name }}</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'import_upload' %}" class="btn btn-success btn-sm"><i class="bi bi-upload me-1"></i>Импорт на этаж</a>
+    <a href="{% url 'floor_create' stage.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить этаж</a>
+    <a href="{% url 'stage_update' stage.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Смета (план)</div><div class="value text-money">{{ total_planned|currency }}</div></div>
+        <div class="icon bg-info bg-opacity-10 text-info"><i class="bi bi-clipboard-check"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Расходы (факт)
+            {% if stage.has_floors %}<span class="badge bg-primary bg-opacity-10 text-primary ms-1" style="font-size:.65rem">из этажей</span>{% endif %}
+          </div>
+          <div class="value text-money">{{ total_actual|currency }}</div>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Отклонение</div><div class="value text-money {{ deviation|deviation_class }}">{% if deviation > 0 %}+{% endif %}{{ deviation|currency }}</div></div>
+        <div class="icon {% if deviation <= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}"><i class="bi bi-arrow-left-right"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Этажей</div><div class="value">{{ floor_stats|length }}</div></div>
+        <div class="icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-layers"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Floors -->
+  <div class="col-xl-7">
+    <div class="data-table">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="section-title">Этажи</span>
+        <div class="d-flex gap-2">
+          <a href="{% url 'import_upload' %}" class="btn btn-sm btn-success"><i class="bi bi-upload me-1"></i>Импорт</a>
+          <a href="{% url 'floor_create' stage.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Этаж</a>
+        </div>
+      </div>
+      {% if floor_stats %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Этаж</th>
+              <th class="text-center">Позиций</th>
+              <th class="text-end">Расходы</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in floor_stats %}
+            <tr>
+              <td>
+                <a href="{% url 'floor_detail' item.floor.pk %}" class="fw-semibold text-decoration-none text-dark">
+                  <i class="bi bi-layers me-1 text-muted"></i>{{ item.floor.display_name }}
+                </a>
+              </td>
+              <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.expenses_count }}</span></td>
+              <td class="text-end text-money fw-semibold">{{ item.total|currency }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{% url 'floor_detail' item.floor.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'floor_update' item.floor.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                  <a href="{% url 'floor_delete' item.floor.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="2" class="fw-bold">Итого</td>
+              <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-layers fs-2 d-block mb-2"></i>
+        Этажей пока нет.<br>
+        <a href="{% url 'floor_create' stage.pk %}" class="mt-2 d-inline-block">Добавить вручную</a>
+        &nbsp;или&nbsp;
+        <a href="{% url 'import_upload' %}">импортировать из 1С</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="col-xl-5">
+    <div class="card-section p-4 h-100">
+      <div class="section-title mb-3">Расходы по этажам</div>
+      {% if floor_stats %}<canvas id="floorChart"></canvas>
+      {% else %}<div class="text-center text-muted py-4">Нет данных</div>{% endif %}
+
+      {% if not stage.has_floors and stage.actual_expenses %}
+      <hr>
+      <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Используется ручной ввод: {{ stage.actual_expenses|currency }}</small>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if floor_stats %}
+<script>
+new Chart(document.getElementById('floorChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [{ data: {{ chart_data|safe }}, backgroundColor: ['#2563eb','#7c3aed','#db2777','#dc2626','#ea580c','#d97706','#65a30d','#16a34a','#0891b2','#0284c7'], borderWidth: 2, borderColor: '#fff' }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + new Intl.NumberFormat('ru-RU').format(c.parsed) + ' сом' } } } }
+});
+</script>
+{% endif %}
+{% endblock %}

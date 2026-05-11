@@ -1,0 +1,11 @@
+Django==4.2.13
+xlrd==2.0.1
+psycopg2-binary==2.9.9
+openpyxl==3.1.2
+pandas==2.1.4
+python-decouple==3.8
+django-crispy-forms==2.1
+crispy-bootstrap5==2023.10
+whitenoise==6.6.0
+gunicorn==21.2.0
+Pillow==10.2.0

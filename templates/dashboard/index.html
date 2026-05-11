@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Дашборд — Строй Финанс{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h1><i class="bi bi-speedometer2 me-2 text-primary"></i>Дашборд</h1>
+  <a href="{% url 'complex_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Добавить ЖК
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Global Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="label">Баланс кассы</div>
+          <div class="value text-money">{{ cash_balance|currency }}</div>
+        </div>
+        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-cash-stack"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="label">Общие расходы (факт)</div>
+          <div class="value text-money">{{ total_actual|currency }}</div>
+        </div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="label">Расходы по смете (план)</div>
+          <div class="value text-money">{{ total_planned|currency }}</div>
+        </div>
+        <div class="icon bg-info bg-opacity-10 text-info"><i class="bi bi-clipboard-data"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="label">Чистый баланс</div>
+          <div class="value text-money {{ net_balance|profit_class }}">{{ net_balance|currency }}</div>
+        </div>
+        <div class="icon {% if net_balance >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+          <i class="bi bi-{% if net_balance >= 0 %}graph-up-arrow{% else %}graph-down-arrow{% endif %}"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Chart -->
+  <div class="col-xl-7">
+    <div class="card-section p-4 h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="section-title">Plan vs Факт по объектам</span>
+        <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ complexes_count }} ЖК</span>
+      </div>
+      {% if complex_stats %}
+      <canvas id="mainChart" height="280"></canvas>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
+        Добавьте жилые комплексы для отображения графика
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Quick summary -->
+  <div class="col-xl-5">
+    <div class="card-section p-4 h-100">
+      <div class="section-title mb-3">Общие отклонения</div>
+      <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1">
+          <small class="text-muted">Факт / План</small>
+          <small class="fw-semibold">{{ total_actual|currency }} / {{ total_planned|currency }}</small>
+        </div>
+        {% if total_planned > 0 %}
+        {% with pct=total_actual|percent:total_planned %}
+        <div class="progress" style="height:8px">
+          <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></div>
+        </div>
+        <small class="text-muted">{{ pct }}% от сметы</small>
+        {% endwith %}
+        {% endif %}
+      </div>
+
+      <div class="mb-2">
+        <div class="d-flex justify-content-between">
+          <span class="small text-muted">Отклонение (факт − план)</span>
+          <span class="small fw-bold {{ total_deviation|deviation_class }}">
+            {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
+          </span>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="section-title mb-2" style="font-size:.85rem">Статус кассы</div>
+      {% if cash %}
+      <div class="d-flex justify-content-between mb-1">
+        <span class="small text-muted">Приход</span>
+        <span class="small text-success fw-semibold">{{ cash.total_income|currency }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-1">
+        <span class="small text-muted">Расход</span>
+        <span class="small text-danger fw-semibold">{{ cash.total_expense|currency }}</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span class="small text-muted fw-bold">Остаток</span>
+        <span class="small fw-bold {{ cash.current_balance|profit_class }}">{{ cash.current_balance|currency }}</span>
+      </div>
+      <div class="mt-3">
+        <a href="{% url 'cash_detail' %}" class="btn btn-sm btn-outline-primary w-100">
+          <i class="bi bi-cash me-1"></i>Управление кассой
+        </a>
+      </div>
+      {% else %}
+      <p class="text-muted small">Касса не настроена</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Organizations summary -->
+{% if org_stats %}
+<div class="data-table mt-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">По организациям</span>
+    <a href="{% url 'org_list' %}" class="btn btn-sm btn-outline-secondary">Все <i class="bi bi-arrow-right ms-1"></i></a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Организация</th>
+          <th class="text-center">ЖК</th>
+          <th class="text-end">План</th>
+          <th class="text-end">Факт</th>
+          <th class="text-end">Δ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in org_stats %}
+        <tr>
+          <td><a href="{% url 'org_detail' item.org.pk %}" class="fw-semibold text-decoration-none text-dark"><i class="bi bi-diagram-3 me-1 text-primary"></i>{{ item.org.name }}</a></td>
+          <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.org.complexes_count }}</span></td>
+          <td class="text-end text-money">{{ item.planned|currency }}</td>
+          <td class="text-end text-money">{{ item.actual|currency }}</td>
+          <td class="text-end text-money {{ item.deviation|deviation_class }}">{% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}</td>
+          <td><a href="{% url 'org_detail' item.org.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Projects Table -->
+{% if complex_stats %}
+<div class="data-table mt-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Объекты строительства</span>
+    <a href="{% url 'complex_list' %}" class="btn btn-sm btn-outline-secondary">
+      Все объекты <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>ЖК / Объект</th>
+          <th>Статус</th>
+          <th class="text-end">Смета (план)</th>
+          <th class="text-end">Расходы (факт)</th>
+          <th class="text-end">Отклонение</th>
+          <th class="text-end">Прибыль</th>
+          <th class="text-center">Блоки</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in complex_stats %}
+        <tr>
+          <td>
+            <a href="{% url 'complex_detail' item.complex.pk %}" class="fw-semibold text-decoration-none text-dark">
+              {{ item.complex.name }}
+            </a>
+          </td>
+          <td>
+            <span class="badge badge-status bg-{{ item.complex.get_status_color }} bg-opacity-15 text-{{ item.complex.get_status_color }}">
+              {{ item.complex.get_status_display }}
+            </span>
+          </td>
+          <td class="text-end text-money">{{ item.planned|currency }}</td>
+          <td class="text-end text-money">{{ item.actual|currency }}</td>
+          <td class="text-end text-money {{ item.deviation|deviation_class }}">
+            {% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}
+          </td>
+          <td class="text-end text-money {{ item.profit|profit_class }}">{{ item.profit|currency }}</td>
+          <td class="text-center">
+            <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.complex.blocks_count }}</span>
+          </td>
+          <td>
+            <a href="{% url 'complex_detail' item.complex.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if complex_stats %}
+<script>
+const ctx = document.getElementById('mainChart');
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [
+      {
+        label: 'План (смета)',
+        data: {{ chart_planned|safe }},
+        backgroundColor: 'rgba(37,99,235,0.15)',
+        borderColor: 'rgba(37,99,235,0.8)',
+        borderWidth: 1.5,
+        borderRadius: 4,
+      },
+      {
+        label: 'Факт (расходы)',
+        data: {{ chart_actual|safe }},
+        backgroundColor: 'rgba(239,68,68,0.15)',
+        borderColor: 'rgba(239,68,68,0.8)',
+        borderWidth: 1.5,
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: {
+        callbacks: {
+          label: ctx => ' ' + ctx.dataset.label + ': ' +
+            new Intl.NumberFormat('ru-RU').format(ctx.parsed.y) + ' сом'
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: v => new Intl.NumberFormat('ru-RU', {notation:'compact'}).format(v) + ' сом'
+        },
+        grid: { color: '#f1f5f9' }
+      },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ floor.display_name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'complex_list' %}">ЖК</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'complex_detail' floor.stage.block.residential_complex.pk %}">{{ floor.stage.block.residential_complex.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'block_detail' floor.stage.block.pk %}">Блок {{ floor.stage.block.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'stage_detail' floor.stage.pk %}">{{ floor.stage.name }}</a></li>
+      <li class="breadcrumb-item active">{{ floor.display_name }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-layers me-2 text-primary"></i>{{ floor.display_name }}</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'import_upload' %}?floor={{ floor.pk }}" class="btn btn-success btn-sm"><i class="bi bi-upload me-1"></i>Импорт из 1С</a>
+    <a href="{% url 'expense_create' floor.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить расход</a>
+    <a href="{% url 'floor_update' floor.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Итого расходов</div><div class="value text-money">{{ total_expenses|currency }}</div></div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Позиций</div><div class="value">{{ expenses|length }}</div></div>
+        <div class="icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-list-ul"></i></div>
+      </div>
+    </div>
+  </div>
+  {% if zero_price_count > 0 %}
+  <div class="col-sm-6 col-xl-6">
+    <div class="stat-card border-warning">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="label text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Без цены</div>
+          <div class="value text-warning">{{ zero_price_count }} позиций</div>
+          <small class="text-muted">Укажите цену для корректного подсчёта</small>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-tag"></i></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Expenses Table -->
+<div class="data-table">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Позиции расходов</span>
+    <div class="d-flex gap-2">
+      <a href="{% url 'import_upload' %}?floor={{ floor.pk }}" class="btn btn-sm btn-success"><i class="bi bi-upload me-1"></i>Импорт</a>
+      <a href="{% url 'expense_create' floor.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Добавить</a>
+    </div>
+  </div>
+
+  {% if expenses %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th style="width:120px">Код</th>
+          <th>Наименование</th>
+          <th class="text-center">Ед.</th>
+          <th class="text-end">Кол-во</th>
+          <th class="text-end">Цена</th>
+          <th class="text-end">Сумма</th>
+          <th style="width:90px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for exp in expenses %}
+        <tr{% if exp.unit_price == 0 %} class="table-warning"{% endif %}>
+          <td>
+            {% if exp.item_code %}
+            <code class="text-muted small">{{ exp.item_code }}</code>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">{{ exp.name }}</td>
+          <td class="text-center text-muted">{{ exp.unit|default:"—" }}</td>
+          <td class="text-end">{{ exp.quantity }}</td>
+          <td class="text-end text-money">
+            {% if exp.unit_price == 0 %}
+            <span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i>—</span>
+            {% else %}
+            {{ exp.unit_price|currency }}
+            {% endif %}
+          </td>
+          <td class="text-end text-money fw-semibold">
+            {% if exp.total_amount == 0 and exp.unit_price == 0 %}
+            <span class="text-muted">—</span>
+            {% else %}
+            {{ exp.total_amount|currency }}
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'expense_update' exp.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+              <a href="{% url 'expense_delete' exp.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="5" class="fw-bold">Итого</td>
+          <td class="text-end fw-bold text-money">{{ total_expenses|currency }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+    Расходов пока нет.<br>
+    <a href="{% url 'expense_create' floor.pk %}" class="mt-2 d-inline-block">Добавить вручную</a>
+    &nbsp;или&nbsp;
+    <a href="{% url 'import_upload' %}?floor={{ floor.pk }}">импортировать из 1С</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

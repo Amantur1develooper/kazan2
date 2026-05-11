@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Жилые комплексы{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-building me-2 text-primary"></i>Жилые комплексы</h1>
+    <small class="text-muted">Все объекты строительства</small>
+  </div>
+  <a href="{% url 'complex_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Добавить ЖК
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if stats %}
+<div class="data-table">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Статус</th>
+          <th class="text-end">Стоимость реализации</th>
+          <th class="text-end">Смета (план)</th>
+          <th class="text-end">Расходы (факт)</th>
+          <th class="text-end">Отклонение</th>
+          <th class="text-end">Прибыль</th>
+          <th class="text-center">Блоки</th>
+          <th>Сроки</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in stats %}
+        <tr>
+          <td>
+            <a href="{% url 'complex_detail' item.complex.pk %}" class="fw-semibold text-decoration-none text-dark">
+              {{ item.complex.name }}
+            </a>
+          </td>
+          <td>
+            <span class="badge badge-status bg-{{ item.complex.get_status_color }} bg-opacity-15 text-{{ item.complex.get_status_color }}">
+              {{ item.complex.get_status_display }}
+            </span>
+          </td>
+          <td class="text-end text-money">{{ item.complex.total_planned_cost|currency }}</td>
+          <td class="text-end text-money">{{ item.planned|currency }}</td>
+          <td class="text-end text-money">{{ item.actual|currency }}</td>
+          <td class="text-end text-money {{ item.deviation|deviation_class }}">
+            {% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}
+          </td>
+          <td class="text-end text-money {{ item.complex.profit|profit_class }}">
+            {{ item.complex.profit|currency }}
+          </td>
+          <td class="text-center">
+            <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.blocks_count }}</span>
+          </td>
+          <td class="text-muted small">
+            {% if item.complex.start_date %}{{ item.complex.start_date|date:"d.m.Y" }}{% endif %}
+            {% if item.complex.end_date %} — {{ item.complex.end_date|date:"d.m.Y" }}{% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'complex_detail' item.complex.pk %}" class="btn btn-sm btn-outline-primary" title="Открыть">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'complex_update' item.complex.pk %}" class="btn btn-sm btn-outline-secondary" title="Изменить">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <a href="{% url 'complex_delete' item.complex.pk %}" class="btn btn-sm btn-outline-danger" title="Удалить">
+                <i class="bi bi-trash"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
+  <h5 class="text-muted">Объектов ещё нет</h5>
+  <p class="text-muted">Добавьте первый жилой комплекс, чтобы начать учёт.</p>
+  <a href="{% url 'complex_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Добавить ЖК
+  </a>
+</div>
+{% endif %}
+{% endblock %}

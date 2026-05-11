@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1" style="font-size:.8rem">
+        <li class="breadcrumb-item"><a href="{% url 'complex_list' %}">ЖК</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-building-add me-2 text-primary"></i>{{ title }}</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card-section p-4">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+          <div class="form-text text-muted">{{ field.help_text }}</div>
+          {% endif %}
+          {% for error in field.errors %}
+          <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+          </button>
+          {% if object %}
+          <a href="{% url 'complex_detail' object.pk %}" class="btn btn-outline-secondary">Отмена</a>
+          {% else %}
+          <a href="{% url 'complex_list' %}" class="btn btn-outline-secondary">Отмена</a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

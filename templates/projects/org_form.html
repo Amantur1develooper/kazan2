@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'org_list' %}">Организации</a></li>
+      <li class="breadcrumb-item active">{{ title }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-diagram-3 me-2 text-primary"></i>{{ title }}</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-section p-4">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
+          {% if object %}<a href="{% url 'org_detail' object.pk %}" class="btn btn-outline-secondary">Отмена</a>
+          {% else %}<a href="{% url 'org_list' %}" class="btn btn-outline-secondary">Отмена</a>{% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

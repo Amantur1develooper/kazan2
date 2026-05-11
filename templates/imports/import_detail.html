@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Импорт: {{ excel_import.original_filename }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1" style="font-size:.8rem">
+        <li class="breadcrumb-item"><a href="{% url 'import_list' %}">Импорт</a></li>
+        <li class="breadcrumb-item active">{{ excel_import.original_filename }}</li>
+      </ol>
+    </nav>
+    <h1>
+      <i class="bi bi-file-earmark-spreadsheet me-2 text-success"></i>
+      {{ excel_import.original_filename }}
+    </h1>
+  </div>
+  {% if excel_import.status == 'completed' or excel_import.status == 'error' %}
+  <form method="post" action="{% url 'import_reprocess' excel_import.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-clockwise me-1"></i>Повторить импорт
+    </button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="label">Статус</div>
+      <div class="mt-2">
+        <span class="badge badge-status bg-{{ excel_import.get_status_color }} bg-opacity-15 text-{{ excel_import.get_status_color }}" style="font-size:.9rem; padding:.4em .8em">
+          {{ excel_import.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="label">Строк в файле</div>
+      <div class="value">{{ excel_import.rows_total }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="label">Обработано успешно</div>
+      <div class="value text-success">{{ excel_import.rows_processed }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="label">Ошибок</div>
+      <div class="value {% if excel_import.rows_error > 0 %}text-danger{% else %}text-muted{% endif %}">
+        {{ excel_import.rows_error }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Meta info -->
+<div class="card-section p-3 mb-4">
+  <div class="row g-2 small text-muted">
+    <div class="col-sm-4"><strong>Загружен:</strong> {{ excel_import.uploaded_at|date:"d.m.Y H:i" }}</div>
+    <div class="col-sm-4"><strong>Обработан:</strong>
+      {% if excel_import.processed_at %}{{ excel_import.processed_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}
+    </div>
+    <div class="col-sm-4"><strong>Заметки:</strong> {{ excel_import.notes|default:"—" }}</div>
+  </div>
+  {% if excel_import.error_message %}
+  <div class="alert alert-danger mt-2 mb-0 py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ excel_import.error_message }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Logs -->
+<div class="data-table">
+  <div class="p-3 border-bottom">
+    <span class="section-title">Лог импорта</span>
+    <small class="text-muted ms-2">({{ logs.count }} записей)</small>
+  </div>
+  {% if logs %}
+  <div class="table-responsive" style="max-height:600px; overflow-y:auto">
+    <table class="table table-hover table-sm">
+      <thead>
+        <tr>
+          <th style="width:60px">Строка</th>
+          <th style="width:110px">Тип</th>
+          <th>Сообщение</th>
+          <th style="width:130px">Время</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="text-muted small text-center">{{ log.row_number|default:"—" }}</td>
+          <td>
+            <span class="badge bg-{{ log.get_log_color }} bg-opacity-15 text-{{ log.get_log_color }}">
+              {{ log.get_log_type_display }}
+            </span>
+          </td>
+          <td class="small">{{ log.message }}</td>
+          <td class="text-muted small">{{ log.created_at|date:"H:i:s" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-4 text-muted">
+    <i class="bi bi-journal-text fs-2 d-block mb-2"></i>
+    Лог пуст
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
