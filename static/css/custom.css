@@ -25,6 +25,11 @@
   border-radius: 6px;
 }
 
+/* Bootstrap missing opacity step */
+.bg-opacity-15 {
+  --bs-bg-opacity: 0.15;
+}
+
 /* Card hover effect for stat cards */
 .stat-card {
   transition: box-shadow 0.15s ease;

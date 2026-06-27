@@ -78,11 +78,11 @@
           <td class="text-muted small">{{ t.date|date:"d.m.Y" }}</td>
           <td>
             {% if t.transaction_type == 'income' %}
-            <span class="badge bg-success bg-opacity-15 text-success">
+            <span class="badge text-bg-success">
               <i class="bi bi-arrow-down me-1"></i>Приход
             </span>
             {% else %}
-            <span class="badge bg-danger bg-opacity-15 text-danger">
+            <span class="badge text-bg-danger">
               <i class="bi bi-arrow-up me-1"></i>Расход
             </span>
             {% endif %}

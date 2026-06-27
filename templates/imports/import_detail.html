@@ -35,7 +35,7 @@
     <div class="stat-card">
       <div class="label">Статус</div>
       <div class="mt-2">
-        <span class="badge badge-status bg-{{ excel_import.get_status_color }} bg-opacity-15 text-{{ excel_import.get_status_color }}" style="font-size:.9rem; padding:.4em .8em">
+        <span class="badge badge-status text-bg-{{ excel_import.get_status_color }}" style="font-size:.9rem; padding:.4em .8em">
           {{ excel_import.get_status_display }}
         </span>
       </div>
@@ -101,7 +101,7 @@
         <tr>
           <td class="text-muted small text-center">{{ log.row_number|default:"—" }}</td>
           <td>
-            <span class="badge bg-{{ log.get_log_color }} bg-opacity-15 text-{{ log.get_log_color }}">
+            <span class="badge text-bg-{{ log.get_log_color }}">
               {{ log.get_log_type_display }}
             </span>
           </td>
