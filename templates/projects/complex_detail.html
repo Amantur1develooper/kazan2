@@ -104,12 +104,14 @@
               <th class="text-end">Plan</th>
               <th class="text-end">Факт</th>
               <th class="text-end">Δ</th>
+              <th>Освоение</th>
               <th class="text-center">Этапов</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {% for item in block_stats %}
+            {% with pct=item.actual|percent:item.planned %}
             <tr>
               <td>
                 <a href="{% url 'block_detail' item.block.pk %}" class="fw-semibold text-decoration-none text-dark">
@@ -122,6 +124,14 @@
               <td class="text-end text-money {{ item.deviation|deviation_class }}">
                 {% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}
               </td>
+              <td style="min-width:140px">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></div>
+                  </div>
+                  <small class="fw-semibold text-nowrap {% if pct > 100 %}text-danger{% elif pct >= 80 %}text-warning{% else %}text-success{% endif %}">{{ pct }}%</small>
+                </div>
+              </td>
               <td class="text-center">
                 <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.stages_count }}</span>
               </td>
@@ -133,6 +143,7 @@
                 </div>
               </td>
             </tr>
+            {% endwith %}
             {% endfor %}
           </tbody>
           <tfoot class="table-light">
@@ -143,7 +154,7 @@
               <td class="text-end fw-bold text-money {{ total_deviation|deviation_class }}">
                 {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
               </td>
-              <td colspan="2"></td>
+              <td colspan="3"></td>
             </tr>
           </tfoot>
         </table>

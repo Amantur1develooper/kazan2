@@ -58,18 +58,28 @@
       <div class="table-responsive">
         <table class="table table-hover">
           <thead>
-            <tr><th>ЖК</th><th>Статус</th><th class="text-end">Plan</th><th class="text-end">Факт</th><th class="text-end">Δ</th><th></th></tr>
+            <tr><th>ЖК</th><th>Статус</th><th class="text-end">Plan</th><th class="text-end">Факт</th><th class="text-end">Δ</th><th>Освоение</th><th></th></tr>
           </thead>
           <tbody>
             {% for item in stats %}
+            {% with pct=item.actual|percent:item.planned %}
             <tr>
               <td><a href="{% url 'complex_detail' item.complex.pk %}" class="fw-semibold text-decoration-none text-dark">{{ item.complex.name }}</a></td>
               <td><span class="badge badge-status bg-{{ item.complex.get_status_color }} bg-opacity-15 text-{{ item.complex.get_status_color }}">{{ item.complex.get_status_display }}</span></td>
               <td class="text-end text-money">{{ item.planned|currency }}</td>
               <td class="text-end text-money">{{ item.actual|currency }}</td>
               <td class="text-end text-money {{ item.deviation|deviation_class }}">{% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}</td>
+              <td style="min-width:140px">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></div>
+                  </div>
+                  <small class="fw-semibold text-nowrap {% if pct > 100 %}text-danger{% elif pct >= 80 %}text-warning{% else %}text-success{% endif %}">{{ pct }}%</small>
+                </div>
+              </td>
               <td><a href="{% url 'complex_detail' item.complex.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
             </tr>
+            {% endwith %}
             {% endfor %}
           </tbody>
         </table>

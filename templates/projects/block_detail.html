@@ -82,11 +82,13 @@
               <th class="text-end">План</th>
               <th class="text-end">Факт</th>
               <th class="text-end">Δ</th>
+              <th>Освоение</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {% for item in stage_stats %}
+            {% with pct=item.actual|percent:item.planned %}
             <tr>
               <td class="text-muted small">{{ item.stage.order }}</td>
               <td>
@@ -109,6 +111,14 @@
               <td class="text-end text-money {{ item.deviation|deviation_class }}">
                 {% if item.deviation > 0 %}+{% endif %}{{ item.deviation|currency }}
               </td>
+              <td style="min-width:140px">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></div>
+                  </div>
+                  <small class="fw-semibold text-nowrap {% if pct > 100 %}text-danger{% elif pct >= 80 %}text-warning{% else %}text-success{% endif %}">{{ pct }}%</small>
+                </div>
+              </td>
               <td>
                 <div class="d-flex gap-1">
                   <a href="{% url 'stage_detail' item.stage.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
@@ -117,6 +127,7 @@
                 </div>
               </td>
             </tr>
+            {% endwith %}
             {% endfor %}
           </tbody>
           <tfoot class="table-light">
@@ -127,7 +138,7 @@
               <td class="text-end fw-bold text-money {{ total_deviation|deviation_class }}">
                 {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
               </td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>
