@@ -92,4 +92,40 @@
   </a>
 </div>
 {% endif %}
+
+{% if stats %}
+<div class="card-section p-4 mt-4">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-rulers text-primary fs-5"></i>
+    <span class="section-title">Средняя цена за м² по ЖК</span>
+  </div>
+  <div class="row g-3">
+    {% for item in stats %}
+    <div class="col-sm-6 col-xl-3">
+      <div class="border rounded p-3 h-100">
+        <div class="fw-semibold text-dark mb-2">
+          <a href="{% url 'complex_detail' item.complex.pk %}" class="text-decoration-none text-dark">
+            {{ item.complex.name }}
+          </a>
+        </div>
+        {% if item.complex.square_meters %}
+          <div class="text-muted small mb-1">Площадь</div>
+          <div class="fw-semibold mb-2">{{ item.complex.square_meters }} м²</div>
+          <div class="text-muted small mb-1">Расходы (факт)</div>
+          <div class="text-money small mb-2">{{ item.actual|currency }}</div>
+          <hr class="my-2">
+          <div class="text-muted small mb-1">Цена за м²</div>
+          <div class="fw-bold fs-6 text-primary text-money">{{ item.price_per_sqm|currency }}</div>
+        {% else %}
+          <div class="text-muted small">Площадь не указана</div>
+          <a href="{% url 'complex_update' item.complex.pk %}" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-pencil me-1"></i>Указать м²
+          </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

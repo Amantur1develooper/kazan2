@@ -68,6 +68,9 @@ class ResidentialComplex(models.Model):
         help_text='Ожидаемая выручка от продажи объекта'
     )
     status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='planning')
+    square_meters = models.DecimalField(
+        'Площадь (м²)', max_digits=10, decimal_places=2, null=True, blank=True
+    )
     start_date = models.DateField('Дата начала', null=True, blank=True)
     end_date = models.DateField('Плановая сдача', null=True, blank=True)
     description = models.TextField('Описание', blank=True)
@@ -130,6 +133,9 @@ class Block(models.Model):
                              help_text='Например: А, Б, В или Секция 1')
     total_budget = models.DecimalField(
         'Бюджет блока', max_digits=15, decimal_places=2, default=0
+    )
+    square_meters = models.DecimalField(
+        'Площадь (м²)', max_digits=10, decimal_places=2, null=True, blank=True
     )
     description = models.TextField('Описание', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

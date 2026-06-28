@@ -89,8 +89,11 @@ def complex_list(request):
     for c in complexes:
         planned = c.total_planned_expenses
         actual = c.total_actual_expenses
+        sqm = c.square_meters
+        price_per_sqm = (actual / sqm).quantize(Decimal('0.01')) if sqm else None
         stats.append({'complex': c, 'planned': planned, 'actual': actual,
-                       'deviation': actual - planned, 'blocks_count': c.blocks.count()})
+                       'deviation': actual - planned, 'blocks_count': c.blocks.count(),
+                       'price_per_sqm': price_per_sqm})
     return render(request, 'projects/complex_list.html', {'stats': stats})
 
 
@@ -102,8 +105,11 @@ def complex_detail(request, pk):
     for b in blocks:
         planned = b.total_planned_expenses
         actual = b.total_actual_expenses
+        sqm = b.square_meters
+        price_per_sqm = (actual / sqm).quantize(Decimal('0.01')) if sqm else None
         block_stats.append({'block': b, 'planned': planned, 'actual': actual,
-                              'deviation': actual - planned, 'stages_count': b.stages.count()})
+                              'deviation': actual - planned, 'stages_count': b.stages.count(),
+                              'price_per_sqm': price_per_sqm})
 
     total_planned = sum(b['planned'] for b in block_stats)
     total_actual = sum(b['actual'] for b in block_stats)

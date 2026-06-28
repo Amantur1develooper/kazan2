@@ -15,12 +15,13 @@ class OrganizationForm(forms.ModelForm):
 class ResidentialComplexForm(forms.ModelForm):
     class Meta:
         model = ResidentialComplex
-        fields = ['organization', 'name', 'total_planned_cost', 'status', 'start_date', 'end_date', 'description']
+        fields = ['organization', 'name', 'total_planned_cost', 'status', 'square_meters', 'start_date', 'end_date', 'description']
         widgets = {
             'organization': forms.Select(attrs={'class': 'form-select'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'total_planned_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
+            'square_meters': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Например: 15000.00'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -30,10 +31,11 @@ class ResidentialComplexForm(forms.ModelForm):
 class BlockForm(forms.ModelForm):
     class Meta:
         model = Block
-        fields = ['name', 'total_budget', 'description']
+        fields = ['name', 'total_budget', 'square_meters', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: А, Б, В или Секция 1'}),
             'total_budget': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'square_meters': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Например: 5000.00'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
