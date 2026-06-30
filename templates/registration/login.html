@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход — Строй Финанс</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .login-card { background: #fff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,.07); }
+    .brand-icon { width: 56px; height: 56px; background: #2563eb; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #fff; margin: 0 auto 1.25rem; }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand-icon"><i class="bi bi-buildings-fill"></i></div>
+  <h1 class="text-center fw-700 mb-1" style="font-size:1.4rem;font-weight:700;color:#0f172a">Строй Финанс</h1>
+  <p class="text-center text-muted mb-4" style="font-size:.875rem">Войдите в систему</p>
+
+  {% if form.errors %}
+  <div class="alert alert-danger py-2 small">Неверный логин или пароль.</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.875rem">Логин</label>
+      <input type="text" name="username" class="form-control" placeholder="Введите логин" autofocus required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label fw-semibold" style="font-size:.875rem">Пароль</label>
+      <input type="password" name="password" class="form-control" placeholder="Введите пароль" required>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary w-100 fw-semibold">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Войти
+    </button>
+  </form>
+</div>
+</body>
+</html>

@@ -5,7 +5,9 @@ from django.contrib import messages
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.db.models import Value
+from django.contrib.auth.decorators import login_required
 
+from apps.core.decorators import editor_required
 from .models import Organization, ResidentialComplex, Block, Stage, Floor, FloorExpense
 from .forms import (OrganizationForm, ResidentialComplexForm, BlockForm,
                     StageForm, FloorForm, FloorExpenseForm)
@@ -45,6 +47,7 @@ def org_detail(request, pk):
     return render(request, 'projects/org_detail.html', context)
 
 
+@editor_required
 def org_create(request):
     if request.method == 'POST':
         form = OrganizationForm(request.POST)
@@ -57,6 +60,7 @@ def org_create(request):
     return render(request, 'projects/org_form.html', {'form': form, 'title': 'Добавить организацию'})
 
 
+@editor_required
 def org_update(request, pk):
     org = get_object_or_404(Organization, pk=pk)
     if request.method == 'POST':
@@ -71,6 +75,7 @@ def org_update(request, pk):
                   {'form': form, 'title': 'Редактировать организацию', 'object': org})
 
 
+@editor_required
 def org_delete(request, pk):
     org = get_object_or_404(Organization, pk=pk)
     if request.method == 'POST':
@@ -127,6 +132,7 @@ def complex_detail(request, pk):
     return render(request, 'projects/complex_detail.html', context)
 
 
+@editor_required
 def complex_create(request):
     if request.method == 'POST':
         form = ResidentialComplexForm(request.POST)
@@ -139,6 +145,7 @@ def complex_create(request):
     return render(request, 'projects/complex_form.html', {'form': form, 'title': 'Добавить ЖК'})
 
 
+@editor_required
 def complex_update(request, pk):
     complex_obj = get_object_or_404(ResidentialComplex, pk=pk)
     if request.method == 'POST':
@@ -153,6 +160,7 @@ def complex_update(request, pk):
                   {'form': form, 'title': 'Редактировать ЖК', 'object': complex_obj})
 
 
+@editor_required
 def complex_delete(request, pk):
     complex_obj = get_object_or_404(ResidentialComplex, pk=pk)
     if request.method == 'POST':
@@ -195,6 +203,7 @@ def block_detail(request, pk):
     return render(request, 'projects/block_detail.html', context)
 
 
+@editor_required
 def block_create(request, complex_pk):
     complex_obj = get_object_or_404(ResidentialComplex, pk=complex_pk)
     if request.method == 'POST':
@@ -211,6 +220,7 @@ def block_create(request, complex_pk):
                   {'form': form, 'complex_obj': complex_obj, 'title': 'Добавить блок'})
 
 
+@editor_required
 def block_update(request, pk):
     block_obj = get_object_or_404(Block.objects.select_related('residential_complex'), pk=pk)
     if request.method == 'POST':
@@ -227,6 +237,7 @@ def block_update(request, pk):
     })
 
 
+@editor_required
 def block_delete(request, pk):
     block_obj = get_object_or_404(Block.objects.select_related('residential_complex'), pk=pk)
     if request.method == 'POST':
@@ -263,6 +274,7 @@ def stage_detail(request, pk):
     return render(request, 'projects/stage_detail.html', context)
 
 
+@editor_required
 def stage_create(request, block_pk):
     block_obj = get_object_or_404(Block.objects.select_related('residential_complex'), pk=block_pk)
     if request.method == 'POST':
@@ -279,6 +291,7 @@ def stage_create(request, block_pk):
                   {'form': form, 'block_obj': block_obj, 'title': 'Добавить этап'})
 
 
+@editor_required
 def stage_update(request, pk):
     stage = get_object_or_404(Stage.objects.select_related('block__residential_complex'), pk=pk)
     if request.method == 'POST':
@@ -294,6 +307,7 @@ def stage_update(request, pk):
     })
 
 
+@editor_required
 def stage_delete(request, pk):
     stage = get_object_or_404(Stage.objects.select_related('block'), pk=pk)
     if request.method == 'POST':
@@ -323,6 +337,7 @@ def floor_detail(request, pk):
     return render(request, 'projects/floor_detail.html', context)
 
 
+@editor_required
 def floor_create(request, stage_pk):
     stage = get_object_or_404(Stage.objects.select_related('block__residential_complex'), pk=stage_pk)
     if request.method == 'POST':
@@ -339,6 +354,7 @@ def floor_create(request, stage_pk):
                   {'form': form, 'stage': stage, 'title': 'Добавить этаж'})
 
 
+@editor_required
 def floor_update(request, pk):
     floor = get_object_or_404(Floor.objects.select_related('stage__block__residential_complex'), pk=pk)
     if request.method == 'POST':
@@ -354,6 +370,7 @@ def floor_update(request, pk):
     })
 
 
+@editor_required
 def floor_delete(request, pk):
     floor = get_object_or_404(Floor.objects.select_related('stage'), pk=pk)
     if request.method == 'POST':
@@ -367,6 +384,7 @@ def floor_delete(request, pk):
 
 # ── FloorExpense ──────────────────────────────────────────────────────────────
 
+@editor_required
 def expense_create(request, floor_pk):
     floor = get_object_or_404(Floor.objects.select_related('stage__block__residential_complex'), pk=floor_pk)
     if request.method == 'POST':
@@ -386,6 +404,7 @@ def expense_create(request, floor_pk):
                   {'form': form, 'floor': floor, 'title': 'Добавить расход'})
 
 
+@editor_required
 def expense_update(request, pk):
     expense = get_object_or_404(FloorExpense.objects.select_related('floor__stage__block__residential_complex'), pk=pk)
     if request.method == 'POST':
@@ -404,6 +423,7 @@ def expense_update(request, pk):
     })
 
 
+@editor_required
 def expense_delete(request, pk):
     expense = get_object_or_404(FloorExpense.objects.select_related('floor'), pk=pk)
     if request.method == 'POST':

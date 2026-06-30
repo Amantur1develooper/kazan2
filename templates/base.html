@@ -139,14 +139,27 @@
     <a href="{% url 'import_list' %}" class="sidebar-link {% if 'import' in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-file-earmark-excel"></i> Импорт из 1С
     </a>
+    {% if request.user.is_staff %}
     <a href="/admin/" class="sidebar-link">
       <i class="bi bi-gear"></i> Администрирование
     </a>
+    {% endif %}
   </nav>
 
   <div class="sidebar-footer">
-    <i class="bi bi-circle-fill text-success me-1" style="font-size:.5rem"></i>
-    Система активна
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div style="color:rgba(255,255,255,.7);font-size:.8rem;font-weight:600">
+          <i class="bi bi-person-circle me-1"></i>{{ request.user.username }}
+        </div>
+        <div style="color:rgba(255,255,255,.35);font-size:.7rem">
+          {% if request.user.is_staff %}Редактор{% else %}Просмотр{% endif %}
+        </div>
+      </div>
+      <a href="{% url 'logout' %}" class="btn btn-sm" style="color:rgba(255,255,255,.4);padding:.25rem .5rem" title="Выйти">
+        <i class="bi bi-box-arrow-right"></i>
+      </a>
+    </div>
   </div>
 </aside>
 

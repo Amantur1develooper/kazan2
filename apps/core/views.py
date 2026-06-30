@@ -6,6 +6,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.db.models import Value
 
+from .decorators import editor_required
 from .models import MainCash, CashTransaction
 from .forms import CashTransactionForm
 from apps.projects.models import Organization, ResidentialComplex, Stage, FloorExpense
@@ -75,6 +76,7 @@ def cash_detail(request):
     return render(request, 'core/cash_detail.html', context)
 
 
+@editor_required
 def transaction_create(request):
     cash = MainCash.objects.first()
     if not cash:
@@ -92,6 +94,7 @@ def transaction_create(request):
     return render(request, 'core/transaction_form.html', {'form': form, 'cash': cash})
 
 
+@editor_required
 def transaction_delete(request, pk):
     transaction = get_object_or_404(CashTransaction, pk=pk)
     if request.method == 'POST':

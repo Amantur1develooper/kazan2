@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
 
+from apps.core.decorators import editor_required
 from .models import ExcelImport, ImportLog
 from .forms import ExcelImportForm, FloorSelectForm
 from .floor_parser import parse_floor_excel, apply_floor_import
@@ -14,6 +15,7 @@ def import_list(request):
     return render(request, 'imports/import_list.html', {'imports': imports})
 
 
+@editor_required
 def import_upload(request):
     """
     Two-step upload:
@@ -188,6 +190,7 @@ def import_detail(request, pk):
                   {'excel_import': excel_import, 'logs': logs})
 
 
+@editor_required
 def import_reprocess(request, pk):
     excel_import = get_object_or_404(ExcelImport, pk=pk)
     if request.method == 'POST':
