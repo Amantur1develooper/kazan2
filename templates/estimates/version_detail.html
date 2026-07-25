@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Изменения {{ version.imported_at|date:"d.m.Y H:i" }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'estimate_list' %}">Сметы</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'estimate_detail' estimate.pk %}">Блок {{ estimate_block.name }}</a></li>
+      <li class="breadcrumb-item active">История {{ version.imported_at|date:"d.m.Y H:i" }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-clock-history me-2 text-secondary"></i>
+      Изменения от {{ version.imported_at|date:"d.m.Y H:i" }}
+    </h1>
+  </div>
+  <a href="{% url 'estimate_detail' estimate.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К смете
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Summary -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="label">Файл</div>
+      <div class="fw-semibold small mt-1">{{ version.source_file|default:"—" }}</div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="label">Итого до</div>
+      <div class="value text-money text-muted" style="font-size:1.1rem">{{ version.total_before|currency }}</div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="label">Итого после</div>
+      <div class="value text-money" style="font-size:1.1rem">{{ version.total_after|currency }}</div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="label">Изменение суммы</div>
+      {% with diff=version.total_after|subtract:version.total_before %}
+      <div class="value text-money {% if diff > 0 %}text-danger{% elif diff < 0 %}text-success{% else %}text-muted{% endif %}" style="font-size:1.1rem">
+        {% if diff > 0 %}+{% endif %}{{ diff|currency }}
+      </div>
+      {% endwith %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card border-success">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="label text-success">Добавлено позиций</div>
+          <div class="value text-success">{{ version.items_added }}</div>
+        </div>
+        <div class="icon bg-success bg-opacity-10 text-success"><i class="bi bi-plus-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card border-warning">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="label text-warning">Изменено позиций</div>
+          <div class="value text-warning">{{ version.items_updated }}</div>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-pencil-square"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card border-danger">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="label text-danger">Удалено позиций</div>
+          <div class="value text-danger">{{ version.items_removed }}</div>
+        </div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-dash-circle"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not changes %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-check-circle fs-2 d-block mb-2 text-success"></i>
+  Первый импорт — история изменений не сравнивается.
+</div>
+{% else %}
+
+{% if added %}
+<div class="data-table mb-3">
+  <div class="p-3 border-bottom">
+    <span class="section-title text-success"><i class="bi bi-plus-circle me-1"></i>Добавленные позиции ({{ added|length }})</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead><tr>
+        <th style="width:70px">Код</th>
+        <th>Наименование</th>
+        <th class="text-end">Сумма</th>
+      </tr></thead>
+      <tbody>
+        {% for ch in added %}
+        <tr>
+          <td><code class="text-muted small">{{ ch.item_code|default:"—" }}</code></td>
+          <td class="text-success fw-semibold">{{ ch.item_name }}</td>
+          <td class="text-end text-money text-success">{{ ch.new_value }} сом</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if updated %}
+<div class="data-table mb-3">
+  <div class="p-3 border-bottom">
+    <span class="section-title text-warning"><i class="bi bi-pencil-square me-1"></i>Изменённые позиции ({{ updated|length }})</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead><tr>
+        <th style="width:70px">Код</th>
+        <th>Наименование</th>
+        <th>Поле</th>
+        <th class="text-end">Было</th>
+        <th class="text-end">Стало</th>
+      </tr></thead>
+      <tbody>
+        {% for ch in updated %}
+        <tr>
+          <td><code class="text-muted small">{{ ch.item_code|default:"—" }}</code></td>
+          <td class="fw-semibold">{{ ch.item_name }}</td>
+          <td class="text-muted">{{ ch.field_name }}</td>
+          <td class="text-end text-money text-muted">{{ ch.old_value }} сом</td>
+          <td class="text-end text-money text-warning fw-semibold">{{ ch.new_value }} сом</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if removed %}
+<div class="data-table mb-3">
+  <div class="p-3 border-bottom">
+    <span class="section-title text-danger"><i class="bi bi-dash-circle me-1"></i>Удалённые позиции ({{ removed|length }})</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead><tr>
+        <th style="width:70px">Код</th>
+        <th>Наименование</th>
+        <th class="text-end">Сумма (было)</th>
+      </tr></thead>
+      <tbody>
+        {% for ch in removed %}
+        <tr>
+          <td><code class="text-muted small">{{ ch.item_code|default:"—" }}</code></td>
+          <td class="text-danger fw-semibold"><s>{{ ch.item_name }}</s></td>
+          <td class="text-end text-money text-muted">{{ ch.old_value }} сом</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

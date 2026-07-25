@@ -72,12 +72,14 @@ def import_upload(request):
                 request.session['import_doc_title'] = parsed.get('doc_title', '')
                 request.session['import_format'] = parsed.get('format', 'generic')
 
-                # Store preview (first 20 items)
+                # Store preview (first 20 items) — convert to JSON-safe types
                 preview_items = parsed.get('items', [])[:20]
                 for item in preview_items:
                     item['quantity'] = float(item['quantity'])
                     item['unit_price'] = float(item['unit_price'])
                     item['total_amount'] = float(item['total_amount'])
+                    d = item.get('expense_date')
+                    item['expense_date'] = d.isoformat() if d else None
                 request.session['import_preview_items'] = preview_items
 
                 request.session['import_id'] = excel_import.pk
@@ -156,9 +158,13 @@ def import_preview(request, pk):
         _process_floor_import(excel_import)
         messages.success(
             request,
-            f'Импорт завершён: создано {excel_import.rows_processed}, '
-            f'обновлено записей, ошибок {excel_import.rows_error}.'
+            f'Импорт завершён: загружено {excel_import.rows_processed} записей. '
+            f'Распределите расходы по смете.'
         )
+        floor = excel_import.target_floor
+        # Redirect to allocation review if block has an estimate
+        if floor and hasattr(floor.stage.block, 'estimate'):
+            return redirect('floor_allocate_review', floor_pk=floor.pk)
         return redirect('import_detail', pk=pk)
 
     zero_price_warning = preview_items and all(

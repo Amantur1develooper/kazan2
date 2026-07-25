@@ -11,6 +11,7 @@ urlpatterns = [
     path('', include('apps.core.urls')),
     path('complexes/', include('apps.projects.urls')),
     path('imports/', include('apps.imports.urls')),
+    path('estimates/', include('apps.estimates.urls')),
 ]
 
 if settings.DEBUG:

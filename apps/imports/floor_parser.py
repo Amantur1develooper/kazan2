@@ -15,7 +15,38 @@ On re-import: match by item_code (if present) or by name.
 """
 
 import re
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+
+_RU_MONTHS = {
+    'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4,
+    'мая': 5, 'июня': 6, 'июля': 7, 'августа': 8,
+    'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12,
+}
+
+
+def _parse_date(text: str):
+    """Extract date from strings like 'от 5 мая 2026 г.' or '25.07.2026'."""
+    if not text:
+        return None
+    # Russian month name: "от D месяц YYYY"
+    m = re.search(r'(\d{1,2})\s+([а-яё]+)\s+(\d{4})', text, re.IGNORECASE)
+    if m:
+        day, month_str, year = int(m.group(1)), m.group(2).lower(), int(m.group(3))
+        month = _RU_MONTHS.get(month_str)
+        if month:
+            try:
+                return date(year, month, day)
+            except ValueError:
+                pass
+    # Numeric: DD.MM.YYYY
+    m = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', text)
+    if m:
+        try:
+            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            pass
+    return None
 
 
 def _to_decimal(value) -> Decimal:
@@ -73,6 +104,7 @@ def parse_peremeshchenie_xls(filepath) -> dict:
 
     doc_title = _str(ws.cell_value(1, 1)) if ws.nrows > 1 else ''
     recipient = _str(ws.cell_value(5, 6)) if ws.nrows > 5 else ''
+    doc_date = _parse_date(doc_title)
 
     items = []
     for r in range(ws.nrows):
@@ -105,11 +137,13 @@ def parse_peremeshchenie_xls(filepath) -> dict:
             'quantity': qty,
             'unit_price': price,
             'total_amount': total,
+            'expense_date': doc_date,
         })
 
     return {
         'doc_title': doc_title,
         'recipient': recipient,
+        'doc_date': doc_date,
         'items': items,
         'format': 'peremeshchenie',
     }
@@ -130,6 +164,17 @@ def parse_prihod(filepath) -> dict:
         ws = list(wb.worksheets)[0]
         rows = [list(row) for row in ws.iter_rows(values_only=True)]
         wb.close()
+
+    # Extract doc date from header rows
+    doc_date = None
+    for row in rows[:5]:
+        for cell in row:
+            d = _parse_date(str(cell or ''))
+            if d:
+                doc_date = d
+                break
+        if doc_date:
+            break
 
     # Find header row
     header_idx = 0
@@ -179,11 +224,13 @@ def parse_prihod(filepath) -> dict:
             'quantity': qty,
             'unit_price': price,
             'total_amount': total,
+            'expense_date': doc_date,
         })
 
     return {
         'doc_title': 'Приход на склад',
         'recipient': '',
+        'doc_date': doc_date,
         'items': items,
         'format': 'prihod',
     }
@@ -207,6 +254,17 @@ def parse_generic(filepath) -> dict:
         ws = list(wb.worksheets)[0]
         rows = [list(row) for row in ws.iter_rows(values_only=True)]
         wb.close()
+
+    # Extract doc date from header rows
+    doc_date = None
+    for row in rows[:5]:
+        for cell in row:
+            d = _parse_date(str(cell or ''))
+            if d:
+                doc_date = d
+                break
+        if doc_date:
+            break
 
     # Find header row
     header_idx = 0
@@ -261,11 +319,13 @@ def parse_generic(filepath) -> dict:
             'quantity': qty,
             'unit_price': price,
             'total_amount': total,
+            'expense_date': doc_date,
         })
 
     return {
         'doc_title': '',
         'recipient': '',
+        'doc_date': doc_date,
         'items': items,
         'format': 'generic',
     }
@@ -305,9 +365,9 @@ def apply_floor_import(floor, parsed_data, import_mode='replace', excel_import=N
     """
     Apply parsed floor expense data to the database.
 
-    import_mode:
-        'replace' — update quantity/price if code/name matches; create if new
-        'add'     — add quantities to existing records; create if new
+    Each import always creates new FloorExpense records so every delivery
+    is preserved as a separate history entry. Totals are summed across all
+    records with the same name in the views layer.
 
     Returns dict with stats: created, updated, skipped.
     """
@@ -327,41 +387,26 @@ def apply_floor_import(floor, parsed_data, import_mode='replace', excel_import=N
             price = item.get('unit_price', Decimal('0'))
             total = item.get('total_amount', Decimal('0'))
 
-            # Match existing expense
-            existing = None
-            if code:
-                existing = floor.expenses.filter(item_code=code).first()
-            if not existing:
-                existing = floor.expenses.filter(name__iexact=name).first()
+            # expense_date may be a date object or ISO string (from session)
+            raw_date = item.get('expense_date')
+            if isinstance(raw_date, str):
+                try:
+                    raw_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    raw_date = None
 
-            if existing:
-                if import_mode == 'add':
-                    existing.quantity += qty
-                    if price > 0:
-                        existing.unit_price = price
-                    existing.total_amount = existing.quantity * existing.unit_price if existing.unit_price else existing.total_amount + total
-                else:  # replace
-                    existing.quantity = qty
-                    if price > 0:
-                        existing.unit_price = price
-                    existing.total_amount = total if total else (qty * price if price else Decimal('0'))
-                if code:
-                    existing.item_code = code
-                existing.source_import = excel_import
-                existing.save()
-                stats['updated'] += 1
-            else:
-                FloorExpense.objects.create(
-                    floor=floor,
-                    item_code=code,
-                    name=name,
-                    unit=item.get('unit', ''),
-                    quantity=qty,
-                    unit_price=price,
-                    total_amount=total if total else (qty * price),
-                    source_import=excel_import,
-                )
-                stats['created'] += 1
+            FloorExpense.objects.create(
+                floor=floor,
+                item_code=code,
+                name=name,
+                unit=item.get('unit', ''),
+                quantity=qty,
+                unit_price=price,
+                total_amount=total if total else (qty * price),
+                source_import=excel_import,
+                expense_date=raw_date,
+            )
+            stats['created'] += 1
         except Exception as e:
             stats['errors'] += 1
 

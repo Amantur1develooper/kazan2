@@ -64,7 +64,7 @@
   </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 mb-4">
   <!-- Floors -->
   <div class="col-xl-7">
     <div class="data-table">
@@ -141,9 +141,108 @@
     </div>
   </div>
 </div>
+
+<!-- Grouped expenses across all floors -->
+{% if stage_expenses_grouped %}
+<div class="data-table">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">
+      Расходы по наименованиям (все этажи)
+      <span class="badge bg-secondary bg-opacity-10 text-secondary ms-2">{{ stage_expenses_grouped|length }}</span>
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead class="table-light">
+        <tr>
+          <th style="width:32px"></th>
+          <th>Наименование</th>
+          <th class="text-center" style="width:60px">Ед.</th>
+          <th class="text-end" style="width:120px">Кол-во</th>
+          <th class="text-end" style="width:150px">Сумма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for grp in stage_expenses_grouped %}
+        {% with gid=forloop.counter %}
+        <tr {% if grp.records|length > 1 %}role="button" data-bs-toggle="collapse" data-bs-target="#sgrp{{ gid }}" style="cursor:pointer"{% endif %}>
+          <td class="text-center text-muted" style="font-size:.75rem">
+            {% if grp.records|length > 1 %}
+            <i class="bi bi-chevron-right sgrp-chevron" id="schev{{ gid }}" style="transition:.2s"></i>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">{{ grp.name }}</td>
+          <td class="text-center text-muted">{{ grp.unit|default:"—" }}</td>
+          <td class="text-end text-muted">{{ grp.total_qty|floatformat:2 }}</td>
+          <td class="text-end text-money fw-semibold">{{ grp.total_amount|currency }}</td>
+        </tr>
+        {% if grp.records|length > 1 %}
+        <tr>
+          <td colspan="5" class="p-0">
+            <div class="collapse" id="sgrp{{ gid }}">
+              <table class="table table-sm mb-0" style="font-size:.8rem;background:#f8fafc">
+                <thead>
+                  <tr class="text-muted">
+                    <th style="width:32px;padding-left:2.5rem"></th>
+                    <th>Дата</th>
+                    <th>Этаж</th>
+                    <th class="text-end">Кол-во</th>
+                    <th class="text-end">Цена</th>
+                    <th class="text-end">Сумма</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for exp in grp.records %}
+                  <tr>
+                    <td style="padding-left:2.5rem"><i class="bi bi-arrow-return-right text-muted"></i></td>
+                    <td class="text-muted" style="white-space:nowrap">
+                      {% if exp.expense_date %}{{ exp.expense_date|date:"d.m.Y" }}{% else %}{{ exp.created_at|date:"d.m.Y" }}{% endif %}
+                    </td>
+                    <td>
+                      <a href="{% url 'floor_detail' exp.floor_id %}" class="text-decoration-none text-muted">{{ exp.floor.display_name }}</a>
+                    </td>
+                    <td class="text-end">{{ exp.quantity|floatformat:3 }}</td>
+                    <td class="text-end text-money">
+                      {% if exp.unit_price == 0 %}<span class="text-warning">—</span>{% else %}{{ exp.unit_price|currency }}{% endif %}
+                    </td>
+                    <td class="text-end text-money fw-semibold">
+                      {% if exp.total_amount == 0 %}<span class="text-muted">—</span>{% else %}{{ exp.total_amount|currency }}{% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="4" class="fw-bold">Итого</td>
+          <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+<script>
+document.querySelectorAll('[data-bs-target^="#sgrp"]').forEach(function(row) {
+  var target = row.getAttribute('data-bs-target');
+  var collapseEl = document.querySelector(target);
+  var chevId = 'schev' + target.replace('#sgrp','');
+  var chev = document.getElementById(chevId);
+  if (!collapseEl || !chev) return;
+  collapseEl.addEventListener('show.bs.collapse', function() { chev.style.transform = 'rotate(90deg)'; });
+  collapseEl.addEventListener('hide.bs.collapse', function() { chev.style.transform = 'rotate(0deg)'; });
+});
+</script>
 {% if floor_stats %}
 <script>
 new Chart(document.getElementById('floorChart'), {

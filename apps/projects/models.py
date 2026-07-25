@@ -293,11 +293,17 @@ class FloorExpense(models.Model):
     unit_price = models.DecimalField('Цена за единицу', max_digits=15, decimal_places=2, default=0)
     total_amount = models.DecimalField('Сумма', max_digits=15, decimal_places=2, default=0)
 
+    nomenclature = models.ForeignKey(
+        'estimates.Nomenclature', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='floor_expenses',
+        verbose_name='Номенклатура'
+    )
     source_import = models.ForeignKey(
         'imports.ExcelImport', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='created_expenses',
         verbose_name='Источник (импорт)'
     )
+    expense_date = models.DateField('Дата документа', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

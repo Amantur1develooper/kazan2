@@ -39,6 +39,9 @@ urlpatterns = [
     path('expenses/<int:pk>/edit/', views.expense_update, name='expense_update'),
     path('expenses/<int:pk>/delete/', views.expense_delete, name='expense_delete'),
 
+    # Estimate (redirect to estimates app)
+    path('blocks/<int:block_pk>/estimate/', views.estimate_for_block, name='estimate_for_block'),
+
     # AJAX
     path('ajax/complexes/', views.ajax_complexes, name='ajax_complexes'),
     path('ajax/blocks/', views.ajax_blocks, name='ajax_blocks'),

@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.db.models.functions import Coalesce
 from django.db.models import Value
 from django.contrib.auth.decorators import login_required
@@ -261,10 +261,26 @@ def stage_detail(request, pk):
     for f in floors:
         floor_stats.append({'floor': f, 'total': f.total_expenses, 'expenses_count': f.expenses_count})
 
+    # Expenses grouped by name across all floors in this stage
+    raw_expenses = FloorExpense.objects.filter(
+        floor__stage=stage
+    ).select_related('floor').order_by('name', '-created_at')
+
+    stage_grouped = {}
+    for exp in raw_expenses:
+        key = exp.name
+        if key not in stage_grouped:
+            stage_grouped[key] = {'name': key, 'unit': exp.unit, 'total_qty': Decimal('0'), 'total_amount': Decimal('0'), 'records': []}
+        stage_grouped[key]['total_qty'] += exp.quantity
+        stage_grouped[key]['total_amount'] += exp.total_amount
+        stage_grouped[key]['records'].append(exp)
+    stage_expenses_grouped = sorted(stage_grouped.values(), key=lambda x: -x['total_amount'])
+
     actual = stage.computed_actual_expenses
     context = {
         'stage': stage,
         'floor_stats': floor_stats,
+        'stage_expenses_grouped': stage_expenses_grouped,
         'total_actual': actual,
         'total_planned': stage.planned_expenses,
         'deviation': actual - stage.planned_expenses,
@@ -325,12 +341,24 @@ def floor_detail(request, pk):
     floor = get_object_or_404(
         Floor.objects.select_related('stage__block__residential_complex__organization'), pk=pk
     )
-    expenses = floor.expenses.all()
-    zero_price_count = expenses.filter(unit_price=0).count()
+    expenses = list(floor.expenses.order_by('name', '-created_at'))
+    zero_price_count = sum(1 for e in expenses if e.unit_price == 0)
+
+    # Group by name for summary table
+    grouped = {}
+    for exp in expenses:
+        key = exp.name
+        if key not in grouped:
+            grouped[key] = {'name': key, 'unit': exp.unit, 'total_qty': Decimal('0'), 'total_amount': Decimal('0'), 'records': []}
+        grouped[key]['total_qty'] += exp.quantity
+        grouped[key]['total_amount'] += exp.total_amount
+        grouped[key]['records'].append(exp)
+    expenses_grouped = sorted(grouped.values(), key=lambda x: x['name'])
 
     context = {
         'floor': floor,
         'expenses': expenses,
+        'expenses_grouped': expenses_grouped,
         'total_expenses': floor.total_expenses,
         'zero_price_count': zero_price_count,
     }
@@ -470,3 +498,13 @@ def ajax_floors(request):
         for f in Floor.objects.filter(stage_id=st_id):
             floors.append({'id': f.pk, 'name': f.display_name})
     return JsonResponse(floors, safe=False)
+
+
+def estimate_for_block(request, block_pk):
+    from apps.estimates.models import Estimate
+    block = get_object_or_404(Block, pk=block_pk)
+    estimate, _ = Estimate.objects.get_or_create(
+        block=block,
+        defaults={'name': f'Смета блока {block.name}'}
+    )
+    return redirect('estimate_detail', pk=estimate.pk)

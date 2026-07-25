@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Нераспределённые расходы — Блок {{ estimate_block.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'estimate_list' %}">Сметы</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'estimate_detail' estimate.pk %}">Блок {{ estimate_block.name }}</a></li>
+      <li class="breadcrumb-item active">Нераспределённые расходы</li>
+    </ol></nav>
+    <h1><i class="bi bi-exclamation-circle me-2 text-warning"></i>Нераспределённые расходы</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">
+      Выберите позицию сметы для каждого расхода. Кол-во можно не заполнять — возьмётся полное количество.
+    </p>
+  </div>
+  <a href="{% url 'estimate_detail' estimate.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К смете
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+{# Stage filter #}
+<div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
+  <span class="text-muted small">Этап:</span>
+  <a href="{% url 'estimate_unlinked' estimate.pk %}"
+     class="btn btn-sm {% if not stage_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Все</a>
+  {% for stage in stages %}
+  <a href="{% url 'estimate_unlinked' estimate.pk %}?stage={{ stage.pk }}"
+     class="btn btn-sm {% if stage_filter == stage.pk|stringformat:'s' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+     style="font-size:.78rem">{{ stage.name }}</a>
+  {% endfor %}
+</div>
+
+{% if not unlinked %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-check-circle fs-2 d-block mb-3 text-success"></i>
+  <p>Все расходы план-факта привязаны к позициям сметы.</p>
+</div>
+{% else %}
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="data-table mb-3">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="section-title">
+        Расходы без привязки
+        <span class="badge bg-warning text-dark ms-2">{{ unlinked|length }}</span>
+      </span>
+      <button type="submit" class="btn btn-success btn-sm">
+        <i class="bi bi-save me-1"></i>Сохранить
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.875rem">
+        <thead class="table-light">
+          <tr>
+            <th>Этап</th>
+            <th>Этаж</th>
+            <th>Наименование</th>
+            <th class="text-end">Кол-во</th>
+            <th>Ед.</th>
+            <th class="text-end">Сумма</th>
+            <th style="min-width:300px">Позиция сметы</th>
+            <th style="width:110px">Кол-во <span class="text-muted fw-normal">(необяз.)</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fe in unlinked %}
+          <tr>
+            <td class="text-muted small">{{ fe.floor.stage.name }}</td>
+            <td class="text-muted small">{{ fe.floor.display_name }}</td>
+            <td class="fw-semibold">{{ fe.name }}</td>
+            <td class="text-end text-muted">{{ fe.quantity|floatformat:2 }}</td>
+            <td class="text-muted">{{ fe.unit|default:"—" }}</td>
+            <td class="text-end text-money">{{ fe.total_amount|currency }}</td>
+            <td>
+              <select name="item_{{ fe.pk }}" class="form-select form-select-sm">
+                <option value="">— выбрать позицию —</option>
+                {% regroup all_items by section as grouped_items %}
+                {% for grp in grouped_items %}
+                <optgroup label="{{ grp.grouper.code }} {{ grp.grouper.name }}">
+                  {% for item in grp.list %}
+                  <option value="{{ item.pk }}">{{ item.code }} {{ item.name }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <input type="number" step="0.001" min="0"
+                     name="qty_{{ fe.pk }}"
+                     class="form-control form-control-sm"
+                     placeholder="{{ fe.quantity|floatformat:3 }}"
+                     style="width:100px">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end">
+    <button type="submit" class="btn btn-success">
+      <i class="bi bi-save me-1"></i>Сохранить все привязки
+    </button>
+  </div>
+</form>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Сметы{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-clipboard2-data me-2 text-primary"></i>Сметы</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="data-table">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Все сметы по блокам</span>
+    <small class="text-muted">Смета создаётся автоматически при открытии блока</small>
+  </div>
+
+  {% if estimates %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Организация</th>
+          <th>ЖК</th>
+          <th>Блок</th>
+          <th>Статус</th>
+          <th class="text-end">Итого (план)</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for est in estimates %}
+        <tr>
+          <td class="text-muted small">{{ est.block.residential_complex.organization.name|default:"—" }}</td>
+          <td>{{ est.block.residential_complex.name }}</td>
+          <td class="fw-semibold">Блок {{ est.block.name }}</td>
+          <td>
+            {% if est.status == 'active' %}
+              <span class="badge bg-success">Активна</span>
+            {% elif est.status == 'draft' %}
+              <span class="badge bg-secondary">Черновик</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Архив</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-money fw-semibold">{{ est.total_amount|currency }}</td>
+          <td>
+            <a href="{% url 'estimate_detail' est.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-clipboard2 fs-2 d-block mb-2"></i>
+    Смет ещё нет.<br>
+    <small>Откройте любой блок и нажмите «Смета» для создания.</small>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

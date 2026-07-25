@@ -80,6 +80,31 @@ def enumerate_list(iterable):
 
 
 @register.filter
+def subtract(value, arg):
+    try:
+        return Decimal(str(value)) - Decimal(str(arg))
+    except Exception:
+        return 0
+
+
+@register.filter
+def negate(value):
+    try:
+        return -Decimal(str(value))
+    except Exception:
+        return 0
+
+
+@register.filter
+def get_item(d, key):
+    """Dict lookup by variable key in templates: {{ mydict|get_item:key }}"""
+    try:
+        return d.get(key)
+    except AttributeError:
+        return None
+
+
+@register.filter
 def percent(value, total):
     try:
         v = float(value)

@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Смета — Блок {{ estimate_block.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.estimate-sticky-head th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f1f5f9;
+  border-bottom: 2px solid #cbd5e1 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,.06);
+}
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'estimate_list' %}">Сметы</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'complex_detail' estimate_block.residential_complex.pk %}">{{ estimate_block.residential_complex.name }}</a></li>
+      <li class="breadcrumb-item active">Блок {{ estimate_block.name }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-clipboard2-data me-2 text-primary"></i>
+      Смета — Блок {{ estimate_block.name }}
+      {% if estimate.name %}<small class="text-muted fw-normal fs-6 ms-2">{{ estimate.name }}</small>{% endif %}
+    </h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'estimate_expense_links' estimate.pk %}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-link-45deg me-1"></i>Расходы ПФ
+    </a>
+    <a href="{% url 'estimate_unlinked' estimate.pk %}" class="btn btn-outline-warning btn-sm">
+      <i class="bi bi-exclamation-circle me-1"></i>Нераспределённые
+    </a>
+    <form method="post" action="{% url 'estimate_add_misc_sections' estimate.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary btn-sm" title="Добавить «Прочие расходы» в конец каждого этапа">
+        <i class="bi bi-plus-circle me-1"></i>Прочие расходы
+      </button>
+    </form>
+    <a href="{% url 'estimate_import' estimate.pk %}" class="btn btn-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Импорт Excel
+    </a>
+    <a href="{% url 'block_detail' estimate_block.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>К блоку
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Итого по смете (план)</div>
+          <div class="value text-money">{{ total_plan|currency }}</div>
+        </div>
+        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-clipboard2-data"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Расходы ПФ (факт)</div>
+          <div class="value text-money">{{ total_actual|currency }}</div>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card {% if total_deviation > 0 %}border-danger{% elif total_deviation < 0 %}border-success{% endif %}">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Отклонение (факт − план)</div>
+          <div class="value text-money {% if total_deviation > 0 %}text-danger{% elif total_deviation < 0 %}text-success{% endif %}">
+            {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
+          </div>
+        </div>
+        <div class="icon {% if total_deviation > 0 %}bg-danger bg-opacity-10 text-danger{% else %}bg-success bg-opacity-10 text-success{% endif %}">
+          <i class="bi bi-arrow-{% if total_deviation > 0 %}up{% else %}down{% endif %}-circle"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not flat_rows %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-clipboard2 fs-2 d-block mb-3"></i>
+  <p class="mb-2">Смета пуста. Загрузите Excel файл или добавьте разделы вручную.</p>
+  <a href="{% url 'estimate_import' estimate.pk %}" class="btn btn-success">
+    <i class="bi bi-upload me-1"></i>Импортировать из Excel
+  </a>
+</div>
+{% else %}
+
+<!-- Estimate flat table -->
+<div class="data-table" style="overflow:visible">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Разделы и позиции сметы</span>
+    <small class="text-muted">{{ top_sections|length }} разделов верхнего уровня · {{ flat_rows|length }} строк</small>
+  </div>
+
+  <div>
+    <table class="table align-middle mb-0 w-100" style="font-size:.875rem">
+      <thead class="estimate-sticky-head">
+        <tr>
+          <th style="width:70px">Код</th>
+          <th>Наименование</th>
+          <th class="text-center" style="width:55px">Ед.</th>
+          <th class="text-end" style="width:80px">Кол-во</th>
+          <th class="text-end" style="width:120px">Цена</th>
+          <th class="text-end" style="width:140px">План (сом)</th>
+          <th class="text-end" style="width:140px">Расходы ПФ</th>
+          <th class="text-end" style="width:120px">Откл.</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      {% for sec in top_sections %}
+      {# ── Top-level section header row — always visible ── #}
+      <tbody>
+        <tr class="table-primary sec-header"
+            style="cursor:pointer;user-select:none"
+            data-bs-toggle="collapse"
+            data-bs-target="#sec-{{ sec.pk }}"
+            aria-expanded="true"
+            aria-controls="sec-{{ sec.pk }}">
+          <td><code class="text-muted" style="font-size:.78rem">{{ sec.code }}</code></td>
+          <td style="padding-left:.5rem">
+            <i class="bi bi-chevron-down sec-chevron me-2 text-primary" style="font-size:.75rem;transition:transform .2s"></i>
+            <span class="fw-bold">{{ sec.name }}</span>
+          </td>
+          <td></td><td></td><td></td>
+          <td class="text-end text-money fw-bold">{{ sec.total_amount|currency }}</td>
+          <td class="text-end text-money fw-bold {% if sec.pf_expense > 0 %}text-success{% endif %}">
+            {% if sec.pf_expense > 0 %}{{ sec.pf_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end fw-bold">
+            {% if sec.actual > sec.total_amount %}
+              <span class="text-danger">+{{ sec.actual|subtract:sec.total_amount|currency }}</span>
+            {% elif sec.total_amount > sec.actual and sec.total_amount > 0 %}
+              <span class="text-success">-{{ sec.total_amount|subtract:sec.actual|currency }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'section_item_add' sec.pk %}" class="btn btn-sm btn-outline-success py-0 px-2"
+               title="Добавить позицию" style="font-size:.75rem" onclick="event.stopPropagation()">
+              <i class="bi bi-plus"></i>
+            </a>
+          </td>
+        </tr>
+      </tbody>
+
+      {# ── Collapsible content for this top section ── #}
+      <tbody id="sec-{{ sec.pk }}" class="collapse show">
+        {% for row in sec.flat_children %}
+          {% if row.type == 'section' %}
+            {% with sec2=row.obj lvl=row.level %}
+            <tr class="{% if lvl == 1 %}table-light{% endif %}"
+                style="{% if lvl > 1 %}background:#f8fafc;{% endif %}">
+              <td><code class="text-muted" style="font-size:.78rem">{{ sec2.code }}</code></td>
+              <td style="padding-left:calc({{ lvl }}rem + 0.5rem)">
+                <span class="fw-semibold">{{ sec2.name }}</span>
+              </td>
+              <td></td><td></td><td></td>
+              <td class="text-end text-money fw-semibold">{{ sec2.total_amount|currency }}</td>
+              <td class="text-end text-money fw-semibold {% if sec2.pf_expense > 0 %}text-success{% endif %}">
+                {% if sec2.pf_expense > 0 %}{{ sec2.pf_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end fw-semibold">
+                {% if sec2.actual > sec2.total_amount %}
+                  <span class="text-danger">+{{ sec2.actual|subtract:sec2.total_amount|currency }}</span>
+                {% elif sec2.total_amount > sec2.actual and sec2.total_amount > 0 %}
+                  <span class="text-success">-{{ sec2.total_amount|subtract:sec2.actual|currency }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'section_item_add' sec2.pk %}" class="btn btn-sm btn-outline-success py-0 px-2" title="Добавить позицию" style="font-size:.75rem">
+                  <i class="bi bi-plus"></i>
+                </a>
+              </td>
+            </tr>
+            {% endwith %}
+          {% else %}
+            {% with item=row.obj lvl=row.level %}
+            {% with item_hist=item.history.all %}
+            <tr style="font-size:.84rem;{% if item.is_modified %}background:#fefce8;border-left:3px solid #eab308;{% elif item.actual > item.total_amount and item.total_amount > 0 %}background:#fff5f5;{% endif %}">
+              <td><code class="text-muted" style="font-size:.78rem">{{ item.code }}</code></td>
+              <td style="padding-left:calc({{ lvl }}rem + 0.5rem);color:#475569">
+                {% if item.is_modified %}
+                  <span class="text-warning me-1" title="Изменено вручную {{ item.modified_at|date:'d.m.Y H:i' }}">
+                    <i class="bi bi-pencil-fill" style="font-size:.7rem"></i>
+                  </span>
+                {% endif %}
+                {{ item.name }}
+                {% if item.nomenclature %}
+                  <i class="bi bi-link-45deg text-success ms-1" title="{{ item.nomenclature.name }}"></i>
+                {% else %}
+                  <i class="bi bi-dash text-muted ms-1 opacity-25"></i>
+                {% endif %}
+                {% if item_hist %}
+                  <button class="btn btn-link p-0 ms-1 text-warning" style="font-size:.72rem;vertical-align:middle"
+                          data-bs-toggle="collapse" data-bs-target="#hist-{{ item.pk }}" title="История изменений">
+                    <i class="bi bi-clock-history"></i> {{ item_hist|length }}
+                  </button>
+                {% endif %}
+              </td>
+              <td class="text-center text-muted">{{ item.unit|default:"—" }}</td>
+              <td class="text-end {% if item.is_modified %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                {{ item.quantity|floatformat:2 }}
+              </td>
+              <td class="text-end {% if item.is_modified %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                {{ item.unit_price|currency }}
+              </td>
+              <td class="text-end text-money {% if item.is_modified %}fw-bold text-warning{% endif %}">
+                {{ item.total_amount|currency }}
+              </td>
+              <td class="text-end text-money {% if item.pf_expense > item.total_amount and item.total_amount > 0 %}text-danger fw-semibold{% elif item.pf_expense > 0 %}text-success{% endif %}">
+                {% if item.pf_expense > 0 %}
+                  <button class="btn btn-link p-0 text-decoration-none fw-inherit lh-1
+                      {% if item.pf_expense > item.total_amount and item.total_amount > 0 %}text-danger{% else %}text-success{% endif %}"
+                      style="font-size:inherit"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#pf-{{ item.pk }}"
+                      title="{% if item.pf_source == 'manual' %}Ручная привязка{% else %}Авто-матч по имени{% endif %}">
+                    {{ item.pf_expense|currency }}
+                    {% if item.pf_source == 'auto' %}<i class="bi bi-magic ms-1 text-muted" style="font-size:.6rem" title="Авто"></i>
+                    {% else %}<i class="bi bi-check2 ms-1" style="font-size:.6rem"></i>{% endif %}
+                  </button>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if item.pf_expense > item.total_amount and item.total_amount > 0 %}
+                  <span class="text-danger small">+{{ item.pf_expense|subtract:item.total_amount|currency }}</span>
+                {% elif item.total_amount > item.pf_expense and item.pf_expense > 0 %}
+                  <span class="text-success small">-{{ item.total_amount|subtract:item.pf_expense|currency }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{% url 'section_item_edit' item.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.75rem">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="post" action="{% url 'section_item_delete' item.pk %}" onsubmit="return confirm('Удалить позицию?')">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:.75rem">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% if item.pf_details %}
+            <tr id="pf-{{ item.pk }}" class="collapse">
+              <td colspan="9" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
+                <div style="padding:.6rem 1rem .8rem">
+                  <div class="small fw-semibold text-success mb-2">
+                    <i class="bi bi-receipt me-1"></i>Расходы план-факт: {{ item.code }} {{ item.name }}
+                    {% if item.pf_source == 'auto' %}
+                      <span class="badge bg-secondary ms-1" style="font-size:.65rem;font-weight:400">авто-матч по имени</span>
+                    {% else %}
+                      <span class="badge bg-success ms-1" style="font-size:.65rem;font-weight:400">ручная привязка</span>
+                    {% endif %}
+                  </div>
+                  <table class="table table-sm table-borderless mb-2" style="font-size:.8rem;max-width:800px">
+                    <thead><tr>
+                      <th class="text-muted py-0">Этап</th>
+                      <th class="text-muted py-0">Этаж</th>
+                      <th class="text-muted py-0 text-end">Кол-во</th>
+                      <th class="text-muted py-0">Ед.</th>
+                      <th class="text-muted py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% if item.pf_source == 'manual' %}
+                        {% for alloc in item.pf_details %}
+                        <tr>
+                          <td class="py-0 text-muted">{{ alloc.floor_expense.floor.stage.name }}</td>
+                          <td class="py-0 text-muted">{{ alloc.floor_expense.floor.display_name }}</td>
+                          <td class="py-0 text-end">{{ alloc.quantity|floatformat:2 }}</td>
+                          <td class="py-0 text-muted">{{ alloc.floor_expense.unit|default:"—" }}</td>
+                          <td class="py-0 text-end fw-semibold">{{ alloc.amount|currency }}</td>
+                        </tr>
+                        {% endfor %}
+                      {% else %}
+                        {% for fe in item.pf_details %}
+                        <tr>
+                          <td class="py-0 text-muted">{{ fe.floor.stage.name }}</td>
+                          <td class="py-0 text-muted">{{ fe.floor.display_name }}</td>
+                          <td class="py-0 text-end">{{ fe.quantity|floatformat:2 }}</td>
+                          <td class="py-0 text-muted">{{ fe.unit|default:"—" }}</td>
+                          <td class="py-0 text-end fw-semibold">{{ fe.total_amount|currency }}</td>
+                        </tr>
+                        {% endfor %}
+                      {% endif %}
+                      <tr style="border-top:1px solid #d1fae5">
+                        <td colspan="4" class="py-0 text-end text-muted small">Итого ({{ item.pf_details|length }} записей):</td>
+                        <td class="py-0 text-end fw-bold text-success">{{ item.pf_expense|currency }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+            {% if item_hist %}
+            <tr id="hist-{{ item.pk }}" class="collapse" style="background:#fefce8">
+              <td colspan="9" style="padding:.5rem 1rem .75rem calc({{ lvl|add:1 }}rem + 1.5rem)">
+                <div class="small fw-semibold text-warning mb-1">
+                  <i class="bi bi-clock-history me-1"></i>История изменений: {{ item.code }} {{ item.name }}
+                </div>
+                <table class="table table-sm table-borderless mb-0" style="font-size:.8rem;max-width:600px">
+                  <thead><tr>
+                    <th class="text-muted py-0">Дата</th>
+                    <th class="text-muted py-0">Поле</th>
+                    <th class="text-muted py-0 text-end">Было</th>
+                    <th class="text-muted py-0 text-center">→</th>
+                    <th class="text-muted py-0">Стало</th>
+                  </tr></thead>
+                  <tbody>
+                    {% for h in item_hist %}
+                    <tr>
+                      <td class="text-muted py-0">{{ h.changed_at|date:"d.m.Y H:i" }}</td>
+                      <td class="py-0">{{ h.get_field_label }}</td>
+                      <td class="text-end text-muted py-0">{{ h.old_value }}</td>
+                      <td class="text-center text-muted py-0">→</td>
+                      <td class="fw-semibold py-0">{{ h.new_value }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            {% endif %}
+            {% endwith %}
+            {% endwith %}
+          {% endif %}
+        {% endfor %}
+      </tbody>
+      {% endfor %}
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="5" class="fw-bold">Итого</td>
+          <td class="text-end fw-bold text-money">{{ total_plan|currency }}</td>
+          <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+          <td class="text-end fw-bold text-money {% if total_deviation > 0 %}text-danger{% elif total_deviation < 0 %}text-success{% endif %}">
+            {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if versions %}
+<!-- Import History -->
+<div class="data-table mt-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title"><i class="bi bi-clock-history me-1 text-secondary"></i>История импортов</span>
+    <small class="text-muted">{{ versions|length }} версий</small>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead>
+        <tr>
+          <th>Дата и время</th>
+          <th>Файл</th>
+          <th class="text-end">Итого до</th>
+          <th class="text-end">Итого после</th>
+          <th class="text-end">Изменение</th>
+          <th class="text-center">Добавлено</th>
+          <th class="text-center">Изменено</th>
+          <th class="text-center">Удалено</th>
+          <th style="width:90px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ver in versions %}
+        <tr>
+          <td class="fw-semibold">{{ ver.imported_at|date:"d.m.Y H:i" }}</td>
+          <td class="text-muted small">{{ ver.source_file|default:"—" }}</td>
+          <td class="text-end text-money text-muted">{{ ver.total_before|currency }}</td>
+          <td class="text-end text-money fw-semibold">{{ ver.total_after|currency }}</td>
+          <td class="text-end">
+            {% with diff=ver.total_after|subtract:ver.total_before %}
+              {% if diff > 0 %}
+                <span class="text-danger small">+{{ diff|currency }}</span>
+              {% elif diff < 0 %}
+                <span class="text-success small">{{ diff|currency }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td class="text-center">
+            {% if ver.items_added %}<span class="badge bg-success">+{{ ver.items_added }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-center">
+            {% if ver.items_updated %}<span class="badge bg-warning text-dark">{{ ver.items_updated }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-center">
+            {% if ver.items_removed %}<span class="badge bg-danger">-{{ ver.items_removed }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if ver.changes.exists %}
+            <a href="{% url 'estimate_version_detail' estimate.pk ver.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.8rem">
+              <i class="bi bi-eye me-1"></i>Детали
+            </a>
+            {% else %}
+            <span class="text-muted small">Первый</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.sec-header').forEach(function(row) {
+  var target = row.getAttribute('data-bs-target');
+  var chevron = row.querySelector('.sec-chevron');
+  if (!target || !chevron) return;
+  var collapseEl = document.querySelector(target);
+  if (!collapseEl) return;
+  collapseEl.addEventListener('hide.bs.collapse', function() {
+    chevron.style.transform = 'rotate(-90deg)';
+  });
+  collapseEl.addEventListener('show.bs.collapse', function() {
+    chevron.style.transform = 'rotate(0deg)';
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Справочник номенклатуры{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-list-columns me-2 text-primary"></i>Справочник номенклатуры</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'nomenclature_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="data-table">
+  <div class="p-3 border-bottom">
+    <form method="get" class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" style="max-width:300px" placeholder="Поиск по названию...">
+      <button class="btn btn-sm btn-outline-secondary">Найти</button>
+      {% if q %}<a href="?" class="btn btn-sm btn-outline-secondary">Сбросить</a>{% endif %}
+    </form>
+  </div>
+
+  {% if items %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Наименование</th>
+          <th>Код 1С</th>
+          <th>Ед. изм.</th>
+          <th>Группа</th>
+          <th>Связей в сметах</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for nom in items %}
+        <tr>
+          <td class="fw-semibold">{{ nom.name }}</td>
+          <td><code class="text-muted small">{{ nom.code_1c|default:"—" }}</code></td>
+          <td class="text-muted">{{ nom.unit|default:"—" }}</td>
+          <td class="text-muted">{{ nom.group|default:"—" }}</td>
+          <td class="text-muted">{{ nom.estimate_items.count }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'nomenclature_edit' nom.pk %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'nomenclature_delete' nom.pk %}" onsubmit="return confirm('Деактивировать?')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-list-columns fs-2 d-block mb-2"></i>
+    {% if q %}Ничего не найдено по запросу «{{ q }}»{% else %}Справочник пуст.{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

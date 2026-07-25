@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Распределение расходов — {{ floor.display_name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'block_detail' estimate_block.pk %}">Блок {{ estimate_block.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'stage_detail' stage.pk %}">{{ stage.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'floor_detail' floor.pk %}">{{ floor.display_name }}</a></li>
+      <li class="breadcrumb-item active">Распределение по смете</li>
+    </ol></nav>
+    <h1><i class="bi bi-diagram-3 me-2 text-primary"></i>Распределение расходов по смете</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">
+      Проверьте и подтвердите привязку расходов к позициям сметы. Нераспределённые останутся в разделе «Нераспределённые расходы».
+    </p>
+  </div>
+  <a href="{% url 'floor_detail' floor.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К этажу
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+{% if not suggestions %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-check-circle fs-2 d-block mb-3 text-success"></i>
+  <p>Все расходы этажа уже распределены по смете.</p>
+  <a href="{% url 'floor_detail' floor.pk %}" class="btn btn-outline-secondary btn-sm">К этажу</a>
+</div>
+{% else %}
+
+{# Summary badges #}
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  <div class="stat-card p-3" style="min-width:160px">
+    <div class="label text-success"><i class="bi bi-check-circle me-1"></i>Авто-совпадение</div>
+    <div class="value">{{ counts.one }}</div>
+    <small class="text-muted">будут привязаны автоматически</small>
+  </div>
+  <div class="stat-card p-3" style="min-width:160px">
+    <div class="label text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Выбрать вручную</div>
+    <div class="value">{{ counts.many }}</div>
+    <small class="text-muted">несколько вариантов в смете</small>
+  </div>
+  <div class="stat-card p-3" style="min-width:160px">
+    <div class="label text-muted"><i class="bi bi-question-circle me-1"></i>Нет совпадения</div>
+    <div class="value">{{ counts.none }}</div>
+    <small class="text-muted">останутся нераспределёнными</small>
+  </div>
+</div>
+
+<form method="post" id="allocForm">
+  {% csrf_token %}
+
+  {% if counts.one %}
+  <div class="data-table mb-4">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="section-title">
+        <i class="bi bi-check-circle text-success me-2"></i>Авто-совпадение
+        <span class="badge bg-success bg-opacity-10 text-success ms-2">{{ counts.one }}</span>
+      </span>
+      <small class="text-muted">Совпадение по названию — можно изменить</small>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.875rem">
+        <thead class="table-light">
+          <tr>
+            <th>Расход (план-факт)</th>
+            <th class="text-end" style="width:120px">Кол-во</th>
+            <th class="text-end" style="width:140px">Сумма</th>
+            <th style="min-width:320px">Позиция сметы</th>
+            <th style="width:110px">Кол-во <span class="text-muted fw-normal">(необяз.)</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in suggestions %}{% if s.status == 'one' %}
+          <tr style="background:rgba(22,163,74,.04)">
+            <td>
+              <div class="fw-semibold">{{ s.fe.name }}
+                {% if s.from_memory %}<i class="bi bi-bookmark-fill text-success ms-1" title="Из памяти" style="font-size:.75rem"></i>{% endif %}
+              </div>
+              <small class="text-muted">{{ s.fe.floor.display_name }}{% if s.fe.expense_date %} · {{ s.fe.expense_date|date:"d.m.Y" }}{% endif %}</small>
+            </td>
+            <td class="text-end text-muted">{{ s.fe.quantity|floatformat:2 }} {{ s.fe.unit }}</td>
+            <td class="text-end text-money fw-semibold">{{ s.fe.total_amount|currency }}</td>
+            <td>
+              <select name="item_{{ s.fe.pk }}" class="form-select form-select-sm">
+                <option value="">— не привязывать —</option>
+                {% for choice in item_choices %}
+                  {% if choice.type == 'optgroup' %}
+                    </optgroup><optgroup label="{{ choice.label }}">
+                  {% else %}
+                    <option value="{{ choice.id }}"
+                      {% if s.auto_item and s.auto_item.pk == choice.id %}selected{% endif %}>
+                      {{ choice.label }}
+                    </option>
+                  {% endif %}
+                {% endfor %}
+                </optgroup>
+              </select>
+            </td>
+            <td>
+              <input type="number" step="0.001" min="0"
+                     name="qty_{{ s.fe.pk }}"
+                     class="form-control form-control-sm"
+                     placeholder="{{ s.fe.quantity|floatformat:3 }}"
+                     style="width:100px">
+            </td>
+          </tr>
+          {% endif %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if counts.many %}
+  <div class="data-table mb-4">
+    <div class="p-3 border-bottom">
+      <span class="section-title">
+        <i class="bi bi-exclamation-triangle text-warning me-2"></i>Выберите позицию вручную
+        <span class="badge bg-warning text-dark ms-2">{{ counts.many }}</span>
+      </span>
+      <div class="text-muted small mt-1">Эти расходы совпадают с несколькими позициями сметы — выберите нужную.</div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.875rem">
+        <thead class="table-light">
+          <tr>
+            <th>Расход (план-факт)</th>
+            <th class="text-end" style="width:120px">Кол-во</th>
+            <th class="text-end" style="width:140px">Сумма</th>
+            <th style="min-width:320px">Позиция сметы</th>
+            <th style="width:110px">Кол-во <span class="text-muted fw-normal">(необяз.)</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in suggestions %}{% if s.status == 'many' %}
+          <tr style="background:rgba(234,179,8,.05)">
+            <td>
+              <div class="fw-semibold">{{ s.fe.name }}</div>
+              <small class="text-muted">{{ s.fe.floor.display_name }}{% if s.fe.expense_date %} · {{ s.fe.expense_date|date:"d.m.Y" }}{% endif %}</small>
+            </td>
+            <td class="text-end text-muted">{{ s.fe.quantity|floatformat:2 }} {{ s.fe.unit }}</td>
+            <td class="text-end text-money fw-semibold">{{ s.fe.total_amount|currency }}</td>
+            <td>
+              <select name="item_{{ s.fe.pk }}" class="form-select form-select-sm border-warning">
+                <option value="">— выбрать позицию —</option>
+                {# Show direct matches first #}
+                <optgroup label="Совпадения по названию">
+                  {% for m in s.matches %}
+                  <option value="{{ m.pk }}" selected>{{ m.section.code }} {{ m.section.name }} → {{ m.name }}</option>
+                  {% endfor %}
+                </optgroup>
+                {# All items #}
+                {% for choice in item_choices %}
+                  {% if choice.type == 'optgroup' %}
+                    </optgroup><optgroup label="{{ choice.label }}">
+                  {% else %}
+                    <option value="{{ choice.id }}">{{ choice.label }}</option>
+                  {% endif %}
+                {% endfor %}
+                </optgroup>
+              </select>
+              <small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>{{ s.matches|length }} совпадения — выберите нужное</small>
+            </td>
+            <td>
+              <input type="number" step="0.001" min="0"
+                     name="qty_{{ s.fe.pk }}"
+                     class="form-control form-control-sm"
+                     placeholder="{{ s.fe.quantity|floatformat:3 }}"
+                     style="width:100px">
+            </td>
+          </tr>
+          {% endif %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if counts.none %}
+  <div class="data-table mb-4">
+    <div class="p-3 border-bottom">
+      <span class="section-title text-muted">
+        <i class="bi bi-question-circle me-2"></i>Нет совпадения в смете
+        <span class="badge bg-secondary bg-opacity-10 text-secondary ms-2">{{ counts.none }}</span>
+      </span>
+      <div class="text-muted small mt-1">Можно привязать вручную или оставить — они попадут в «Нераспределённые расходы».</div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.875rem">
+        <thead class="table-light">
+          <tr>
+            <th>Расход (план-факт)</th>
+            <th class="text-end" style="width:120px">Кол-во</th>
+            <th class="text-end" style="width:140px">Сумма</th>
+            <th style="min-width:320px">Позиция сметы (необязательно)</th>
+            <th style="width:110px">Кол-во</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in suggestions %}{% if s.status == 'none' %}
+          <tr class="text-muted">
+            <td>
+              <div class="fw-semibold text-body">{{ s.fe.name }}</div>
+              <small>{{ s.fe.floor.display_name }}{% if s.fe.expense_date %} · {{ s.fe.expense_date|date:"d.m.Y" }}{% endif %}</small>
+            </td>
+            <td class="text-end">{{ s.fe.quantity|floatformat:2 }} {{ s.fe.unit }}</td>
+            <td class="text-end text-money fw-semibold text-body">{{ s.fe.total_amount|currency }}</td>
+            <td>
+              <select name="item_{{ s.fe.pk }}" class="form-select form-select-sm">
+                <option value="">— оставить нераспределённым —</option>
+                {% for choice in item_choices %}
+                  {% if choice.type == 'optgroup' %}
+                    </optgroup><optgroup label="{{ choice.label }}">
+                  {% else %}
+                    <option value="{{ choice.id }}">{{ choice.label }}</option>
+                  {% endif %}
+                {% endfor %}
+                </optgroup>
+              </select>
+            </td>
+            <td>
+              <input type="number" step="0.001" min="0"
+                     name="qty_{{ s.fe.pk }}"
+                     class="form-control form-control-sm"
+                     placeholder="{{ s.fe.quantity|floatformat:3 }}"
+                     style="width:100px">
+            </td>
+          </tr>
+          {% endif %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="d-flex justify-content-between align-items-center">
+    <a href="{% url 'floor_detail' floor.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-skip-forward me-1"></i>Пропустить, распределю позже
+    </a>
+    <button type="submit" class="btn btn-success btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Подтвердить распределение
+    </button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

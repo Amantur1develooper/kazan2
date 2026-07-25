@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ action }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'estimate_list' %}">Сметы</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'estimate_detail' estimate.pk %}">Блок {{ estimate.block.name }}</a></li>
+      <li class="breadcrumb-item active">{{ action }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-pencil-square me-2"></i>{{ action }}</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-section p-4 mb-3">
+      <div class="label mb-1">Раздел сметы</div>
+      <div class="fw-semibold">{{ section.code }} {{ section.name }}</div>
+    </div>
+
+    <div class="card-section p-4">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-primary px-4">Сохранить</button>
+          <a href="{% url 'estimate_detail' estimate.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

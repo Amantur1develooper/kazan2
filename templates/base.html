@@ -130,9 +130,12 @@
       <i class="bi bi-building"></i> Жилые комплексы
     </a>
 
-    <div class="sidebar-section-title">Финансы</div>
-    <a href="{% url 'cash_detail' %}" class="sidebar-link {% if 'cash' in request.resolver_match.url_name or 'transaction' in request.resolver_match.url_name %}active{% endif %}">
-      <i class="bi bi-cash-stack"></i> Главная касса
+    <div class="sidebar-section-title">Планирование</div>
+    <a href="{% url 'estimate_list' %}" class="sidebar-link {% if 'estimate' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-clipboard2-data"></i> Сметы
+    </a>
+    <a href="{% url 'nomenclature_list' %}" class="sidebar-link {% if 'nomenclature' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-list-columns"></i> Номенклатура
     </a>
 
     <div class="sidebar-section-title">Данные</div>

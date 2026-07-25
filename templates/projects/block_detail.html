@@ -14,6 +14,7 @@
     <h1><i class="bi bi-layers me-2 text-primary"></i>Блок {{ block_obj.name }}</h1>
   </div>
   <div class="d-flex gap-2">
+    <a href="{% url 'estimate_for_block' block_obj.pk %}" class="btn btn-success btn-sm"><i class="bi bi-clipboard2-data me-1"></i>Смета</a>
     <a href="{% url 'stage_create' block_obj.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Добавить этап</a>
     <a href="{% url 'block_update' block_obj.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i></a>
     <a href="{% url 'block_delete' block_obj.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a>
@@ -90,7 +91,7 @@
             {% for item in stage_stats %}
             {% with pct=item.actual|percent:item.planned %}
             <tr>
-              <td class="text-muted small">{{ item.stage.order }}</td>
+              <td class="text-muted small">{{ forloop.counter }}</td>
               <td>
                 <a href="{% url 'stage_detail' item.stage.pk %}" class="fw-semibold text-decoration-none text-dark">
                   {{ item.stage.name }}

@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.projects',
     'apps.imports',
+    'apps.estimates',
 ]
 
 MIDDLEWARE = [

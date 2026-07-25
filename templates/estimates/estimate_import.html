@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт сметы{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'estimate_list' %}">Сметы</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'estimate_detail' estimate.pk %}">Блок {{ estimate.block.name }}</a></li>
+      <li class="breadcrumb-item active">Импорт</li>
+    </ol></nav>
+    <h1><i class="bi bi-upload me-2 text-success"></i>Импорт сметы из Excel</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+
+    <div class="card-section p-4 mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="bg-primary bg-opacity-10 rounded p-2"><i class="bi bi-building text-primary"></i></div>
+        <div>
+          <div class="label mb-0">Смета для блока</div>
+          <div class="fw-semibold">{{ estimate.block.residential_complex.name }} — Блок {{ estimate.block.name }}</div>
+        </div>
+      </div>
+      {% if estimate.sections.exists %}
+      <div class="alert alert-warning mb-0 mt-3 py-2">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Внимание: существующие данные сметы будут <strong>полностью заменены</strong> при импорте.
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-success px-4">
+            <i class="bi bi-upload me-1"></i>Загрузить и импортировать
+          </button>
+          <a href="{% url 'estimate_detail' estimate.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3">
+      <div class="section-title mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Ожидаемый формат</div>
+      <ul class="list-unstyled small text-muted mb-0">
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Столбец А: код (1, 1.1, 4.1.2...)</li>
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Столбец Б: Наименование</li>
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Столбец Ж: Количество</li>
+        <li class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Столбец К/М: Цена работ / материалов</li>
+        <li><i class="bi bi-check-circle text-success me-2"></i>Столбец П: Итого стоимости</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

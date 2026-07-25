@@ -1,0 +1,80 @@
+{% load finance_filters %}
+
+{# Section header row #}
+<tr class="{% if level == 0 %}table-primary{% elif level == 1 %}table-light{% endif %}"
+    style="{% if level > 1 %}background:#f8fafc;{% endif %}">
+  <td>
+    <code class="text-muted small">{{ section.code }}</code>
+  </td>
+  <td style="padding-left: calc({{ level }}rem + 0.75rem)">
+    <span class="fw-{% if level == 0 %}bold{% else %}semibold{% endif %}">{{ section.name }}</span>
+  </td>
+  <td></td><td></td><td></td>
+  <td class="text-end text-money fw-semibold">{{ section.total_amount|currency }}</td>
+  <td class="text-end text-money fw-semibold">{{ section._actual|currency }}</td>
+  <td class="text-end fw-semibold">
+    {% if section._actual > section.total_amount %}
+      <span class="text-danger">+{{ section._actual|subtract:section.total_amount|currency }}</span>
+    {% elif section.total_amount > section._actual %}
+      <span class="text-success">-{{ section.total_amount|subtract:section._actual|currency }}</span>
+    {% else %}
+      <span class="text-muted">0</span>
+    {% endif %}
+  </td>
+  <td>
+    <a href="{% url 'section_item_add' section.pk %}" class="btn btn-sm btn-outline-success py-0 px-1" title="Добавить позицию">
+      <i class="bi bi-plus" style="font-size:.75rem"></i>
+    </a>
+  </td>
+</tr>
+
+{# Child sections (recursive) #}
+{% for child in section.children.all %}
+  {% with next_level=level|add:1 %}
+    {% include 'estimates/_section_row.html' with section=child level=next_level %}
+  {% endwith %}
+{% endfor %}
+
+{# Items directly in this section #}
+{% for item in section.items.all %}
+<tr style="font-size:.84rem; {% if item._actual > item.total_amount %}background:#fff5f5;{% endif %}">
+  <td></td>
+  <td style="padding-left: calc({{ level|add:1 }}rem + 0.75rem); color:#475569">
+    {{ item.name }}
+    {% if item.nomenclature %}
+      <i class="bi bi-link-45deg text-success ms-1" title="{{ item.nomenclature.name }}"></i>
+    {% else %}
+      <i class="bi bi-dash text-muted ms-1 opacity-50"></i>
+    {% endif %}
+  </td>
+  <td class="text-center text-muted">{{ item.unit|default:"—" }}</td>
+  <td class="text-end text-muted">{{ item.quantity|floatformat:2 }}</td>
+  <td class="text-end text-muted">{{ item.unit_price|currency }}</td>
+  <td class="text-end text-money">{{ item.total_amount|currency }}</td>
+  <td class="text-end text-money {% if item._actual > item.total_amount %}text-danger fw-semibold{% endif %}">
+    {{ item._actual|currency }}
+  </td>
+  <td class="text-end">
+    {% if item._actual > item.total_amount %}
+      <span class="text-danger small">+{{ item._actual|subtract:item.total_amount|currency }}</span>
+    {% elif item.total_amount > item._actual and item._actual > 0 %}
+      <span class="text-success small">-{{ item.total_amount|subtract:item._actual|currency }}</span>
+    {% else %}
+      <span class="text-muted">—</span>
+    {% endif %}
+  </td>
+  <td>
+    <div class="d-flex gap-1">
+      <a href="{% url 'section_item_edit' item.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1">
+        <i class="bi bi-pencil" style="font-size:.75rem"></i>
+      </a>
+      <form method="post" action="{% url 'section_item_delete' item.pk %}" onsubmit="return confirm('Удалить позицию?')">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-danger py-0 px-1">
+          <i class="bi bi-trash" style="font-size:.75rem"></i>
+        </button>
+      </form>
+    </div>
+  </td>
+</tr>
+{% endfor %}
