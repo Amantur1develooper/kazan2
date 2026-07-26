@@ -1,3 +1,4 @@
+import json
 from django import template
 from decimal import Decimal
 
@@ -93,6 +94,12 @@ def negate(value):
         return -Decimal(str(value))
     except Exception:
         return 0
+
+
+@register.filter
+def tojson(value):
+    """Serialize value to a JSON string safe for embedding in <script>."""
+    return json.dumps(value, ensure_ascii=False)
 
 
 @register.filter

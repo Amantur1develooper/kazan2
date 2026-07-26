@@ -219,6 +219,10 @@ def _process_floor_import(excel_import):
         excel_import.save()
         return
 
+    # Guard against double-processing (browser back+resubmit, etc.)
+    if excel_import.status == 'completed':
+        return
+
     excel_import.status = 'processing'
     excel_import.save(update_fields=['status'])
 

@@ -374,6 +374,11 @@ def apply_floor_import(floor, parsed_data, import_mode='replace', excel_import=N
     from apps.projects.models import FloorExpense
 
     stats = {'created': 0, 'updated': 0, 'errors': 0}
+
+    # Guard: if records for this import already exist, skip to prevent duplicates
+    if excel_import and FloorExpense.objects.filter(source_import=excel_import).exists():
+        return stats
+
     items = parsed_data.get('items', [])
 
     for item in items:

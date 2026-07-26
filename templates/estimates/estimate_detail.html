@@ -267,54 +267,87 @@
                 </div>
               </td>
             </tr>
-            {% if item.pf_details %}
+            {% if item.pf_floors %}
             <tr id="pf-{{ item.pk }}" class="collapse">
               <td colspan="9" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
                 <div style="padding:.6rem 1rem .8rem">
-                  <div class="small fw-semibold text-success mb-2">
-                    <i class="bi bi-receipt me-1"></i>Расходы план-факт: {{ item.code }} {{ item.name }}
-                    {% if item.pf_source == 'auto' %}
-                      <span class="badge bg-secondary ms-1" style="font-size:.65rem;font-weight:400">авто-матч по имени</span>
-                    {% else %}
-                      <span class="badge bg-success ms-1" style="font-size:.65rem;font-weight:400">ручная привязка</span>
-                    {% endif %}
-                  </div>
-                  <table class="table table-sm table-borderless mb-2" style="font-size:.8rem;max-width:800px">
-                    <thead><tr>
-                      <th class="text-muted py-0">Этап</th>
-                      <th class="text-muted py-0">Этаж</th>
-                      <th class="text-muted py-0 text-end">Кол-во</th>
-                      <th class="text-muted py-0">Ед.</th>
-                      <th class="text-muted py-0 text-end">Сумма</th>
-                    </tr></thead>
-                    <tbody>
-                      {% if item.pf_source == 'manual' %}
-                        {% for alloc in item.pf_details %}
-                        <tr>
-                          <td class="py-0 text-muted">{{ alloc.floor_expense.floor.stage.name }}</td>
-                          <td class="py-0 text-muted">{{ alloc.floor_expense.floor.display_name }}</td>
-                          <td class="py-0 text-end">{{ alloc.quantity|floatformat:2 }}</td>
-                          <td class="py-0 text-muted">{{ alloc.floor_expense.unit|default:"—" }}</td>
-                          <td class="py-0 text-end fw-semibold">{{ alloc.amount|currency }}</td>
-                        </tr>
-                        {% endfor %}
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small fw-semibold text-success">
+                      <i class="bi bi-receipt me-1"></i>Расходы план-факт: {{ item.code }} {{ item.name }}
+                      {% if item.pf_source == 'auto' %}
+                        <span class="badge bg-secondary ms-1" style="font-size:.65rem;font-weight:400">авто-матч</span>
                       {% else %}
-                        {% for fe in item.pf_details %}
-                        <tr>
-                          <td class="py-0 text-muted">{{ fe.floor.stage.name }}</td>
-                          <td class="py-0 text-muted">{{ fe.floor.display_name }}</td>
-                          <td class="py-0 text-end">{{ fe.quantity|floatformat:2 }}</td>
-                          <td class="py-0 text-muted">{{ fe.unit|default:"—" }}</td>
-                          <td class="py-0 text-end fw-semibold">{{ fe.total_amount|currency }}</td>
-                        </tr>
-                        {% endfor %}
+                        <span class="badge bg-success ms-1" style="font-size:.65rem;font-weight:400">ручная привязка</span>
                       {% endif %}
-                      <tr style="border-top:1px solid #d1fae5">
-                        <td colspan="4" class="py-0 text-end text-muted small">Итого ({{ item.pf_details|length }} записей):</td>
-                        <td class="py-0 text-end fw-bold text-success">{{ item.pf_expense|currency }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                    </div>
+                    <span class="fw-bold text-success small me-2">Итого: {{ item.pf_expense|currency }}</span>
+                  </div>
+
+                  {# Floors accordion — pure JS, one open at a time #}
+                  <div class="pf-acc" style="max-width:740px">
+                  {% for flg in item.pf_floors %}
+                  <div class="pf-floor mb-1">
+                    <div class="pf-floor-hd d-flex align-items-center gap-2 px-2 py-1 rounded"
+                         style="background:#dcfce7;cursor:pointer;font-size:.82rem;user-select:none"
+                         onclick="pfAccToggle(this)">
+                      <i class="bi bi-chevron-right pf-chev" style="font-size:.65rem;transition:.2s"></i>
+                      <span class="fw-semibold text-dark">{{ flg.floor.display_name }}</span>
+                      <span class="text-muted" style="font-size:.75rem">{{ flg.floor.stage.name }}</span>
+                      <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ flg.records|length }} зап.</span>
+                      <span class="ms-auto fw-bold text-success">{{ flg.total|currency }}</span>
+                    </div>
+                    <div class="pf-floor-bd" style="display:none">
+                      <table class="table table-sm table-borderless mb-0" style="font-size:.78rem;background:#f0fdf4">
+                        <thead><tr class="text-muted">
+                          <th class="py-0 ps-3">Наименование</th>
+                          <th class="py-0">Дата</th>
+                          <th class="py-0 text-end">Кол-во</th>
+                          <th class="py-0">Ед.</th>
+                          <th class="py-0 text-end">Цена</th>
+                          <th class="py-0 text-end">Сумма</th>
+                        </tr></thead>
+                        <tbody>
+                          {% if item.pf_source == 'manual' %}
+                            {% for alloc in flg.records %}
+                            <tr>
+                              <td class="py-0 ps-3">{{ alloc.floor_expense.name }}</td>
+                              <td class="py-0 text-muted" style="white-space:nowrap">{% if alloc.floor_expense.expense_date %}{{ alloc.floor_expense.expense_date|date:"d.m.Y" }}{% else %}{{ alloc.floor_expense.created_at|date:"d.m.Y" }}{% endif %}</td>
+                              <td class="py-0 text-end">{{ alloc.quantity|floatformat:2 }}</td>
+                              <td class="py-0 text-muted">{{ alloc.floor_expense.unit|default:"—" }}</td>
+                              <td class="py-0 text-end text-muted">{{ alloc.floor_expense.unit_price|currency }}</td>
+                              <td class="py-0 text-end fw-semibold">{{ alloc.amount|currency }}</td>
+                            </tr>
+                            {% endfor %}
+                          {% else %}
+                            {% for fe in flg.records %}
+                            <tr>
+                              <td class="py-0 ps-3">{{ fe.name }}</td>
+                              <td class="py-0 text-muted" style="white-space:nowrap">{% if fe.expense_date %}{{ fe.expense_date|date:"d.m.Y" }}{% else %}{{ fe.created_at|date:"d.m.Y" }}{% endif %}</td>
+                              <td class="py-0 text-end">{{ fe.quantity|floatformat:2 }}</td>
+                              <td class="py-0 text-muted">{{ fe.unit|default:"—" }}</td>
+                              <td class="py-0 text-end text-muted">{{ fe.unit_price|currency }}</td>
+                              <td class="py-0 text-end fw-semibold">{{ fe.total_amount|currency }}</td>
+                            </tr>
+                            {% endfor %}
+                          {% endif %}
+                        </tbody>
+                        <tfoot>
+                          <tr style="border-top:1px solid #bbf7d0">
+                            <td colspan="5" class="py-0 text-end text-muted ps-3">Итого по этажу:</td>
+                            <td class="py-0 text-end fw-bold text-success">{{ flg.total|currency }}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                  {% endfor %}
+                  </div>
+                  {# Overall total #}
+                  <div class="d-flex justify-content-end mt-2 me-2">
+                    <span class="small text-muted me-2">Итого по позиции:</span>
+                    <span class="fw-bold text-success">{{ item.pf_expense|currency }}</span>
+                  </div>
+
                 </div>
               </td>
             </tr>
@@ -440,18 +473,33 @@
 
 {% block scripts %}
 <script>
+// Section collapse chevrons
 document.querySelectorAll('.sec-header').forEach(function(row) {
   var target = row.getAttribute('data-bs-target');
   var chevron = row.querySelector('.sec-chevron');
   if (!target || !chevron) return;
   var collapseEl = document.querySelector(target);
   if (!collapseEl) return;
-  collapseEl.addEventListener('hide.bs.collapse', function() {
-    chevron.style.transform = 'rotate(-90deg)';
-  });
-  collapseEl.addEventListener('show.bs.collapse', function() {
-    chevron.style.transform = 'rotate(0deg)';
-  });
+  collapseEl.addEventListener('hide.bs.collapse', function() { chevron.style.transform = 'rotate(-90deg)'; });
+  collapseEl.addEventListener('show.bs.collapse', function() { chevron.style.transform = 'rotate(0deg)'; });
 });
+
+// PF floor accordion — one floor open at a time
+function pfAccToggle(hd) {
+  var floor = hd.closest('.pf-floor');
+  var acc   = hd.closest('.pf-acc');
+  var bd    = floor.querySelector('.pf-floor-bd');
+  var isOpen = bd.style.display !== 'none';
+
+  // Close all floors in this accordion
+  acc.querySelectorAll('.pf-floor-bd').forEach(function(b) { b.style.display = 'none'; });
+  acc.querySelectorAll('.pf-chev').forEach(function(c) { c.style.transform = 'rotate(0deg)'; });
+
+  // Open clicked one only if it was closed
+  if (!isOpen) {
+    bd.style.display = 'block';
+    hd.querySelector('.pf-chev').style.transform = 'rotate(90deg)';
+  }
+}
 </script>
 {% endblock %}

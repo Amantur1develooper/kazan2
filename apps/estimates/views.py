@@ -87,15 +87,15 @@ def estimate_detail(request, pk):
     items_by_section = {}
     for item in all_items:
         if item.pk in pf_by_alloc:
-            # Ручная привязка через ExpenseAllocation
             item.pf_expense = pf_by_alloc[item.pk]
             item.pf_source = 'manual'
             item.pf_details = detail_by_alloc.get(item.pk, [])
+            item.pf_floors = _group_pf_by_floor_alloc(item.pf_details)
         else:
-            # Автоматический матч по имени
             item.pf_expense = pf_by_name.get(item.name, Decimal('0'))
             item.pf_source = 'auto' if item.pf_expense > 0 else 'none'
             item.pf_details = fe_detail_by_name.get(item.name, [])
+            item.pf_floors = _group_pf_by_floor_fe(item.pf_details)
         item.actual = item.pf_expense
         items_by_section.setdefault(item.section_id, []).append(item)
 
@@ -662,8 +662,13 @@ def floor_allocate_review(request, floor_pk):
             'from_memory': False,
         })
 
-    # Build optgroup choices for selects
-    item_choices = _build_item_choices(all_items)
+    # Build choices: stage section first, then all remaining items
+    if stage_section:
+        stage_items = [i for i in all_items if _item_in_section(i, stage_section)]
+        other_items = [i for i in all_items if not _item_in_section(i, stage_section)]
+        item_choices = _build_item_choices_with_priority(stage_section, stage_items, other_items)
+    else:
+        item_choices = _build_item_choices(all_items)
 
     counts = {
         'one': sum(1 for s in suggestions if s['status'] == 'one'),
@@ -678,8 +683,33 @@ def floor_allocate_review(request, floor_pk):
         'estimate_block': block,
         'suggestions': suggestions,
         'item_choices': item_choices,
+        'stage_section': stage_section,
         'counts': counts,
     })
+
+
+def _group_pf_by_floor_alloc(allocs):
+    """Group ExpenseAllocation list by floor → [{floor, records, total, dates}]"""
+    floors = {}
+    for alloc in allocs:
+        fl = alloc.floor_expense.floor
+        if fl.pk not in floors:
+            floors[fl.pk] = {'floor': fl, 'records': [], 'total': Decimal('0')}
+        floors[fl.pk]['records'].append(alloc)
+        floors[fl.pk]['total'] += alloc.amount
+    return sorted(floors.values(), key=lambda x: x['floor'].number or 0)
+
+
+def _group_pf_by_floor_fe(fes):
+    """Group FloorExpense list by floor → [{floor, records, total}]"""
+    floors = {}
+    for fe in fes:
+        fl = fe.floor
+        if fl.pk not in floors:
+            floors[fl.pk] = {'floor': fl, 'records': [], 'total': Decimal('0')}
+        floors[fl.pk]['records'].append(fe)
+        floors[fl.pk]['total'] += fe.total_amount
+    return sorted(floors.values(), key=lambda x: x['floor'].number or 0)
 
 
 def _item_in_section(item, section):
@@ -701,11 +731,31 @@ def _build_item_choices(all_items):
         if sec_label != current_section:
             choices.append({'type': 'optgroup', 'label': sec_label})
             current_section = sec_label
-        choices.append({
-            'type': 'option',
-            'id': item.pk,
-            'label': f'{item.code} {item.name}'.strip() if item.code else item.name,
-        })
+        label = f'{item.code}  {item.name}' if item.code else item.name
+        choices.append({'type': 'option', 'id': item.pk, 'label': label})
+    return choices
+
+
+def _build_item_choices_with_priority(stage_section, stage_items, other_items):
+    """Stage section items first (marked), then all other items."""
+    choices = []
+    if stage_items:
+        sec_label = f'★ {stage_section.code} {stage_section.name}'
+        choices.append({'type': 'optgroup', 'label': sec_label})
+        for item in stage_items:
+            label = f'{item.code}  {item.name}' if item.code else item.name
+            choices.append({'type': 'option', 'id': item.pk, 'label': label})
+
+    if other_items:
+        choices.append({'type': 'optgroup', 'label': '─── Остальные разделы ───'})
+        current_section = None
+        for item in other_items:
+            sec_label = f'{item.section.code} {item.section.name}'.strip()
+            if sec_label != current_section:
+                choices.append({'type': 'optgroup', 'label': sec_label})
+                current_section = sec_label
+            label = f'{item.code}  {item.name}' if item.code else item.name
+            choices.append({'type': 'option', 'id': item.pk, 'label': label})
     return choices
 
 
