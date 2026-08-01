@@ -190,15 +190,114 @@ def block_detail(request, pk):
     total_planned = sum(x['planned'] for x in stage_stats)
     total_actual = sum(x['actual'] for x in stage_stats)
 
+    # ── Estimate-based plan/fact summary ──────────────────────────────────────
+    estimate_summary = None
+    estimate_total_plan = None
+    estimate_total_fact = Decimal('0')
+    try:
+        from apps.estimates.models import EstimateItem, ExpenseAllocation
+        estimate = block_obj.estimate
+
+        # Section ancestry: sec_id → top_section_id
+        sec_parent = dict(estimate.sections.values_list('id', 'parent_id'))
+
+        def _top_id(sec_id):
+            seen = set()
+            while sec_parent.get(sec_id) is not None:
+                if sec_id in seen:
+                    break
+                seen.add(sec_id)
+                sec_id = sec_parent[sec_id]
+            return sec_id
+
+        all_items = list(
+            EstimateItem.objects.filter(section__estimate=estimate)
+            .values('id', 'name', 'section_id')
+        )
+        item_to_top = {i['id']: _top_id(i['section_id']) for i in all_items}
+        item_names = [i['name'] for i in all_items]
+
+        # Auto name-match sums
+        pf_by_name = {
+            r['name']: r['s']
+            for r in FloorExpense.objects.filter(
+                floor__stage__block=block_obj, name__in=item_names
+            ).values('name').annotate(s=Sum('total_amount'))
+        }
+
+        # Manual alloc sums per item
+        pf_by_alloc = {
+            r['estimate_item_id']: r['s']
+            for r in ExpenseAllocation.objects.filter(
+                estimate_item__section__estimate=estimate,
+                estimate_item__isnull=False,
+            ).values('estimate_item_id').annotate(s=Sum('amount'))
+        }
+
+        # FE ids already allocated (to exclude from unallocated)
+        alloc_fe_ids = set(
+            ExpenseAllocation.objects.filter(
+                floor_expense__floor__stage__block=block_obj,
+                estimate_item__isnull=False,
+            ).values_list('floor_expense_id', flat=True)
+        )
+
+        # Fact per top section from items (manual overrides auto per item)
+        actual_by_top = {}
+        for item in all_items:
+            fact = pf_by_alloc.get(item['id']) or pf_by_name.get(item['name'], Decimal('0'))
+            top = item_to_top[item['id']]
+            actual_by_top[top] = actual_by_top.get(top, Decimal('0')) + fact
+
+        # Unallocated FEs per stage (one query)
+        unalloc_by_stage = {
+            r['floor__stage_id']: r['s']
+            for r in FloorExpense.objects.filter(
+                floor__stage__block=block_obj
+            ).exclude(id__in=alloc_fe_ids)
+            .exclude(name__in=item_names)  # exclude auto-matched: already counted per item
+            .values('floor__stage_id').annotate(s=Sum('total_amount'))
+        }
+
+        stage_by_name = {s.name: s for s in block_obj.stages.all()}
+        top_sections = list(estimate.sections.filter(parent__isnull=True).order_by('order', 'code'))
+
+        estimate_summary = []
+        for sec in top_sections:
+            label = f'{sec.code} {sec.name}'.strip()
+            matched_stage = stage_by_name.get(label) or stage_by_name.get(sec.name)
+            fact = actual_by_top.get(sec.id, Decimal('0'))
+            if matched_stage:
+                fact += unalloc_by_stage.get(matched_stage.id, Decimal('0'))
+            estimate_summary.append({
+                'section': sec,
+                'plan': sec.total_amount,
+                'fact': fact,
+                'deviation': fact - sec.total_amount,
+            })
+
+        estimate_total_plan = sum(x['plan'] for x in estimate_summary)
+        estimate_total_fact = sum(x['fact'] for x in estimate_summary)
+
+    except Exception:
+        pass
+
     context = {
         'block_obj': block_obj,
         'stage_stats': stage_stats,
         'total_planned': total_planned,
         'total_actual': total_actual,
         'total_deviation': total_actual - total_planned,
+        'estimate_summary': estimate_summary,
+        'estimate_total_plan': estimate_total_plan,
+        'estimate_total_fact': estimate_total_fact,
+        'estimate_total_deviation': estimate_total_fact - (estimate_total_plan or Decimal('0')),
         'chart_labels': json.dumps([x['stage'].name for x in stage_stats]),
         'chart_planned': json.dumps([float(x['planned']) for x in stage_stats]),
         'chart_actual': json.dumps([float(x['actual']) for x in stage_stats]),
+        'est_chart_labels': json.dumps([f'{x["section"].code} {x["section"].name}'.strip() for x in (estimate_summary or [])]),
+        'est_chart_plan': json.dumps([float(x['plan']) for x in (estimate_summary or [])]),
+        'est_chart_fact': json.dumps([float(x['fact']) for x in (estimate_summary or [])]),
     }
     return render(request, 'projects/block_detail.html', context)
 
@@ -425,6 +524,8 @@ def expense_create(request, floor_pk):
                 expense.total_amount = expense.unit_price * expense.quantity
             expense.save()
             messages.success(request, f'Расход «{expense.name}» добавлен.')
+            if hasattr(floor.stage.block, 'estimate'):
+                return redirect('floor_allocate_review', floor_pk=floor.pk)
             return redirect('floor_detail', pk=floor.pk)
     else:
         form = FloorExpenseForm()

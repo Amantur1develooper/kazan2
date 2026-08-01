@@ -36,7 +36,11 @@
   <div class="col-sm-6 col-xl-3">
     <div class="stat-card">
       <div class="d-flex justify-content-between">
-        <div><div class="label">Смета (план)</div><div class="value text-money">{{ total_planned|currency }}</div></div>
+        <div>
+          <div class="label">Смета (план)</div>
+          <div class="value text-money">{% if estimate_total_plan %}{{ estimate_total_plan|currency }}{% else %}{{ total_planned|currency }}{% endif %}</div>
+          {% if estimate_total_plan %}<small class="text-muted" style="font-size:.72rem">из загруженной сметы</small>{% endif %}
+        </div>
         <div class="icon bg-info bg-opacity-10 text-info"><i class="bi bi-clipboard-check"></i></div>
       </div>
     </div>
@@ -44,7 +48,11 @@
   <div class="col-sm-6 col-xl-3">
     <div class="stat-card">
       <div class="d-flex justify-content-between">
-        <div><div class="label">Расходы (факт)</div><div class="value text-money">{{ total_actual|currency }}</div></div>
+        <div>
+          <div class="label">Расходы (факт)</div>
+          <div class="value text-money">{% if estimate_total_plan %}{{ estimate_total_fact|currency }}{% else %}{{ total_actual|currency }}{% endif %}</div>
+          {% if estimate_total_plan %}<small class="text-muted" style="font-size:.72rem">все расходы по блоку</small>{% endif %}
+        </div>
         <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div>
       </div>
     </div>
@@ -54,9 +62,13 @@
       <div class="d-flex justify-content-between">
         <div>
           <div class="label">Отклонение</div>
-          <div class="value text-money {{ total_deviation|deviation_class }}">{% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}</div>
+          {% if estimate_total_plan %}
+            <div class="value text-money {{ estimate_total_deviation|deviation_class }}">{% if estimate_total_deviation > 0 %}+{% endif %}{{ estimate_total_deviation|currency }}</div>
+          {% else %}
+            <div class="value text-money {{ total_deviation|deviation_class }}">{% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}</div>
+          {% endif %}
         </div>
-        <div class="icon {% if total_deviation <= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+        <div class="icon {% if estimate_total_deviation <= 0 or not estimate_total_plan %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
           <i class="bi bi-arrow-left-right"></i>
         </div>
       </div>
@@ -162,6 +174,101 @@
     </div>
   </div>
 </div>
+
+{% if estimate_summary %}
+<!-- Estimate Plan/Fact Summary -->
+<div class="row g-4 mt-1">
+  <div class="col-xl-8">
+    <div class="data-table">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="section-title"><i class="bi bi-clipboard2-data me-1 text-primary"></i>Сводка план-факт по смете</span>
+        <a href="{% url 'estimate_for_block' block_obj.pk %}" class="btn btn-sm btn-outline-primary" style="font-size:.8rem">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Открыть смету
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:.875rem">
+          <thead>
+            <tr>
+              <th>Раздел сметы</th>
+              <th class="text-end" style="width:140px">План (сом)</th>
+              <th class="text-end" style="width:140px">Факт (сом)</th>
+              <th class="text-end" style="width:130px">Откл.</th>
+              <th style="min-width:140px">Освоение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in estimate_summary %}
+            {% with pct=row.fact|percent:row.plan %}
+            <tr>
+              <td>
+                <span class="fw-semibold">
+                  {% if row.section.code %}<code class="text-muted me-1" style="font-size:.78rem">{{ row.section.code }}</code>{% endif %}
+                  {{ row.section.name }}
+                </span>
+              </td>
+              <td class="text-end text-money">{{ row.plan|currency }}</td>
+              <td class="text-end text-money {% if row.fact > 0 %}fw-semibold{% endif %}">
+                {% if row.fact > 0 %}{{ row.fact|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end text-money">
+                {% if row.deviation > 0 %}
+                  <span class="text-danger small fw-semibold">+{{ row.deviation|currency }}</span>
+                {% elif row.deviation < 0 %}
+                  <span class="text-success small fw-semibold">{{ row.deviation|currency }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.plan > 0 %}
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct|unlocalize }}{% endif %}%"></div>
+                  </div>
+                  <small class="fw-semibold text-nowrap {% if pct > 100 %}text-danger{% elif pct >= 80 %}text-warning{% else %}text-success{% endif %}">{{ pct }}%</small>
+                </div>
+                {% else %}<span class="text-muted small">—</span>{% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td class="fw-bold">Итого</td>
+              <td class="text-end fw-bold text-money">{{ estimate_total_plan|currency }}</td>
+              <td class="text-end fw-bold text-money">{{ estimate_total_fact|currency }}</td>
+              <td class="text-end fw-bold text-money {{ estimate_total_deviation|deviation_class }}">
+                {% if estimate_total_deviation > 0 %}+{% endif %}{{ estimate_total_deviation|currency }}
+              </td>
+              <td>
+                {% with pct=estimate_total_fact|percent:estimate_total_plan %}
+                {% if estimate_total_plan > 0 %}
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height:6px">
+                    <div class="progress-bar {{ pct|progress_class }}" style="width:{% if pct > 100 %}100{% else %}{{ pct|unlocalize }}{% endif %}%"></div>
+                  </div>
+                  <small class="fw-semibold {% if pct > 100 %}text-danger{% elif pct >= 80 %}text-warning{% else %}text-success{% endif %}">{{ pct }}%</small>
+                </div>
+                {% endif %}
+                {% endwith %}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card-section p-4 h-100">
+      <div class="section-title mb-3">Освоение по разделам сметы</div>
+      <canvas id="estChart"></canvas>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -186,6 +293,32 @@ new Chart(document.getElementById('stageChart'), {
     scales: {
       x: { beginAtZero: true, ticks: { callback: v => new Intl.NumberFormat('ru-RU', {notation:'compact'}).format(v) }, grid: { color: '#f1f5f9' } },
       y: { grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% if estimate_summary %}
+<script>
+new Chart(document.getElementById('estChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ est_chart_labels|safe }},
+    datasets: [
+      { label: 'План', data: {{ est_chart_plan|safe }}, backgroundColor: 'rgba(37,99,235,0.18)', borderColor: 'rgba(37,99,235,0.7)', borderWidth: 1.5, borderRadius: 4 },
+      { label: 'Факт', data: {{ est_chart_fact|safe }}, backgroundColor: 'rgba(234,179,8,0.25)', borderColor: 'rgba(234,179,8,0.9)', borderWidth: 1.5, borderRadius: 4 }
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + new Intl.NumberFormat('ru-RU').format(c.parsed.x) + ' сом' } }
+    },
+    scales: {
+      x: { beginAtZero: true, ticks: { callback: v => new Intl.NumberFormat('ru-RU', {notation:'compact'}).format(v) }, grid: { color: '#f1f5f9' } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
     }
   }
 });

@@ -44,11 +44,22 @@ def estimate_detail(request, pk):
     )
 
     # ── Расходы ПФ: два уровня ────────────────────────────────────────────────
-    # Уровень 1 (автоматический): FloorExpense.name == EstimateItem.name по блоку
     item_names = {item.name: item.pk for item in all_items}
+
+    # FE ids with real allocations — computed first to avoid double-counting
+    alloc_fe_ids = set(
+        ExpenseAllocation.objects.filter(
+            floor_expense__floor__stage__block=estimate.block,
+            estimate_item__isnull=False,
+        ).values_list('floor_expense_id', flat=True)
+    )
+
+    # Уровень 1 (автоматический): only unallocated FEs to avoid double-counting
+    # with manual allocations to different items
     fe_name_rows = (
         FloorExpense.objects
         .filter(floor__stage__block=estimate.block, name__in=item_names.keys())
+        .exclude(id__in=alloc_fe_ids)
         .values('name')
         .annotate(s=Sum('total_amount'))
     )
@@ -58,6 +69,7 @@ def estimate_detail(request, pk):
     fe_detail_rows = (
         FloorExpense.objects
         .filter(floor__stage__block=estimate.block, name__in=item_names.keys())
+        .exclude(id__in=alloc_fe_ids)
         .select_related('floor__stage', 'floor')
         .order_by('name', 'floor__stage__name', 'floor__number')
     )
@@ -112,16 +124,46 @@ def estimate_detail(request, pk):
         if s.parent_id and s.parent_id in section_map:
             section_map[s.parent_id].plan_children.append(s)
 
+    top_sections = [s for s in all_sections if not s.parent_id]
+
+    # ── Прочие расходы: attach unallocated FloorExpense to matching subsection ──
+    # alloc_fe_ids already computed above; reuse it here
+    block_stages = list(estimate.block.stages.all())
+    for top_sec in top_sections:
+        label = f'{top_sec.code} {top_sec.name}'.strip()
+        matched_stage = next(
+            (st for st in block_stages if st.name == label or st.name == top_sec.name),
+            None,
+        )
+        if not matched_stage:
+            continue
+        unalloc_list = list(
+            FloorExpense.objects
+            .filter(floor__stage=matched_stage)
+            .exclude(id__in=alloc_fe_ids)
+            .exclude(name__in=item_names.keys())  # exclude auto-matched: already counted per item
+            .select_related('floor')
+            .order_by('name', '-expense_date')
+        )
+        if not unalloc_list:
+            continue
+        unalloc_total = sum(fe.total_amount for fe in unalloc_list)
+        for child in top_sec.plan_children:
+            if 'прочие' in child.name.lower():
+                child.misc_pf = unalloc_total
+                child.misc_fes = unalloc_list
+                break
+
     # Compute pf_expense bottom-up
     def _compute_actual(section):
         total = sum(i.pf_expense for i in section.plan_items)
+        total += getattr(section, 'misc_pf', Decimal('0'))
         for child in section.plan_children:
             total += _compute_actual(child)
         section.actual = total
         section.pf_expense = total
         return total
 
-    top_sections = [s for s in all_sections if not s.parent_id]
     for sec in top_sections:
         _compute_actual(sec)
 
@@ -407,8 +449,7 @@ def estimate_expense_links(request, pk):
                 for fe in fes:
                     qty = fe.quantity
                     amt = fe.total_amount
-                    # Remove old none-placeholder
-                    fe.allocations.filter(estimate_item__isnull=True).delete()
+                    fe.allocations.exclude(estimate_item=item).delete()
                     ExpenseAllocation.objects.update_or_create(
                         floor_expense=fe,
                         estimate_item=item,
@@ -505,8 +546,8 @@ def estimate_unlinked(request, pk):
             else:
                 amt = fe.total_amount
 
-            # Remove old none-placeholder allocations, create real one
-            fe.allocations.filter(estimate_item__isnull=True).delete()
+            # Replace any existing allocations (null placeholder or wrong item)
+            fe.allocations.exclude(estimate_item=item).delete()
             ExpenseAllocation.objects.update_or_create(
                 floor_expense=fe,
                 estimate_item=item,
@@ -617,7 +658,7 @@ def floor_allocate_review(request, floor_pk):
                 amt = (fe.total_amount * qty / fe.quantity).quantize(Decimal('0.01'))
             else:
                 amt = fe.total_amount
-            fe.allocations.filter(estimate_item__isnull=True).delete()
+            fe.allocations.exclude(estimate_item=item).delete()
             ExpenseAllocation.objects.update_or_create(
                 floor_expense=fe,
                 estimate_item=item,

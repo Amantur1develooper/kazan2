@@ -178,7 +178,20 @@
               <td></td><td></td><td></td>
               <td class="text-end text-money fw-semibold">{{ sec2.total_amount|currency }}</td>
               <td class="text-end text-money fw-semibold {% if sec2.pf_expense > 0 %}text-success{% endif %}">
-                {% if sec2.pf_expense > 0 %}{{ sec2.pf_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+                {% if sec2.pf_expense > 0 %}
+                  {% if sec2.misc_fes %}
+                    <button class="btn btn-link p-0 text-decoration-none fw-semibold text-success"
+                            style="font-size:inherit"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#misc-{{ sec2.pk }}"
+                            title="Нераспределённые расходы">
+                      {{ sec2.pf_expense|currency }}
+                      <i class="bi bi-exclamation-circle ms-1 text-warning" style="font-size:.65rem"></i>
+                    </button>
+                  {% else %}
+                    {{ sec2.pf_expense|currency }}
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
               <td class="text-end fw-semibold">
                 {% if sec2.actual > sec2.total_amount %}
@@ -195,6 +208,51 @@
                 </a>
               </td>
             </tr>
+            {% if sec2.misc_fes %}
+            <tr id="misc-{{ sec2.pk }}" class="collapse">
+              <td colspan="9" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#fefce8;border-left:3px solid #eab308">
+                <div style="padding:.6rem 1rem .8rem">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small fw-semibold text-warning">
+                      <i class="bi bi-exclamation-circle me-1"></i>Нераспределённые расходы ({{ sec2.misc_fes|length }})
+                      <span class="text-muted fw-normal ms-1" style="font-size:.75rem">— не привязаны к позициям сметы</span>
+                    </div>
+                    <a href="{% url 'estimate_unlinked' estimate.pk %}" class="btn btn-sm btn-outline-warning py-0 px-2 me-2" style="font-size:.75rem">
+                      <i class="bi bi-link-45deg me-1"></i>Распределить
+                    </a>
+                  </div>
+                  <table class="table table-sm table-borderless mb-0" style="font-size:.78rem;background:#fefce8">
+                    <thead><tr class="text-muted">
+                      <th class="py-0">Этаж</th>
+                      <th class="py-0">Наименование</th>
+                      <th class="py-0" style="white-space:nowrap">Дата</th>
+                      <th class="py-0 text-end">Кол-во</th>
+                      <th class="py-0">Ед.</th>
+                      <th class="py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for fe in sec2.misc_fes %}
+                      <tr>
+                        <td class="py-0 text-muted">{{ fe.floor.display_name }}</td>
+                        <td class="py-0">{{ fe.name }}</td>
+                        <td class="py-0 text-muted" style="white-space:nowrap">{% if fe.expense_date %}{{ fe.expense_date|date:"d.m.Y" }}{% else %}{{ fe.created_at|date:"d.m.Y" }}{% endif %}</td>
+                        <td class="py-0 text-end text-muted">{{ fe.quantity|floatformat:2 }}</td>
+                        <td class="py-0 text-muted">{{ fe.unit|default:"—" }}</td>
+                        <td class="py-0 text-end fw-semibold">{{ fe.total_amount|currency }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot>
+                      <tr style="border-top:1px solid #fde68a">
+                        <td colspan="5" class="py-0 text-end text-muted">Итого нераспределённых:</td>
+                        <td class="py-0 text-end fw-bold text-warning">{{ sec2.misc_pf|currency }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% endwith %}
           {% else %}
             {% with item=row.obj lvl=row.level %}
