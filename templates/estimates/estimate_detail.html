@@ -67,7 +67,7 @@
       </div>
     </div>
   </div>
-  <div class="col-sm-4">
+  <div class="col-sm-3">
     <div class="stat-card">
       <div class="d-flex justify-content-between">
         <div>
@@ -78,7 +78,20 @@
       </div>
     </div>
   </div>
-  <div class="col-sm-4">
+  {% if has_dds %}
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">ДДС (расходы)</div>
+          <div class="value text-money text-info">{{ total_dds|currency }}</div>
+        </div>
+        <div class="icon bg-info bg-opacity-10 text-info"><i class="bi bi-cash-stack"></i></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  <div class="col-sm-{% if has_dds %}3{% else %}4{% endif %}">
     <div class="stat-card {% if total_deviation > 0 %}border-danger{% elif total_deviation < 0 %}border-success{% endif %}">
       <div class="d-flex justify-content-between">
         <div>
@@ -121,9 +134,10 @@
           <th class="text-center" style="width:55px">Ед.</th>
           <th class="text-end" style="width:80px">Кол-во</th>
           <th class="text-end" style="width:120px">Цена</th>
-          <th class="text-end" style="width:140px">План (сом)</th>
-          <th class="text-end" style="width:140px">Расходы ПФ</th>
-          <th class="text-end" style="width:120px">Откл.</th>
+          <th class="text-end" style="width:130px">План (сом)</th>
+          <th class="text-end" style="width:130px">Расходы ПФ</th>
+          {% if has_dds %}<th class="text-end" style="width:120px"><span class="text-info">ДДС</span></th>{% endif %}
+          <th class="text-end" style="width:110px">Откл.</th>
           <th style="width:80px"></th>
         </tr>
       </thead>
@@ -146,6 +160,11 @@
           <td class="text-end text-money fw-bold {% if sec.pf_expense > 0 %}text-success{% endif %}">
             {% if sec.pf_expense > 0 %}{{ sec.pf_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
+          {% if has_dds %}
+          <td class="text-end fw-bold {% if sec.dds_expense > 0 %}text-info{% endif %}">
+            {% if sec.dds_expense > 0 %}{{ sec.dds_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          {% endif %}
           <td class="text-end fw-bold">
             {% if sec.actual > sec.total_amount %}
               <span class="text-danger">+{{ sec.actual|subtract:sec.total_amount|currency }}</span>
@@ -184,7 +203,7 @@
                             style="font-size:inherit"
                             data-bs-toggle="collapse"
                             data-bs-target="#misc-{{ sec2.pk }}"
-                            title="Нераспределённые расходы">
+                            title="Нераспределённые расходы ПФ">
                       {{ sec2.pf_expense|currency }}
                       <i class="bi bi-exclamation-circle ms-1 text-warning" style="font-size:.65rem"></i>
                     </button>
@@ -193,6 +212,24 @@
                   {% endif %}
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
+              {% if has_dds %}
+              <td class="text-end fw-semibold {% if sec2.dds_expense > 0 %}text-info{% endif %}">
+                {% if sec2.dds_expense > 0 %}
+                  {% if sec2.misc_dds_records %}
+                    <button class="btn btn-link p-0 text-decoration-none fw-semibold text-info"
+                            style="font-size:inherit"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#misc-dds-{{ sec2.pk }}"
+                            title="Нераспределённые ДДС">
+                      {{ sec2.dds_expense|currency }}
+                      <i class="bi bi-exclamation-circle ms-1 text-warning" style="font-size:.65rem"></i>
+                    </button>
+                  {% else %}
+                    {{ sec2.dds_expense|currency }}
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              {% endif %}
               <td class="text-end fw-semibold">
                 {% if sec2.actual > sec2.total_amount %}
                   <span class="text-danger">+{{ sec2.actual|subtract:sec2.total_amount|currency }}</span>
@@ -210,7 +247,7 @@
             </tr>
             {% if sec2.misc_fes %}
             <tr id="misc-{{ sec2.pk }}" class="collapse">
-              <td colspan="9" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#fefce8;border-left:3px solid #eab308">
+              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#fefce8;border-left:3px solid #eab308">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-warning">
@@ -252,6 +289,49 @@
                 </div>
               </td>
             </tr>
+            {% if sec2.misc_dds_records %}
+            <tr id="misc-dds-{{ sec2.pk }}" class="collapse">
+              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
+                <div style="padding:.6rem 1rem .8rem">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small fw-semibold text-info">
+                      <i class="bi bi-cash-stack me-1"></i>Нераспределённые ДДС-расходы ({{ sec2.misc_dds_records|length }})
+                      <span class="text-muted fw-normal ms-1" style="font-size:.75rem">— не привязаны к позициям сметы</span>
+                    </div>
+                    <a href="{% url 'dds_distribute' sec2.misc_dds_records.0.source_import_id %}" class="btn btn-sm btn-outline-info py-0 px-2 me-2" style="font-size:.75rem">
+                      <i class="bi bi-diagram-3 me-1"></i>Распределить
+                    </a>
+                  </div>
+                  <table class="table table-sm table-borderless mb-0" style="font-size:.78rem;background:#eff6ff">
+                    <thead><tr class="text-muted">
+                      <th class="py-0">Дата</th>
+                      <th class="py-0">Тип операции</th>
+                      <th class="py-0">Контрагент</th>
+                      <th class="py-0">Объект</th>
+                      <th class="py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for rec in sec2.misc_dds_records %}
+                      <tr>
+                        <td class="py-0 text-muted" style="white-space:nowrap">{{ rec.operation_date|date:"d.m.Y" }}</td>
+                        <td class="py-0">{{ rec.operation_type }}</td>
+                        <td class="py-0 text-muted">{{ rec.counterparty|truncatechars:28 }}</td>
+                        <td class="py-0 text-muted">{{ rec.object_ref|truncatechars:28 }}</td>
+                        <td class="py-0 text-end fw-semibold text-danger">{{ rec.amount|currency }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot>
+                      <tr style="border-top:1px solid #bfdbfe">
+                        <td colspan="4" class="py-0 text-end text-muted">Итого нераспределённых ДДС:</td>
+                        <td class="py-0 text-end fw-bold text-info">{{ sec2.misc_dds|currency }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% endif %}
             {% endwith %}
           {% else %}
@@ -302,6 +382,20 @@
                   </button>
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
+              {% if has_dds %}
+              <td class="text-end text-money {% if item.dds_expense > 0 %}text-info fw-semibold{% endif %}">
+                {% if item.dds_expense > 0 %}
+                  <button class="btn btn-link p-0 text-decoration-none fw-semibold text-info lh-1"
+                          style="font-size:inherit"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#dds-{{ item.pk }}"
+                          title="Раскрыть ДДС-расходы">
+                    {{ item.dds_expense|currency }}
+                    <i class="bi bi-cash-stack ms-1" style="font-size:.6rem"></i>
+                  </button>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              {% endif %}
               <td class="text-end">
                 {% if item.pf_expense > item.total_amount and item.total_amount > 0 %}
                   <span class="text-danger small">+{{ item.pf_expense|subtract:item.total_amount|currency }}</span>
@@ -327,7 +421,7 @@
             </tr>
             {% if item.pf_floors %}
             <tr id="pf-{{ item.pk }}" class="collapse">
-              <td colspan="9" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
+              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-success">
@@ -410,9 +504,52 @@
               </td>
             </tr>
             {% endif %}
+            {% if item.dds_breakdown %}
+            <tr id="dds-{{ item.pk }}" class="collapse">
+              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
+                <div style="padding:.6rem 1rem .8rem">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small fw-semibold text-info">
+                      <i class="bi bi-cash-stack me-1"></i>ДДС-расходы: {{ item.code }} {{ item.name }}
+                      <span class="badge bg-info bg-opacity-25 text-info ms-1" style="font-size:.65rem;font-weight:400">{{ item.dds_breakdown|length }} зап.</span>
+                    </div>
+                    <span class="fw-bold text-info small me-2">Итого: {{ item.dds_expense|currency }}</span>
+                  </div>
+                  <table class="table table-sm table-borderless mb-0" style="font-size:.78rem;background:#eff6ff">
+                    <thead><tr class="text-muted">
+                      <th class="py-0">Дата</th>
+                      <th class="py-0">Тип операции</th>
+                      <th class="py-0">Контрагент</th>
+                      <th class="py-0">Касса</th>
+                      <th class="py-0">Объект</th>
+                      <th class="py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for rec in item.dds_breakdown %}
+                      <tr>
+                        <td class="py-0 text-muted text-nowrap">{{ rec.operation_date|date:"d.m.Y" }}</td>
+                        <td class="py-0">{{ rec.operation_type }}</td>
+                        <td class="py-0 text-muted">{{ rec.counterparty|default:"—"|truncatechars:28 }}</td>
+                        <td class="py-0 text-muted">{{ rec.account.name|default:"—"|truncatechars:20 }}</td>
+                        <td class="py-0 text-muted">{{ rec.object_ref|default:"—"|truncatechars:24 }}</td>
+                        <td class="py-0 text-end fw-semibold text-info">{{ rec.amount|currency }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot>
+                      <tr style="border-top:1px solid #bfdbfe">
+                        <td colspan="5" class="py-0 text-end text-muted">Итого ДДС по позиции:</td>
+                        <td class="py-0 text-end fw-bold text-info">{{ item.dds_expense|currency }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% if item_hist %}
             <tr id="hist-{{ item.pk }}" class="collapse" style="background:#fefce8">
-              <td colspan="9" style="padding:.5rem 1rem .75rem calc({{ lvl|add:1 }}rem + 1.5rem)">
+              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:.5rem 1rem .75rem calc({{ lvl|add:1 }}rem + 1.5rem)">
                 <div class="small fw-semibold text-warning mb-1">
                   <i class="bi bi-clock-history me-1"></i>История изменений: {{ item.code }} {{ item.name }}
                 </div>
@@ -450,6 +587,9 @@
           <td colspan="5" class="fw-bold">Итого</td>
           <td class="text-end fw-bold text-money">{{ total_plan|currency }}</td>
           <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+          {% if has_dds %}
+          <td class="text-end fw-bold text-money text-info">{{ total_dds|currency }}</td>
+          {% endif %}
           <td class="text-end fw-bold text-money {% if total_deviation > 0 %}text-danger{% elif total_deviation < 0 %}text-success{% endif %}">
             {% if total_deviation > 0 %}+{% endif %}{{ total_deviation|currency }}
           </td>

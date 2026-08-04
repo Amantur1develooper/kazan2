@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}ДДС — Кассы и счета{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-cash-stack me-2 text-success"></i>ДДС — Кассы и счета</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Движение денежных средств по кассам и банковским счетам</p>
+  </div>
+  <a href="{% url 'dds_import_upload' %}" class="btn btn-success btn-sm">
+    <i class="bi bi-upload me-1"></i>Загрузить ДДС
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not accounts %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-cash-stack fs-2 d-block mb-3"></i>
+  <p class="mb-3">Кассы ещё не созданы. Загрузите файл ДДС из 1С — кассы создадутся автоматически.</p>
+  <a href="{% url 'dds_import_upload' %}" class="btn btn-success">
+    <i class="bi bi-upload me-1"></i>Загрузить ДДС
+  </a>
+</div>
+{% else %}
+
+{% for section in rc_summary %}
+<div class="mb-4">
+
+  {# ── ЖК header with totals ─────────────────────────────────────────── #}
+  <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+    <h5 class="mb-0 fw-semibold">
+      <i class="bi bi-buildings me-1 text-primary"></i>
+      {% if section.rc %}{{ section.rc.name }}{% else %}Без ЖК{% endif %}
+    </h5>
+    <div class="d-flex gap-2 ms-auto flex-wrap">
+      <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2" style="font-size:.82rem">
+        <i class="bi bi-arrow-down me-1"></i>{{ section.income|currency }}
+      </span>
+      <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger px-3 py-2" style="font-size:.82rem">
+        <i class="bi bi-arrow-up me-1"></i>{{ section.expense|currency }}
+      </span>
+      <span class="badge rounded-pill {% if section.balance >= 0 %}bg-primary bg-opacity-10 text-primary{% else %}bg-danger bg-opacity-10 text-danger{% endif %} px-3 py-2 fw-bold" style="font-size:.82rem">
+        Итого: {{ section.balance|currency }}
+      </span>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    {# ── Accounts table ────────────────────────────────────────────────── #}
+    <div class="col-xl-6">
+      <div class="data-table h-100">
+        <div class="p-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="section-title" style="font-size:.82rem">
+            <i class="bi bi-safe me-1 text-muted"></i>Кассы и счета
+          </span>
+          <a href="{% url 'dds_import_upload' %}" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:.75rem">
+            <i class="bi bi-upload me-1"></i>Загрузить
+          </a>
+        </div>
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:.82rem">
+          <thead class="table-light">
+            <tr>
+              <th>Касса / Счёт</th>
+              <th class="text-end">Приход</th>
+              <th class="text-end">Расход</th>
+              <th class="text-end">Баланс</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for acc in section.accounts %}
+            <tr>
+              <td>
+                <div class="fw-semibold">
+                  <i class="bi bi-{% if acc.account_type == 'bank' %}bank{% else %}safe{% endif %} me-1 text-muted"></i>
+                  {{ acc.name }}
+                </div>
+                {% if acc.block %}
+                  <small class="text-primary" style="font-size:.72rem">
+                    <i class="bi bi-building me-1"></i>{{ acc.block.name }}
+                  </small>
+                {% endif %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1" style="font-size:.68rem">
+                  {{ acc.get_account_type_display }}
+                </span>
+              </td>
+              <td class="text-end text-money text-success">{{ acc.disp_income|currency }}</td>
+              <td class="text-end text-money text-danger">{{ acc.disp_expense|currency }}</td>
+              <td class="text-end text-money fw-semibold {% if acc.disp_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ acc.disp_balance|currency }}
+              </td>
+              <td class="text-end">
+                <a href="{% url 'dds_account_detail' acc.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td class="fw-semibold text-muted" style="font-size:.78rem">Итого кассы</td>
+              <td class="text-end fw-semibold text-success text-money">{{ section.income|currency }}</td>
+              <td class="text-end fw-semibold text-danger text-money">{{ section.expense|currency }}</td>
+              <td class="text-end fw-bold {% if section.balance >= 0 %}text-success{% else %}text-danger{% endif %} text-money">
+                {{ section.balance|currency }}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    {# ── Block breakdown ───────────────────────────────────────────────── #}
+    <div class="col-xl-6">
+      <div class="data-table h-100">
+        <div class="p-2 px-3 border-bottom">
+          <span class="section-title" style="font-size:.82rem">
+            <i class="bi bi-building me-1 text-muted"></i>Расходы по блокам
+          </span>
+        </div>
+        {% if section.blocks %}
+        <table class="table table-sm align-middle mb-0" style="font-size:.82rem">
+          <thead class="table-light">
+            <tr>
+              <th>Блок</th>
+              <th class="text-end">Приход</th>
+              <th class="text-end">Расход</th>
+              <th class="text-end">Баланс</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for blk in section.blocks %}
+            <tr>
+              <td class="fw-semibold">
+                {% if blk.id == '__none__' %}
+                  <span class="text-muted fst-italic">Без блока</span>
+                {% else %}
+                  <i class="bi bi-building me-1 text-muted"></i>{{ blk.name }}
+                {% endif %}
+              </td>
+              <td class="text-end text-money {% if blk.income %}text-success{% else %}text-muted{% endif %}">
+                {% if blk.income %}{{ blk.income|currency }}{% else %}—{% endif %}
+              </td>
+              <td class="text-end text-money {% if blk.expense %}text-danger{% else %}text-muted{% endif %}">
+                {% if blk.expense %}{{ blk.expense|currency }}{% else %}—{% endif %}
+              </td>
+              <td class="text-end text-money fw-semibold {% if blk.balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ blk.balance|currency }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td class="fw-semibold text-muted" style="font-size:.78rem">Итого ЖК</td>
+              <td class="text-end fw-semibold text-success text-money">{{ section.income|currency }}</td>
+              <td class="text-end fw-semibold text-danger text-money">{{ section.expense|currency }}</td>
+              <td class="text-end fw-bold {% if section.balance >= 0 %}text-success{% else %}text-danger{% endif %} text-money">
+                {{ section.balance|currency }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        {% else %}
+        <div class="p-3 text-center text-muted" style="font-size:.82rem">
+          <i class="bi bi-building d-block mb-1"></i>
+          Нет данных по блокам
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>{# /row #}
+</div>{# /section #}
+{% endfor %}
+
+{% if unlinked_no_block or unlinked_no_item %}
+<div class="alert alert-warning d-flex align-items-center gap-3 mt-2" style="font-size:.875rem">
+  <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+  <div>
+    Есть нераспределённые записи:
+    {% if unlinked_no_block %}
+      <span class="badge bg-danger ms-1">{{ unlinked_no_block }} без блока</span>
+    {% endif %}
+    {% if unlinked_no_item %}
+      <span class="badge bg-warning text-dark ms-1">{{ unlinked_no_item }} без позиции сметы</span>
+    {% endif %}
+    <a href="{% url 'dds_unlinked' %}" class="btn btn-warning btn-sm ms-3 py-0">
+      <i class="bi bi-link-45deg me-1"></i>Распределить
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

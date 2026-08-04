@@ -282,6 +282,44 @@ def block_detail(request, pk):
     except Exception:
         pass
 
+    # ── ДДС по блоку ─────────────────────────────────────────────────────────
+    dds_income = Decimal('0')
+    dds_expense = Decimal('0')
+    dds_by_stage = []
+    try:
+        from apps.dds.models import CashFlowRecord
+        from django.db.models import Q
+        dds_qs = CashFlowRecord.objects.filter(block=block_obj)
+        dds_income = dds_qs.filter(direction='in').aggregate(
+            s=Coalesce(Sum('amount'), Value(Decimal('0')))
+        )['s']
+        dds_expense = dds_qs.filter(direction='out').aggregate(
+            s=Coalesce(Sum('amount'), Value(Decimal('0')))
+        )['s']
+
+        # Per-stage breakdown (by operation_type grouping for incoming chart)
+        stage_income_rows = (
+            dds_qs.filter(direction='in')
+            .values('operation_type')
+            .annotate(s=Sum('amount'))
+            .order_by('-s')[:6]
+        )
+        stage_expense_rows = (
+            dds_qs.filter(direction='out')
+            .values('operation_type')
+            .annotate(s=Sum('amount'))
+            .order_by('-s')[:6]
+        )
+        dds_by_op = {
+            'income': list(stage_income_rows),
+            'expense': list(stage_expense_rows),
+        }
+    except Exception:
+        dds_by_op = {'income': [], 'expense': []}
+
+    dds_balance = dds_income - dds_expense
+    has_dds = dds_income > 0 or dds_expense > 0
+
     context = {
         'block_obj': block_obj,
         'stage_stats': stage_stats,
@@ -292,12 +330,21 @@ def block_detail(request, pk):
         'estimate_total_plan': estimate_total_plan,
         'estimate_total_fact': estimate_total_fact,
         'estimate_total_deviation': estimate_total_fact - (estimate_total_plan or Decimal('0')),
+        'dds_income': dds_income,
+        'dds_expense': dds_expense,
+        'dds_balance': dds_balance,
+        'dds_by_op': dds_by_op,
+        'has_dds': has_dds,
         'chart_labels': json.dumps([x['stage'].name for x in stage_stats]),
         'chart_planned': json.dumps([float(x['planned']) for x in stage_stats]),
         'chart_actual': json.dumps([float(x['actual']) for x in stage_stats]),
         'est_chart_labels': json.dumps([f'{x["section"].code} {x["section"].name}'.strip() for x in (estimate_summary or [])]),
         'est_chart_plan': json.dumps([float(x['plan']) for x in (estimate_summary or [])]),
         'est_chart_fact': json.dumps([float(x['fact']) for x in (estimate_summary or [])]),
+        'dds_income_labels': json.dumps([r['operation_type'] for r in dds_by_op['income']]),
+        'dds_income_data': json.dumps([float(r['s']) for r in dds_by_op['income']]),
+        'dds_expense_labels': json.dumps([r['operation_type'] for r in dds_by_op['expense']]),
+        'dds_expense_data': json.dumps([float(r['s']) for r in dds_by_op['expense']]),
     }
     return render(request, 'projects/block_detail.html', context)
 

@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Нераспределённые ДДС{% endblock %}
+
+{% block extra_head %}
+<style>
+.tab-badge { font-size:.72rem; vertical-align:middle; }
+.row-dirty { background:#fffbeb !important; }
+.filter-bar { background:#f8f9fa; border-radius:.5rem; padding:.75rem 1rem; margin-bottom:1rem; }
+/* searchable select wrapper */
+.sel-wrap { position:relative; min-width:260px; max-width:320px; }
+.sel-filter {
+  width:100%; font-size:.78rem; padding:.2rem .5rem;
+  border:1px solid #dee2e6; border-radius:.375rem .375rem 0 0;
+  border-bottom:none; outline:none; background:#fff;
+}
+.sel-filter:focus { border-color:#86b7fe; }
+.sel-wrap select {
+  border-radius:0 0 .375rem .375rem;
+  font-size:.78rem; width:100%;
+}
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      <li class="breadcrumb-item active">Нераспределённые</li>
+    </ol></nav>
+    <h1><i class="bi bi-link-45deg me-2 text-warning"></i>Нераспределённые записи ДДС</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Записи без блока или без позиции сметы</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Filters ─────────────────────────────────────────────────────────────── #}
+<div class="filter-bar d-flex flex-wrap gap-2 align-items-center">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center w-100" id="filterForm">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <select name="rc" class="form-select form-select-sm" style="max-width:200px" onchange="this.form.submit()">
+      <option value="">Все ЖК</option>
+      {% for rc in all_complexes %}
+        <option value="{{ rc.pk }}" {% if f_rc == rc.pk|stringformat:'s' %}selected{% endif %}>{{ rc.name }}</option>
+      {% endfor %}
+    </select>
+    <div class="input-group input-group-sm" style="max-width:280px">
+      <input type="text" name="q" class="form-control" placeholder="Поиск по контрагенту, объекту…" value="{{ f_q }}">
+      <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+    </div>
+    {% if f_q %}
+      <a href="?tab={{ tab }}&rc={{ f_rc }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x"></i> Сбросить
+      </a>
+    {% endif %}
+  </form>
+</div>
+
+{# ── Tabs ─────────────────────────────────────────────────────────────────── #}
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'no_block' %}active{% endif %}"
+       href="?tab=no_block&rc={{ f_rc }}&q={{ f_q }}">
+      Без блока
+      <span class="badge bg-danger tab-badge">{{ total_no_block }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'no_item' %}active{% endif %}"
+       href="?tab=no_item&rc={{ f_rc }}&q={{ f_q }}">
+      Без позиции сметы
+      <span class="badge bg-warning text-dark tab-badge">{{ total_no_item }}</span>
+    </a>
+  </li>
+</ul>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# TAB 1: no block                                                           #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{% if tab == 'no_block' %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="tab" value="no_block">
+
+  {% if no_block_records %}
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <small class="text-muted">Показано: {{ no_block_records|length }} из {{ total_no_block }}</small>
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-save me-1"></i>Сохранить изменения
+    </button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle" style="font-size:.82rem">
+      <thead class="table-light sticky-top">
+        <tr>
+          <th style="width:90px">Дата</th>
+          <th>Счёт</th>
+          <th>Тип операции</th>
+          <th>Контрагент / Объект</th>
+          <th class="text-end">Сумма</th>
+          <th style="min-width:220px">Привязать к блоку</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in no_block_records %}
+        <tr class="rec-row" data-id="{{ rec.pk }}">
+          <td class="text-muted">{{ rec.operation_date|date:'d.m.Y' }}</td>
+          <td>
+            {% if rec.account %}
+              <span class="badge bg-light text-dark border" style="font-size:.72rem">{{ rec.account.name }}</span>
+            {% else %}&mdash;{% endif %}
+          </td>
+          <td>
+            {% if rec.direction == 'in' %}
+              <span class="badge bg-success-subtle text-success">{{ rec.operation_type|default:"Приход" }}</span>
+            {% elif rec.direction == 'out' %}
+              <span class="badge bg-danger-subtle text-danger">{{ rec.operation_type|default:"Расход" }}</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary">{{ rec.operation_type|default:"Перемещение" }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div>{{ rec.counterparty|default:"—" }}</div>
+            {% if rec.object_ref %}<small class="text-muted">{{ rec.object_ref }}</small>{% endif %}
+          </td>
+          <td class="text-end fw-semibold {% if rec.direction == 'in' %}text-success{% elif rec.direction == 'out' %}text-danger{% endif %}">
+            {{ rec.amount|currency }}
+          </td>
+          <td>
+            <select name="block_{{ rec.pk }}" class="form-select form-select-sm select-sm-dds block-select">
+              <option value="">— не привязан —</option>
+              {% for choice in block_choices %}
+                {% if choice.type == 'optgroup' %}
+                  </optgroup><optgroup label="{{ choice.label }}">
+                {% else %}
+                  <option value="{{ choice.id }}"
+                    {% if rec.block_id == choice.id %}selected{% endif %}>
+                    {{ choice.label }}
+                  </option>
+                {% endif %}
+              {% endfor %}
+              </optgroup>
+            </select>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex justify-content-end mt-2">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-save me-1"></i>Сохранить изменения
+    </button>
+  </div>
+
+  {% else %}
+  <div class="alert alert-success d-flex align-items-center gap-2">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <span>Все записи привязаны к блокам.</span>
+  </div>
+  {% endif %}
+</form>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# TAB 2: no estimate_item                                                   #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{% if tab == 'no_item' %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="tab" value="no_item">
+
+  {% if no_item_records %}
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <small class="text-muted">Показано: {{ no_item_records|length }} из {{ total_no_item }}</small>
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-save me-1"></i>Сохранить изменения
+    </button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle" style="font-size:.82rem">
+      <thead class="table-light sticky-top">
+        <tr>
+          <th style="width:90px">Дата</th>
+          <th>Блок</th>
+          <th>Тип операции</th>
+          <th>Контрагент / Объект</th>
+          <th class="text-end">Сумма</th>
+          <th style="min-width:240px">Привязать к позиции сметы</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in no_item_records %}
+        <tr class="rec-row" data-id="{{ rec.pk }}">
+          <td class="text-muted">{{ rec.operation_date|date:'d.m.Y' }}</td>
+          <td>
+            {% if rec.block %}
+              <a href="{% url 'block_detail' rec.block.pk %}" class="text-decoration-none fw-semibold" style="font-size:.8rem">
+                {{ rec.block.name }}
+              </a>
+            {% else %}&mdash;{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-danger-subtle text-danger">{{ rec.operation_type|default:"Расход" }}</span>
+          </td>
+          <td>
+            <div>{{ rec.counterparty|default:"—" }}</div>
+            {% if rec.object_ref %}<small class="text-muted">{{ rec.object_ref }}</small>{% endif %}
+            {% if rec.description %}<small class="text-muted d-block">{{ rec.description|truncatechars:60 }}</small>{% endif %}
+          </td>
+          <td class="text-end fw-semibold text-danger">
+            {{ rec.amount|currency }}
+          </td>
+          <td>
+            <div class="sel-wrap">
+              <input type="text" class="sel-filter" placeholder="Поиск позиции…" autocomplete="off">
+              <select name="item_{{ rec.pk }}" class="form-select form-select-sm item-select"
+                      size="4"
+                      data-block="{{ rec.block_id|default:'' }}"
+                      data-cur="{{ rec.estimate_item_id|default:'' }}">
+                <option value="">загрузка…</option>
+              </select>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex justify-content-end mt-2">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-save me-1"></i>Сохранить изменения
+    </button>
+  </div>
+
+  {% else %}
+  <div class="alert alert-success d-flex align-items-center gap-2">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <span>Все расходы привязаны к позициям сметы.</span>
+  </div>
+  {% endif %}
+</form>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script id="dds-item-opts-json" type="application/json">{{ item_choices_json|safe }}</script>
+<script>
+(function () {
+  const itemSelects = document.querySelectorAll('.item-select');
+  if (!itemSelects.length) return;
+
+  const optsData = JSON.parse(document.getElementById('dds-item-opts-json').textContent);
+
+  function buildHTML(choices, filter) {
+    const q = (filter || '').toLowerCase().trim();
+    let html = '<option value="">— не привязан —</option>';
+    choices.forEach(function (c) {
+      if (c.t === 'g') {
+        html += '</optgroup><optgroup label="' + c.l.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '">';
+      } else {
+        if (q && !c.l.toLowerCase().includes(q)) return;
+        html += '<option value="' + c.id + '">' +
+                c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</option>';
+      }
+    });
+    return html + '</optgroup>';
+  }
+
+  itemSelects.forEach(function (sel) {
+    const blockId = sel.dataset.block;
+    const curVal  = sel.dataset.cur;
+    const choices = optsData[blockId] || [];
+
+    sel.innerHTML = buildHTML(choices, '');
+    if (curVal) sel.value = curVal;
+
+    const wrap = sel.closest('.sel-wrap');
+    const filterInput = wrap && wrap.querySelector('.sel-filter');
+    if (filterInput) {
+      filterInput.addEventListener('input', function () {
+        const prev = sel.value;
+        sel.innerHTML = buildHTML(choices, this.value);
+        sel.value = prev;
+      });
+    }
+
+    const initial = sel.value;
+    sel.addEventListener('change', function () {
+      sel.closest('tr').classList.toggle('row-dirty', sel.value !== initial);
+    });
+  });
+})();
+</script>
+{% endblock %}

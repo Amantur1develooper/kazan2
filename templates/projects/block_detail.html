@@ -269,6 +269,98 @@
   </div>
 </div>
 {% endif %}
+
+{% if has_dds %}
+<!-- DDS Summary -->
+<div class="row g-4 mt-1">
+  <div class="col-xl-8">
+    <div class="data-table">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="section-title"><i class="bi bi-cash-stack me-1 text-success"></i>Сводка ДДС по блоку</span>
+        <a href="{% url 'dds_import_upload' %}" class="btn btn-sm btn-outline-success" style="font-size:.8rem">
+          <i class="bi bi-upload me-1"></i>Загрузить ДДС
+        </a>
+      </div>
+
+      <!-- DDS stat cards -->
+      <div class="p-3 d-flex gap-3 flex-wrap border-bottom">
+        <div class="stat-card p-3 flex-grow-1" style="min-width:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="label" style="font-size:.75rem">Приход</div>
+              <div class="value text-money text-success" style="font-size:1.1rem">{{ dds_income|currency }}</div>
+            </div>
+            <div class="icon bg-success bg-opacity-10 text-success" style="width:36px;height:36px;font-size:.9rem">
+              <i class="bi bi-arrow-down-circle"></i>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card p-3 flex-grow-1" style="min-width:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="label" style="font-size:.75rem">Расход</div>
+              <div class="value text-money text-danger" style="font-size:1.1rem">{{ dds_expense|currency }}</div>
+            </div>
+            <div class="icon bg-danger bg-opacity-10 text-danger" style="width:36px;height:36px;font-size:.9rem">
+              <i class="bi bi-arrow-up-circle"></i>
+            </div>
+          </div>
+        </div>
+        <div class="stat-card p-3 flex-grow-1 {% if dds_balance < 0 %}border-danger{% endif %}" style="min-width:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="label" style="font-size:.75rem">Остаток</div>
+              <div class="value text-money {% if dds_balance >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size:1.1rem">{{ dds_balance|currency }}</div>
+            </div>
+            <div class="icon {% if dds_balance >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}" style="width:36px;height:36px;font-size:.9rem">
+              <i class="bi bi-wallet2"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top operation types -->
+      <div class="row g-0">
+        {% if dds_by_op.income %}
+        <div class="col-md-6 p-3 border-end">
+          <div class="small fw-semibold text-success mb-2"><i class="bi bi-arrow-down-circle me-1"></i>Топ приходов</div>
+          {% for row in dds_by_op.income %}
+          <div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="font-size:.82rem">
+            <span class="text-muted">{{ row.operation_type }}</span>
+            <span class="fw-semibold text-success">{{ row.s|currency }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if dds_by_op.expense %}
+        <div class="col-md-6 p-3">
+          <div class="small fw-semibold text-danger mb-2"><i class="bi bi-arrow-up-circle me-1"></i>Топ расходов</div>
+          {% for row in dds_by_op.expense %}
+          <div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="font-size:.82rem">
+            <span class="text-muted">{{ row.operation_type }}</span>
+            <span class="fw-semibold text-danger">{{ row.s|currency }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card-section p-4 h-100">
+      <div class="section-title mb-3">ДДС — структура расходов</div>
+      {% if dds_by_op.expense %}
+        <canvas id="ddsChart"></canvas>
+      {% else %}
+        <div class="text-center text-muted py-4">Нет данных</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -319,6 +411,31 @@ new Chart(document.getElementById('estChart'), {
     scales: {
       x: { beginAtZero: true, ticks: { callback: v => new Intl.NumberFormat('ru-RU', {notation:'compact'}).format(v) }, grid: { color: '#f1f5f9' } },
       y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% if has_dds and dds_by_op.expense %}
+<script>
+new Chart(document.getElementById('ddsChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ dds_expense_labels|safe }},
+    datasets: [{
+      data: {{ dds_expense_data|safe }},
+      backgroundColor: [
+        'rgba(239,68,68,0.7)','rgba(249,115,22,0.7)','rgba(234,179,8,0.7)',
+        'rgba(168,85,247,0.7)','rgba(59,130,246,0.7)','rgba(20,184,166,0.7)'
+      ],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+      tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + new Intl.NumberFormat('ru-RU').format(c.parsed) + ' сом' } }
     }
   }
 });

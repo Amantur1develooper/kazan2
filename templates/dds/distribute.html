@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Распределение ДДС{% endblock %}
+
+{% block extra_head %}
+<style>
+.select-wrap { position: relative; }
+.select-filter {
+  width: 100%; font-size:.8rem; padding:.25rem .5rem;
+  border:1px solid #dee2e6; border-radius:.375rem .375rem 0 0;
+  border-bottom:none; outline:none;
+}
+.select-filter:focus { border-color:#86b7fe; }
+.select-wrap select { border-radius:0 0 .375rem .375rem; font-size:.82rem; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      <li class="breadcrumb-item active">Распределение</li>
+    </ol></nav>
+    <h1><i class="bi bi-diagram-3 me-2 text-primary"></i>Распределение ДДС по блокам</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">{{ dds_import.original_filename }} · {{ dds_import.residential_complex.name }}</p>
+  </div>
+  <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-skip-forward me-1"></i>Пропустить
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  <div class="stat-card p-3" style="min-width:140px">
+    <div class="label text-success"><i class="bi bi-check-circle me-1"></i>Привязано</div>
+    <div class="value">{{ linked_blocks }}</div>
+    <small class="text-muted">авто-определено</small>
+  </div>
+  <div class="stat-card p-3" style="min-width:140px">
+    <div class="label text-warning"><i class="bi bi-question-circle me-1"></i>Без блока</div>
+    <div class="value">{{ unlinked }}</div>
+    <small class="text-muted">нужно указать</small>
+  </div>
+  <div class="stat-card p-3" style="min-width:140px">
+    <div class="label text-muted"><i class="bi bi-list-ul me-1"></i>Всего</div>
+    <div class="value">{{ total }}</div>
+    <small class="text-muted">записей в файле</small>
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+
+  {% for direction, label, icon, color in direction_groups %}
+  {% endfor %}
+
+  <div class="data-table mb-4">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+      <span class="section-title">Записи ДДС <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ total }}</span></span>
+      <div class="d-flex gap-2 align-items-center">
+        <input type="text" id="rowSearch" class="form-control form-control-sm" placeholder="Поиск…" style="width:180px">
+        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:.84rem" id="distTable">
+        <thead class="table-light">
+          <tr>
+            <th>Дата</th>
+            <th>Тип операции</th>
+            <th>Напр.</th>
+            <th class="text-end" style="width:130px">Сумма</th>
+            <th>Контрагент / Объект</th>
+            <th style="min-width:220px">Блок</th>
+            <th style="min-width:260px">Позиция сметы <span class="text-muted fw-normal">(необяз., для расходов)</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rec in records %}
+          <tr class="dist-row"
+              style="{% if rec.direction == 'in' %}background:rgba(22,163,74,.03){% elif rec.direction == 'out' %}background:rgba(239,68,68,.03){% endif %}">
+            <td class="text-muted text-nowrap">{{ rec.operation_date|date:"d.m.Y" }}</td>
+            <td>
+              <div class="fw-semibold" style="font-size:.82rem">{{ rec.operation_type }}</div>
+              {% if rec.description %}<small class="text-muted">{{ rec.description|truncatechars:35 }}</small>{% endif %}
+            </td>
+            <td>
+              {% if rec.direction == 'in' %}
+                <span class="badge bg-success bg-opacity-10 text-success" style="font-size:.7rem">↓ Приход</span>
+              {% elif rec.direction == 'out' %}
+                <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:.7rem">↑ Расход</span>
+              {% else %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:.7rem">⇄ Перемещение</span>
+              {% endif %}
+            </td>
+            <td class="text-end text-money fw-semibold {% if rec.direction == 'in' %}text-success{% elif rec.direction == 'out' %}text-danger{% endif %}">
+              {{ rec.amount|currency }}
+            </td>
+            <td>
+              <div style="font-size:.82rem">{{ rec.counterparty|truncatechars:28 }}</div>
+              {% if rec.object_ref %}<small class="text-muted">{{ rec.object_ref|truncatechars:28 }}</small>{% endif %}
+            </td>
+            <td>
+              <select name="block_{{ rec.pk }}" class="form-select form-select-sm">
+                <option value="">— не указывать —</option>
+                {% for block in all_blocks %}
+                <option value="{{ block.pk }}" {% if rec.block_id == block.pk %}selected{% endif %}>
+                  {{ block.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              {% if rec.direction == 'out' %}
+              <div class="select-wrap">
+                <input type="text" class="select-filter" placeholder="Поиск позиции…" data-target="esi_{{ rec.pk }}">
+                <select name="item_{{ rec.pk }}" id="esi_{{ rec.pk }}" class="form-select form-select-sm" size="3">
+                  <option value="">— не привязывать —</option>
+                  {% for choice in item_choices %}
+                    {% if choice.type == 'optgroup' %}
+                      </optgroup><optgroup label="{{ choice.label }}">
+                    {% else %}
+                      <option value="{{ choice.id }}"
+                        {% if rec.estimate_item_id == choice.id %}selected{% endif %}>
+                        {{ choice.label }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                  </optgroup>
+                </select>
+              </div>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-skip-forward me-1"></i>Пропустить
+    </a>
+    <button type="submit" class="btn btn-success btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Сохранить распределение
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Filter estimate item select by search input
+document.querySelectorAll('.select-filter').forEach(function(input) {
+  var selectId = input.dataset.target;
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  var originalHTML = select.innerHTML;
+  input.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    if (!q) { select.innerHTML = originalHTML; return; }
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = originalHTML;
+    var newHTML = '<option value="">— не привязывать —</option>';
+    tempDiv.querySelectorAll('optgroup').forEach(function(grp) {
+      var opts = [];
+      grp.querySelectorAll('option').forEach(function(opt) {
+        if (opt.textContent.toLowerCase().includes(q)) opts.push(opt.outerHTML);
+      });
+      if (opts.length) newHTML += '<optgroup label="' + grp.getAttribute('label') + '">' + opts.join('') + '</optgroup>';
+    });
+    tempDiv.querySelectorAll('option').forEach(function(opt) {
+      if (opt.value && opt.textContent.toLowerCase().includes(q)) newHTML += opt.outerHTML;
+    });
+    select.innerHTML = newHTML;
+  });
+});
+// Row search
+document.getElementById('rowSearch').addEventListener('input', function() {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('#distTable .dist-row').forEach(function(tr) {
+    var text = tr.textContent.toLowerCase();
+    tr.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

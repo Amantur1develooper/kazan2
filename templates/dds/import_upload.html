@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Загрузка ДДС{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      <li class="breadcrumb-item active">Загрузка файла</li>
+    </ol></nav>
+    <h1><i class="bi bi-cash-stack me-2 text-success"></i>Загрузка ДДС из 1С</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Загрузите файл «Движение денежных средств» из 1С (формат .xls)</p>
+  </div>
+  <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К кассам
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Жилой комплекс</label>
+          {{ form.residential_complex }}
+          <small class="text-muted">Все записи из файла будут привязаны к этому ЖК</small>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Файл ДДС (.xls / .xlsx)</label>
+          {{ form.file }}
+          <small class="text-muted d-block mt-1">Экспорт «Движение денежных средств» из 1С</small>
+        </div>
+        <button type="submit" class="btn btn-success w-100">
+          <i class="bi bi-upload me-2"></i>Загрузить и показать предпросмотр
+        </button>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3" style="font-size:.85rem">
+      <div class="section-title mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Ожидаемые колонки</div>
+      <table class="table table-sm table-borderless mb-0">
+        <tbody>
+          <tr><td class="text-muted">Дата</td><td>Дата операции</td></tr>
+          <tr><td class="text-muted">Банк / Касса</td><td>Тип инструмента</td></tr>
+          <tr><td class="text-muted">Операция</td><td>Тип: Поставщику, От покупателя…</td></tr>
+          <tr><td class="text-muted">Сумма</td><td>Положительная = приход, отрицательная = расход</td></tr>
+          <tr><td class="text-muted">Откуда / куда</td><td>Контрагент</td></tr>
+          <tr><td class="text-muted">Касса / счет</td><td>Название кассы или банк-счёта</td></tr>
+          <tr><td class="text-muted">Объект</td><td>Блок / ЖК (используется для авто-привязки)</td></tr>
+          <tr><td class="text-muted">Назначение</td><td>Описание операции</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

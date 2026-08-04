@@ -1,0 +1,643 @@
+{% extends 'base.html' %}
+{% load finance_filters l10n %}
+
+{% block title %}{{ account.name }} — ДДС{% endblock %}
+
+{% block extra_head %}
+<style>
+.btn-xs { font-size:.72rem; padding:.15rem .35rem; }
+.sel-wrap-er { position:relative; }
+.sel-filter-er { border-radius:.375rem .375rem 0 0; border-bottom:none; }
+.sel-wrap-er select { border-radius:0 0 .375rem .375rem; font-size:.78rem; width:100%; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      {% if account.residential_complex %}
+      <li class="breadcrumb-item">{{ account.residential_complex.name }}</li>
+      {% endif %}
+      <li class="breadcrumb-item active">{{ account.name }}</li>
+    </ol></nav>
+    <h1>
+      <i class="bi bi-{% if account.account_type == 'bank' %}bank{% else %}safe{% endif %} me-2 text-success"></i>
+      {{ account.name }}
+    </h1>
+    {% if account.residential_complex %}
+    <p class="text-muted mb-0" style="font-size:.9rem">{{ account.residential_complex.name }}</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addOpModal">
+      <i class="bi bi-plus-lg me-1"></i>Добавить операцию
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editAccountModal">
+      <i class="bi bi-pencil me-1"></i>Редактировать
+    </button>
+    <a href="{% url 'dds_import_upload' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Загрузить ДДС
+    </a>
+    <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>К кассам
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Общий приход</div><div class="value text-money text-success">{{ total_income|currency }}</div></div>
+        <div class="icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-down-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Общий расход</div><div class="value text-money text-danger">{{ total_expense|currency }}</div></div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card {% if balance < 0 %}border-danger{% endif %}">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Остаток</div>
+          <div class="value text-money {% if balance >= 0 %}text-success{% else %}text-danger{% endif %}">{{ balance|currency }}</div>
+        </div>
+        <div class="icon {% if balance >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+          <i class="bi bi-wallet2"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Filters + Table -->
+  <div class="col-xl-9">
+    <!-- Filters -->
+    <form method="get" class="card-section p-3 mb-3 d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <label class="form-label mb-1" style="font-size:.78rem">Направление</label>
+        <select name="direction" class="form-select form-select-sm" style="width:140px">
+          <option value="" {% if not f_direction %}selected{% endif %}>Все</option>
+          <option value="in" {% if f_direction == 'in' %}selected{% endif %}>↓ Приход</option>
+          <option value="out" {% if f_direction == 'out' %}selected{% endif %}>↑ Расход</option>
+          <option value="transfer" {% if f_direction == 'transfer' %}selected{% endif %}>⇄ Перемещение</option>
+        </select>
+      </div>
+      {% if all_blocks %}
+      <div>
+        <label class="form-label mb-1" style="font-size:.78rem">Блок</label>
+        <select name="block" class="form-select form-select-sm" style="width:150px">
+          <option value="">Все блоки</option>
+          {% for b in all_blocks %}
+          <option value="{{ b.pk }}" {% if f_block == b.pk|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div>
+        <label class="form-label mb-1" style="font-size:.78rem">Дата с</label>
+        <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm" style="width:140px">
+      </div>
+      <div>
+        <label class="form-label mb-1" style="font-size:.78rem">Дата по</label>
+        <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm" style="width:140px">
+      </div>
+      <div class="flex-grow-1">
+        <label class="form-label mb-1" style="font-size:.78rem">Поиск</label>
+        <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm" placeholder="Контрагент, объект, назначение…">
+      </div>
+      <div class="d-flex gap-1">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
+        <a href="{% url 'dds_account_detail' account.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x"></i></a>
+      </div>
+    </form>
+
+    <!-- Records table -->
+    <div class="data-table">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <span class="section-title">Операции <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ records|length }}</span></span>
+        {% if f_direction or f_block or f_date_from or f_date_to or f_q %}
+        <small class="text-muted">
+          Приход: <span class="text-success fw-semibold">{{ filtered_income|currency }}</span>
+          &nbsp;·&nbsp;
+          Расход: <span class="text-danger fw-semibold">{{ filtered_expense|currency }}</span>
+        </small>
+        {% endif %}
+      </div>
+
+      {% if records %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" style="font-size:.84rem">
+          <thead class="table-light">
+            <tr>
+              <th>Дата</th>
+              <th>Тип операции</th>
+              <th style="width:90px">Напр.</th>
+              <th class="text-end" style="width:140px">Сумма</th>
+              <th>Контрагент</th>
+              <th>Объект / Блок</th>
+              <th>Назначение</th>
+              <th style="width:72px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rec in records %}
+            <tr>
+              <td class="text-muted text-nowrap" style="font-size:.8rem">{{ rec.operation_date|date:"d.m.Y" }}</td>
+              <td>
+                <div class="fw-semibold" style="font-size:.82rem">{{ rec.operation_type }}</div>
+                <small class="text-muted" style="font-size:.74rem">{{ rec.account_name|truncatechars:22 }}</small>
+              </td>
+              <td>
+                {% if rec.direction == 'in' %}
+                  <span class="badge bg-success bg-opacity-10 text-success" style="font-size:.7rem">↓ Приход</span>
+                {% elif rec.direction == 'out' %}
+                  <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:.7rem">↑ Расход</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:.7rem">⇄</span>
+                {% endif %}
+              </td>
+              <td class="text-end text-money fw-semibold {% if rec.direction == 'in' %}text-success{% elif rec.direction == 'out' %}text-danger{% endif %}">
+                {{ rec.amount|currency }}
+              </td>
+              <td class="text-muted" style="font-size:.82rem">{{ rec.counterparty|truncatechars:28 }}</td>
+              <td style="font-size:.82rem">
+                {% if rec.block %}
+                  <span class="badge bg-primary bg-opacity-10 text-primary">{{ rec.block.name }}</span>
+                {% endif %}
+                {% if rec.object_ref %}
+                  <small class="text-muted d-block" style="font-size:.74rem">{{ rec.object_ref|truncatechars:28 }}</small>
+                {% endif %}
+              </td>
+              <td class="text-muted" style="font-size:.78rem">{{ rec.description|truncatechars:40 }}</td>
+              <td class="text-end text-nowrap">
+                <button type="button"
+                  class="btn btn-xs btn-outline-secondary py-0 px-1 me-1 rec-edit-btn"
+                  style="font-size:.72rem"
+                  data-bs-toggle="modal" data-bs-target="#editRecModal"
+                  data-rec-pk="{{ rec.pk }}"
+                  data-rec-date="{{ rec.operation_date|date:'Y-m-d' }}"
+                  data-rec-direction="{{ rec.direction }}"
+                  data-rec-amount="{{ rec.amount }}"
+                  data-rec-optype="{{ rec.operation_type }}"
+                  data-rec-counterparty="{{ rec.counterparty }}"
+                  data-rec-objectref="{{ rec.object_ref }}"
+                  data-rec-description="{{ rec.description }}"
+                  data-rec-block="{{ rec.block_id|default:'' }}"
+                  data-rec-item="{{ rec.estimate_item_id|default:'' }}"
+                  title="Редактировать">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="{% url 'dds_record_delete' rec.pk %}" class="d-inline"
+                      onsubmit="return confirm('Удалить эту запись?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-xs btn-outline-danger py-0 px-1"
+                          style="font-size:.72rem" title="Удалить">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <td colspan="3" class="fw-bold text-end">Итого (фильтр):</td>
+              <td class="text-end fw-bold">
+                <span class="text-success d-block" style="font-size:.8rem">↓ {{ filtered_income|currency }}</span>
+                <span class="text-danger d-block" style="font-size:.8rem">↑ {{ filtered_expense|currency }}</span>
+              </td>
+              <td colspan="4"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="bi bi-search fs-3 d-block mb-2"></i>
+        Операций не найдено по заданному фильтру.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sidebar: other accounts + block breakdown -->
+  <div class="col-xl-3">
+    {% if other_accounts %}
+    <div class="card-section p-3 mb-3">
+      <div class="section-title mb-2" style="font-size:.85rem">Другие кассы / счета</div>
+      {% for acc in other_accounts %}
+      <a href="{% url 'dds_account_detail' acc.pk %}"
+         class="d-flex justify-content-between align-items-center py-1 text-decoration-none text-dark border-bottom"
+         style="font-size:.82rem">
+        <span><i class="bi bi-{% if acc.account_type == 'bank' %}bank{% else %}safe{% endif %} me-1 text-muted"></i>{{ acc.name }}</span>
+        <span class="{% if acc.balance >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{{ acc.balance|currency }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if all_blocks %}
+    <div class="card-section p-3">
+      <div class="section-title mb-2" style="font-size:.85rem">Расход по блокам</div>
+      {% for block in all_blocks %}
+      {% with block_expense=block.dds_records.all %}
+      <div class="d-flex justify-content-between py-1 border-bottom" style="font-size:.82rem">
+        <span class="text-muted">{{ block.name }}</span>
+        <a href="?direction=out&block={{ block.pk }}" class="text-danger text-decoration-none fw-semibold">
+          фильтр
+        </a>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add operation modal -->
+<div class="modal fade" id="addOpModal" tabindex="-1" aria-labelledby="addOpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'dds_record_create' account.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="addOpModalLabel">
+            <i class="bi bi-plus-circle me-2 text-primary"></i>Новая операция — {{ account.name }}
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Дата <span class="text-danger">*</span></label>
+              <input type="date" name="operation_date" class="form-control form-control-sm" id="opDate" required>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Направление <span class="text-danger">*</span></label>
+              <select name="direction" class="form-select form-select-sm" required>
+                <option value="out" selected>↑ Расход</option>
+                <option value="in">↓ Приход</option>
+                <option value="transfer">⇄ Перемещение</option>
+              </select>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Сумма, ₽ <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control form-control-sm" min="0.01" step="0.01"
+                     placeholder="0.00" required>
+            </div>
+
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Тип операции <span class="text-danger">*</span></label>
+              <input type="text" name="operation_type" class="form-control form-control-sm"
+                     placeholder="Строительные работы" list="opTypeList" required>
+              <datalist id="opTypeList">
+                <option value="Строительные работы">
+                <option value="Материалы">
+                <option value="Зарплата">
+                <option value="Аренда техники">
+                <option value="Коммунальные услуги">
+                <option value="Прочие расходы">
+                <option value="Поступление от покупателей">
+                <option value="Перемещение средств">
+              </datalist>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Контрагент</label>
+              <input type="text" name="counterparty" class="form-control form-control-sm"
+                     placeholder="Название компании или ФИО">
+            </div>
+
+            {% if all_blocks %}
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Блок</label>
+              <select name="block" class="form-select form-select-sm">
+                <option value="">— не привязывать —</option>
+                {% for b in all_blocks %}
+                <option value="{{ b.pk }}">{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Объект / Адрес</label>
+              <input type="text" name="object_ref" class="form-control form-control-sm"
+                     placeholder="Объект строительства">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Назначение</label>
+              <input type="text" name="description" class="form-control form-control-sm"
+                     placeholder="Краткое описание операции">
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+<!-- Edit account modal -->
+<div class="modal fade" id="editAccountModal" tabindex="-1" aria-labelledby="editAccountModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'dds_account_edit' account.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editAccountModalLabel">
+            <i class="bi bi-pencil me-2 text-secondary"></i>Редактировать кассу
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <div class="col-8">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Название <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control form-control-sm"
+                     value="{{ account.name }}" required>
+            </div>
+
+            <div class="col-4">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Тип</label>
+              <select name="account_type" class="form-select form-select-sm">
+                <option value="cash" {% if account.account_type == 'cash' %}selected{% endif %}>Касса</option>
+                <option value="bank" {% if account.account_type == 'bank' %}selected{% endif %}>Банк</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">ЖК</label>
+              <select name="residential_complex" class="form-select form-select-sm" id="editRcSelect">
+                <option value="">— не привязан —</option>
+                {% for rc in all_rc %}
+                <option value="{{ rc.pk }}"
+                  {% if account.residential_complex_id == rc.pk %}selected{% endif %}>
+                  {{ rc.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Блок</label>
+              <select name="block" class="form-select form-select-sm" id="editBlockSelect">
+                <option value="">— не привязан —</option>
+                {% for b in all_blocks_edit %}
+                <option value="{{ b.pk }}"
+                        data-rc="{{ b.residential_complex_id|default:'' }}"
+                        {% if account.block_id == b.pk %}selected{% endif %}>
+                  {{ b.residential_complex.name }} / {{ b.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Заметки</label>
+              <textarea name="notes" class="form-control form-control-sm" rows="2"
+                        placeholder="Необязательно">{{ account.notes }}</textarea>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit record modal (shared, populated via JS) -->
+<div class="modal fade" id="editRecModal" tabindex="-1" aria-labelledby="editRecModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="post" id="editRecForm" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editRecModalLabel">
+            <i class="bi bi-pencil me-2 text-primary"></i>Редактировать запись
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Дата <span class="text-danger">*</span></label>
+              <input type="date" name="operation_date" id="erDate" class="form-control form-control-sm" required>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Направление <span class="text-danger">*</span></label>
+              <select name="direction" id="erDirection" class="form-select form-select-sm" required>
+                <option value="out">↑ Расход</option>
+                <option value="in">↓ Приход</option>
+                <option value="transfer">⇄ Перемещение</option>
+              </select>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Сумма, ₽ <span class="text-danger">*</span></label>
+              <input type="number" name="amount" id="erAmount" class="form-control form-control-sm"
+                     min="0.01" step="0.01" required>
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Тип операции <span class="text-danger">*</span></label>
+              <input type="text" name="operation_type" id="erOptype" class="form-control form-control-sm"
+                     list="erOpTypeList" required>
+              <datalist id="erOpTypeList">
+                <option value="Строительные работы">
+                <option value="Материалы">
+                <option value="Зарплата">
+                <option value="Аренда техники">
+                <option value="Коммунальные услуги">
+                <option value="Прочие расходы">
+                <option value="Поступление от покупателей">
+                <option value="Перемещение средств">
+              </datalist>
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Контрагент</label>
+              <input type="text" name="counterparty" id="erCounterparty" class="form-control form-control-sm">
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Блок</label>
+              <select name="block" id="erBlock" class="form-select form-select-sm">
+                <option value="">— не привязывать —</option>
+                {% for b in all_blocks_edit %}
+                <option value="{{ b.pk }}" data-rc="{{ b.residential_complex_id|default:'' }}">
+                  {% if b.residential_complex %}{{ b.residential_complex.name }} / {% endif %}{{ b.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Позиция сметы</label>
+              <div class="sel-wrap-er">
+                <input type="text" class="sel-filter-er form-control form-control-sm"
+                       placeholder="Поиск…" autocomplete="off">
+                <select name="estimate_item" id="erItem" class="form-select form-select-sm" size="3">
+                  <option value="">— не привязывать —</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Объект / Адрес</label>
+              <input type="text" name="object_ref" id="erObjectref" class="form-control form-control-sm">
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label fw-semibold" style="font-size:.85rem">Назначение</label>
+              <input type="text" name="description" id="erDescription" class="form-control form-control-sm">
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% block scripts %}
+<script id="dds-item-opts-json" type="application/json">{{ item_choices_json|safe }}</script>
+<script>
+// ── Add-operation modal: default date today ───────────────────────────────────
+document.getElementById('opDate').valueAsDate = new Date();
+
+// ── Account edit modal: filter blocks by RC ───────────────────────────────────
+(function () {
+  const rcSel  = document.getElementById('editRcSelect');
+  const blkSel = document.getElementById('editBlockSelect');
+  if (!rcSel || !blkSel) return;
+  const allOpts = Array.from(blkSel.options);
+  function filterBlocks() {
+    const rcId   = rcSel.value;
+    const prevVal = blkSel.value;
+    blkSel.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = ''; empty.textContent = '— не привязан —';
+    blkSel.appendChild(empty);
+    allOpts.forEach(function (opt) {
+      if (!opt.value) return;
+      if (!rcId || opt.dataset.rc === rcId) blkSel.appendChild(opt.cloneNode(true));
+    });
+    blkSel.value = prevVal;
+  }
+  rcSel.addEventListener('change', filterBlocks);
+  filterBlocks();
+})();
+
+// ── Record edit modal ─────────────────────────────────────────────────────────
+(function () {
+  const optsData = JSON.parse(document.getElementById('dds-item-opts-json').textContent);
+
+  function buildItemHTML(blockId, curItemId) {
+    const choices = optsData[String(blockId)] || [];
+    let html = '<option value="">— не привязывать —</option>';
+    choices.forEach(function (c) {
+      if (c.t === 'g') {
+        html += '</optgroup><optgroup label="' + c.l.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '">';
+      } else {
+        const sel = (curItemId && String(curItemId) === String(c.id)) ? ' selected' : '';
+        html += '<option value="' + c.id + '"' + sel + '>' +
+                c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</option>';
+      }
+    });
+    return html + '</optgroup>';
+  }
+
+  const erBlock  = document.getElementById('erBlock');
+  const erItem   = document.getElementById('erItem');
+  const erFilter = document.querySelector('.sel-filter-er');
+  let   curItemId = '';
+
+  function refreshItems(blockId, filter) {
+    const q = (filter || '').toLowerCase().trim();
+    const choices = optsData[String(blockId)] || [];
+    let html = '<option value="">— не привязывать —</option>';
+    choices.forEach(function (c) {
+      if (c.t === 'g') {
+        html += '</optgroup><optgroup label="' + c.l.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '">';
+      } else {
+        if (q && !c.l.toLowerCase().includes(q)) return;
+        const sel = (curItemId && String(curItemId) === String(c.id)) ? ' selected' : '';
+        html += '<option value="' + c.id + '"' + sel + '>' +
+                c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</option>';
+      }
+    });
+    erItem.innerHTML = html + '</optgroup>';
+  }
+
+  erBlock.addEventListener('change', function () {
+    curItemId = '';
+    erFilter.value = '';
+    refreshItems(this.value, '');
+  });
+  erFilter.addEventListener('input', function () {
+    refreshItems(erBlock.value, this.value);
+  });
+
+  // Populate modal when edit button is clicked
+  document.querySelectorAll('.rec-edit-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const d = btn.dataset;
+      const form = document.getElementById('editRecForm');
+      form.action = '/dds/records/' + d.recPk + '/edit/';
+
+      document.getElementById('erDate').value        = d.recDate;
+      document.getElementById('erDirection').value   = d.recDirection;
+      document.getElementById('erAmount').value      = d.recAmount;
+      document.getElementById('erOptype').value      = d.recOptype;
+      document.getElementById('erCounterparty').value= d.recCounterparty;
+      document.getElementById('erObjectref').value   = d.recObjectref;
+      document.getElementById('erDescription').value = d.recDescription;
+      erBlock.value = d.recBlock || '';
+      curItemId     = d.recItem || '';
+      erFilter.value = '';
+      refreshItems(erBlock.value, '');
+    });
+  });
+})();
+</script>
+{% endblock %}

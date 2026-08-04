@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'apps.projects',
     'apps.imports',
     'apps.estimates',
+    'apps.dds',
 ]
 
 MIDDLEWARE = [

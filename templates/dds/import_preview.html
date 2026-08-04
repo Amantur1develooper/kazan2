@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Предпросмотр ДДС{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      <li class="breadcrumb-item active">Предпросмотр</li>
+    </ol></nav>
+    <h1><i class="bi bi-eye me-2 text-primary"></i>Предпросмотр ДДС</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">{{ dds_import.original_filename }} · {{ dds_import.residential_complex.name }}</p>
+  </div>
+  <a href="{% url 'dds_import_upload' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Приход</div><div class="value text-money text-success">{{ income_preview|currency }}</div></div>
+        <div class="icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-down-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Расход</div><div class="value text-money text-danger">{{ expense_preview|currency }}</div></div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div><div class="label">Всего записей</div><div class="value">{{ total }}</div></div>
+        <div class="icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-list-ul"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="data-table mb-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Первые {{ preview|length }} записей из {{ total }}</span>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-success btn-sm">
+        <i class="bi bi-check-lg me-1"></i>Импортировать все {{ total }} записей
+      </button>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.82rem">
+      <thead class="table-light">
+        <tr>
+          <th>Дата</th>
+          <th>Тип</th>
+          <th style="width:80px">Напр.</th>
+          <th class="text-end" style="width:130px">Сумма</th>
+          <th>Контрагент</th>
+          <th>Счёт</th>
+          <th>Объект</th>
+          <th>Назначение</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in preview %}
+        <tr>
+          <td class="text-muted text-nowrap">{{ rec.operation_date }}</td>
+          <td>{{ rec.operation_type }}</td>
+          <td>
+            {% if rec.direction == 'in' %}
+              <span class="badge bg-success bg-opacity-10 text-success">Приход</span>
+            {% elif rec.direction == 'out' %}
+              <span class="badge bg-danger bg-opacity-10 text-danger">Расход</span>
+            {% else %}
+              <span class="badge bg-secondary bg-opacity-10 text-secondary">Перемещение</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-money {% if rec.direction == 'in' %}text-success{% elif rec.direction == 'out' %}text-danger{% endif %}">
+            {{ rec.amount|currency }}
+          </td>
+          <td class="text-muted small">{{ rec.counterparty|truncatechars:25 }}</td>
+          <td class="text-muted small">{{ rec.account_name|truncatechars:20 }}</td>
+          <td class="small">{{ rec.object_ref|truncatechars:25 }}</td>
+          <td class="text-muted small">{{ rec.description|truncatechars:30 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if total > preview|length %}
+  <div class="p-2 text-center text-muted small border-top">
+    … ещё {{ total|add:"-30" }} записей не показаны
+  </div>
+  {% endif %}
+</div>
+
+<div class="d-flex justify-content-between">
+  <a href="{% url 'dds_import_upload' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-x me-1"></i>Отмена
+  </a>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Импортировать {{ total }} записей
+    </button>
+  </form>
+</div>
+{% endblock %}

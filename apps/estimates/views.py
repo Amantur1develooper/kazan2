@@ -205,6 +205,93 @@ def estimate_detail(request, pk):
     # Build set of item ids that have expense allocations (for "link" icon in template)
     linked_item_ids = set(pf_by_alloc.keys())
 
+    # ── ДДС: прикрепить к позициям и разделу «Прочие» ────────────────────────
+    try:
+        from apps.dds.models import CashFlowRecord
+
+        # Уровень 1: записи привязаны к позиции сметы напрямую
+        dds_by_item = {}
+        for r in CashFlowRecord.objects.filter(
+            estimate_item__section__estimate=estimate,
+            direction='out',
+        ).values('estimate_item_id').annotate(s=Sum('amount')):
+            dds_by_item[r['estimate_item_id']] = r['s']
+
+        # Уровень 2: записи с блоком, но без позиции — по этапу
+        dds_unalloc_by_stage = {}
+        for r in CashFlowRecord.objects.filter(
+            block=estimate.block,
+            direction='out',
+            estimate_item__isnull=True,
+        ).values('block_id').annotate(s=Sum('amount')):
+            # grouped by block only; we'll split by stage below
+            pass
+
+        # More granular: unallocated DDS per stage (via object_ref heuristic not possible here,
+        # so we attach all block-level unallocated DDS to the *first* "Прочие" found)
+        dds_unalloc_total = CashFlowRecord.objects.filter(
+            block=estimate.block,
+            direction='out',
+            estimate_item__isnull=True,
+        ).aggregate(s=Coalesce(Sum('amount'), Value(Decimal('0'))))['s']
+
+        dds_unalloc_records = list(
+            CashFlowRecord.objects.filter(
+                block=estimate.block,
+                direction='out',
+                estimate_item__isnull=True,
+            ).select_related('account').order_by('-operation_date')
+        )
+
+        # Per-item DDS records (for dropdown)
+        from collections import defaultdict as _dd
+        _dds_recs_map = _dd(list)
+        for _rec in CashFlowRecord.objects.filter(
+            estimate_item__section__estimate=estimate,
+            direction='out',
+        ).select_related('account').order_by('estimate_item_id', '-operation_date'):
+            _dds_recs_map[_rec.estimate_item_id].append(_rec)
+
+        # Attach dds_expense and dds_breakdown to each item
+        for item in all_items:
+            item.dds_expense = dds_by_item.get(item.pk, Decimal('0'))
+            item.dds_breakdown = _dds_recs_map.get(item.pk, [])
+
+        # Attach dds unallocated to first "Прочие расходы" child across all top sections
+        dds_misc_attached = False
+        for top_sec in top_sections:
+            if dds_misc_attached:
+                break
+            for child in top_sec.plan_children:
+                if 'прочие' in child.name.lower():
+                    child.misc_dds = dds_unalloc_total
+                    child.misc_dds_records = dds_unalloc_records
+                    dds_misc_attached = True
+                    break
+
+        # Compute dds_expense bottom-up on sections
+        def _compute_dds(section):
+            total = sum(getattr(i, 'dds_expense', Decimal('0')) for i in section.plan_items)
+            total += getattr(section, 'misc_dds', Decimal('0'))
+            for child in section.plan_children:
+                total += _compute_dds(child)
+            section.dds_expense = total
+            return total
+
+        for sec in top_sections:
+            _compute_dds(sec)
+
+        total_dds = sum(s.dds_expense for s in top_sections)
+        has_dds = total_dds > 0 or bool(dds_unalloc_records)
+
+    except Exception:
+        for item in all_items:
+            item.dds_expense = Decimal('0')
+        for s in all_sections:
+            s.dds_expense = Decimal('0')
+        total_dds = Decimal('0')
+        has_dds = False
+
     context = {
         'estimate': estimate,
         'estimate_block': estimate.block,
@@ -213,6 +300,8 @@ def estimate_detail(request, pk):
         'total_plan': total_plan,
         'total_actual': total_actual,
         'total_deviation': total_actual - total_plan,
+        'total_dds': total_dds,
+        'has_dds': has_dds,
         'versions': versions,
         'linked_item_ids': linked_item_ids,
     }

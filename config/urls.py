@@ -12,6 +12,7 @@ urlpatterns = [
     path('complexes/', include('apps.projects.urls')),
     path('imports/', include('apps.imports.urls')),
     path('estimates/', include('apps.estimates.urls')),
+    path('dds/', include('apps.dds.urls')),
 ]
 
 if settings.DEBUG:
