@@ -60,6 +60,11 @@ class DDSImport(models.Model):
         on_delete=models.SET_NULL, related_name='dds_imports',
         verbose_name='ЖК'
     )
+    block = models.ForeignKey(
+        'projects.Block', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='dds_imports',
+        verbose_name='Блок'
+    )
     status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='pending')
     rows_total = models.IntegerField('Всего строк', default=0)
     rows_processed = models.IntegerField('Обработано', default=0)

@@ -32,16 +32,33 @@
     <div class="card-section p-4">
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+
         <div class="mb-4">
           <label class="form-label fw-semibold">Жилой комплекс</label>
           {{ form.residential_complex }}
           <small class="text-muted">Все записи из файла будут привязаны к этому ЖК</small>
         </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">
+            Блок
+            <span class="text-muted fw-normal" style="font-size:.85rem">— необязательно</span>
+          </label>
+          <select name="block" id="id_block" class="form-select">
+            <option value="">— Не указывать блок (авто-привязка по объекту) —</option>
+          </select>
+          <small class="text-muted d-block mt-1">
+            Если выбрать блок — <strong>все</strong> записи из файла сразу попадут в этот блок.
+            Удобно, когда файл содержит данные только одного блока.
+          </small>
+        </div>
+
         <div class="mb-4">
           <label class="form-label fw-semibold">Файл ДДС (.xls / .xlsx)</label>
           {{ form.file }}
           <small class="text-muted d-block mt-1">Экспорт «Движение денежных средств» из 1С</small>
         </div>
+
         <button type="submit" class="btn btn-success w-100">
           <i class="bi bi-upload me-2"></i>Загрузить и показать предпросмотр
         </button>
@@ -65,4 +82,31 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script id="blocks-by-rc-json" type="application/json">{{ blocks_by_rc_json|safe }}</script>
+<script>
+(function () {
+  const blocksByRc = JSON.parse(document.getElementById('blocks-by-rc-json').textContent);
+  const rcSel   = document.getElementById('id_residential_complex');
+  const blkSel  = document.getElementById('id_block');
+
+  function rebuildBlocks() {
+    const rcId = rcSel.value;
+    const blocks = (rcId && blocksByRc[rcId]) ? blocksByRc[rcId] : [];
+    blkSel.innerHTML = '<option value="">— Не указывать блок (авто-привязка по объекту) —</option>';
+    blocks.forEach(function (b) {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.name;
+      blkSel.appendChild(opt);
+    });
+    blkSel.disabled = blocks.length === 0;
+  }
+
+  rcSel.addEventListener('change', rebuildBlocks);
+  rebuildBlocks();
+})();
+</script>
 {% endblock %}

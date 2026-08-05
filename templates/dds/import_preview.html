@@ -11,7 +11,12 @@
       <li class="breadcrumb-item active">Предпросмотр</li>
     </ol></nav>
     <h1><i class="bi bi-eye me-2 text-primary"></i>Предпросмотр ДДС</h1>
-    <p class="text-muted mb-0" style="font-size:.9rem">{{ dds_import.original_filename }} · {{ dds_import.residential_complex.name }}</p>
+    <p class="text-muted mb-0" style="font-size:.9rem">
+      {{ dds_import.original_filename }} · {{ dds_import.residential_complex.name }}
+      {% if dds_import.block %}
+        · <span class="badge bg-primary bg-opacity-10 text-primary">Блок {{ dds_import.block.name }}</span>
+      {% endif %}
+    </p>
   </div>
   <a href="{% url 'dds_import_upload' %}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Назад

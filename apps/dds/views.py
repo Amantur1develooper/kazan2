@@ -49,12 +49,14 @@ def dds_import_upload(request):
         form = DDSImportForm(request.POST, request.FILES)
         if form.is_valid():
             rc = form.cleaned_data['residential_complex']
+            block = form.cleaned_data.get('block')
             uploaded = request.FILES['file']
 
             dds_import = DDSImport.objects.create(
                 file=uploaded,
                 original_filename=uploaded.name,
                 residential_complex=rc,
+                block=block,
                 status='pending',
             )
 
@@ -87,7 +89,19 @@ def dds_import_upload(request):
     else:
         form = DDSImportForm()
 
-    return render(request, 'dds/import_upload.html', {'form': form})
+    # Build RC→blocks mapping for JS filtering
+    import json as _json
+    all_blocks = Block.objects.select_related('residential_complex').order_by('name')
+    blocks_by_rc = {}
+    for blk in all_blocks:
+        rc_id = str(blk.residential_complex_id)
+        blocks_by_rc.setdefault(rc_id, []).append({'id': blk.pk, 'name': blk.name})
+    blocks_by_rc_json = _json.dumps(blocks_by_rc, ensure_ascii=False)
+
+    return render(request, 'dds/import_upload.html', {
+        'form': form,
+        'blocks_by_rc_json': blocks_by_rc_json,
+    })
 
 
 def dds_import_preview(request, pk):
@@ -134,7 +148,10 @@ def dds_import_preview(request, pk):
 
         try:
             records = parse_dds_excel(dds_import.file.path)
-            stats = apply_dds_import(dds_import.residential_complex, records, dds_import)
+            stats = apply_dds_import(
+                dds_import.residential_complex, records, dds_import,
+                default_block=dds_import.block,
+            )
             dds_import.rows_total = len(records)
             dds_import.rows_processed = stats['created']
             dds_import.rows_error = stats['errors']

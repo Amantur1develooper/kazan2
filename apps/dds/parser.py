@@ -121,11 +121,11 @@ def auto_match_block(object_ref: str, blocks) -> object:
     return None
 
 
-def apply_dds_import(residential_complex, records: list, dds_import) -> dict:
+def apply_dds_import(residential_complex, records: list, dds_import, default_block=None) -> dict:
     """
     Persist parsed DDS records to the database.
     Auto-creates CashAccount records per unique account_name.
-    Auto-matches blocks by object_ref string.
+    If default_block is set, all records get that block; otherwise auto-matches by object_ref.
     Returns stats dict.
     """
     from .models import CashAccount, CashFlowRecord
@@ -140,10 +140,10 @@ def apply_dds_import(residential_complex, records: list, dds_import) -> dict:
     for acc in CashAccount.objects.filter(residential_complex=residential_complex):
         account_cache[acc.name] = acc
 
-    # Pre-load all blocks for auto-matching
-    all_blocks = list(Block.objects.filter(
-        residential_complex=residential_complex
-    ).select_related('residential_complex'))
+    # Pre-load all blocks for auto-matching (only needed when no default_block)
+    all_blocks = [] if default_block is not None else list(
+        Block.objects.filter(residential_complex=residential_complex).select_related('residential_complex')
+    )
 
     stats = {'created': 0, 'errors': 0}
     to_create = []
@@ -159,11 +159,12 @@ def apply_dds_import(residential_complex, records: list, dds_import) -> dict:
                     name=acc_name,
                     account_type=acc_type,
                     residential_complex=residential_complex,
+                    block=default_block,
                 )
                 account_cache[acc_name] = acc
             account = account_cache.get(acc_name)
 
-            block = auto_match_block(item.get('object_ref', ''), all_blocks)
+            block = default_block if default_block is not None else auto_match_block(item.get('object_ref', ''), all_blocks)
 
             op_date = item['operation_date']
             if hasattr(op_date, 'isoformat'):
