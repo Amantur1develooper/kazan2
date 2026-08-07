@@ -22,17 +22,63 @@ def org_list(request):
 
 def org_detail(request, pk):
     org = get_object_or_404(Organization, pk=pk)
-    complexes = org.complexes.prefetch_related('blocks__stages__floors__expenses').all()
+    complexes = list(org.complexes.prefetch_related('blocks__stages__floors__expenses').all())
+
+    # DDS totals per RC (via blocks)
+    from apps.dds.models import CashFlowRecord
+    rc_ids = [c.pk for c in complexes]
+
+    dds_income_by_rc = {
+        r['block__residential_complex_id']: r['s']
+        for r in CashFlowRecord.objects.filter(
+            block__residential_complex_id__in=rc_ids, direction='in'
+        ).values('block__residential_complex_id').annotate(s=Sum('amount'))
+    }
+    dds_expense_by_rc = {
+        r['block__residential_complex_id']: r['s']
+        for r in CashFlowRecord.objects.filter(
+            block__residential_complex_id__in=rc_ids, direction='out'
+        ).values('block__residential_complex_id').annotate(s=Sum('amount'))
+    }
 
     stats = []
     for c in complexes:
-        planned = c.total_planned_expenses
-        actual = c.total_actual_expenses
-        stats.append({'complex': c, 'planned': planned, 'actual': actual,
-                       'deviation': actual - planned})
+        planned  = c.total_planned_expenses
+        actual   = c.total_actual_expenses
+        dds_in   = dds_income_by_rc.get(c.pk, Decimal('0'))
+        dds_out  = dds_expense_by_rc.get(c.pk, Decimal('0'))
+        # Маржа = плановая выручка от реализации − фактические расходы
+        margin   = c.total_planned_cost - actual
+        # Δ-долг: ДДС расход − план-факт факт (>0 переплатили, <0 мы должны)
+        debt     = dds_out - actual
+        sqm      = c.square_meters
+        cost_per_sqm     = (actual   / sqm).quantize(Decimal('1')) if sqm and actual   else None
+        dds_cost_per_sqm = (dds_out  / sqm).quantize(Decimal('1')) if sqm and dds_out  else None
+        avg_sale_sqm     = (c.total_planned_cost / sqm).quantize(Decimal('1')) if sqm and c.total_planned_cost else None
+        stats.append({
+            'complex': c,
+            'planned':  planned,
+            'actual':   actual,
+            'deviation': actual - planned,
+            'sale_plan': c.total_planned_cost,
+            'dds_income':  dds_in,
+            'dds_expense': dds_out,
+            'dds_balance': dds_in - dds_out,
+            'margin': margin,
+            'debt':   debt,
+            'sqm':    sqm,
+            'cost_per_sqm':     cost_per_sqm,
+            'dds_cost_per_sqm': dds_cost_per_sqm,
+            'avg_sale_sqm':     avg_sale_sqm,
+        })
 
-    total_planned = sum(s['planned'] for s in stats)
-    total_actual = sum(s['actual'] for s in stats)
+    total_planned     = sum(s['planned']     for s in stats)
+    total_actual      = sum(s['actual']      for s in stats)
+    total_sale_plan   = sum(s['sale_plan']   for s in stats)
+    total_dds_income  = sum(s['dds_income']  for s in stats)
+    total_dds_expense = sum(s['dds_expense'] for s in stats)
+    total_margin      = sum(s['margin']      for s in stats)
+    total_debt        = total_dds_expense - total_actual
 
     context = {
         'org': org,
@@ -40,9 +86,18 @@ def org_detail(request, pk):
         'total_planned': total_planned,
         'total_actual': total_actual,
         'total_deviation': total_actual - total_planned,
-        'chart_labels': json.dumps([s['complex'].name for s in stats]),
+        'total_sale_plan': total_sale_plan,
+        'total_dds_income':  total_dds_income,
+        'total_dds_expense': total_dds_expense,
+        'total_dds_balance': total_dds_income - total_dds_expense,
+        'total_margin':      total_margin,
+        'total_debt':        total_debt,
+        'chart_labels':  json.dumps([s['complex'].name for s in stats]),
         'chart_planned': json.dumps([float(s['planned']) for s in stats]),
-        'chart_actual': json.dumps([float(s['actual']) for s in stats]),
+        'chart_actual':  json.dumps([float(s['actual'])  for s in stats]),
+        'chart_dds_income':  json.dumps([float(s['dds_income'])  for s in stats]),
+        'chart_dds_expense': json.dumps([float(s['dds_expense']) for s in stats]),
+        'chart_margin':      json.dumps([float(s['margin'])      for s in stats]),
     }
     return render(request, 'projects/org_detail.html', context)
 
@@ -104,30 +159,71 @@ def complex_list(request):
 
 def complex_detail(request, pk):
     complex_obj = get_object_or_404(ResidentialComplex.objects.select_related('organization'), pk=pk)
-    blocks = complex_obj.blocks.prefetch_related('stages__floors__expenses').all()
+    blocks = list(complex_obj.blocks.prefetch_related('stages__floors__expenses').all())
+
+    # DDS per block
+    from apps.dds.models import CashFlowRecord
+    block_ids = [b.pk for b in blocks]
+    dds_income_by_block = {
+        r['block_id']: r['s']
+        for r in CashFlowRecord.objects.filter(
+            block_id__in=block_ids, direction='in'
+        ).values('block_id').annotate(s=Sum('amount'))
+    }
+    dds_expense_by_block = {
+        r['block_id']: r['s']
+        for r in CashFlowRecord.objects.filter(
+            block_id__in=block_ids, direction='out'
+        ).values('block_id').annotate(s=Sum('amount'))
+    }
 
     block_stats = []
     for b in blocks:
         planned = b.total_planned_expenses
-        actual = b.total_actual_expenses
-        sqm = b.square_meters
-        price_per_sqm = (actual / sqm).quantize(Decimal('0.01')) if sqm else None
-        block_stats.append({'block': b, 'planned': planned, 'actual': actual,
-                              'deviation': actual - planned, 'stages_count': b.stages.count(),
-                              'price_per_sqm': price_per_sqm})
+        actual  = b.total_actual_expenses
+        sqm     = b.square_meters
+        dds_in  = dds_income_by_block.get(b.pk, Decimal('0'))
+        dds_out = dds_expense_by_block.get(b.pk, Decimal('0'))
+        # Δ-долг: >0 = переплатили (подрядчики должны работу), <0 = мы должны деньги
+        debt = dds_out - actual
+        price_per_sqm    = (actual  / sqm).quantize(Decimal('1')) if sqm and actual  else None
+        dds_cost_per_sqm = (dds_out / sqm).quantize(Decimal('1')) if sqm and dds_out else None
+        block_stats.append({
+            'block': b,
+            'planned': planned,
+            'actual':  actual,
+            'deviation': actual - planned,
+            'stages_count': b.stages.count(),
+            'price_per_sqm':     price_per_sqm,
+            'dds_income':        dds_in,
+            'dds_expense':       dds_out,
+            'dds_balance':       dds_in - dds_out,
+            'debt':              debt,
+            'dds_cost_per_sqm':  dds_cost_per_sqm,
+        })
 
-    total_planned = sum(b['planned'] for b in block_stats)
-    total_actual = sum(b['actual'] for b in block_stats)
+    total_planned     = sum(b['planned']     for b in block_stats)
+    total_actual      = sum(b['actual']      for b in block_stats)
+    total_dds_income  = sum(b['dds_income']  for b in block_stats)
+    total_dds_expense = sum(b['dds_expense'] for b in block_stats)
+    total_debt        = total_dds_expense - total_actual
+    total_sqm         = sum((b['block'].square_meters or 0) for b in block_stats)
 
     context = {
         'complex': complex_obj,
         'block_stats': block_stats,
-        'total_planned': total_planned,
-        'total_actual': total_actual,
-        'total_deviation': total_actual - total_planned,
-        'chart_labels': json.dumps([b['block'].name for b in block_stats]),
-        'chart_planned': json.dumps([float(b['planned']) for b in block_stats]),
-        'chart_actual': json.dumps([float(b['actual']) for b in block_stats]),
+        'total_planned':     total_planned,
+        'total_actual':      total_actual,
+        'total_deviation':   total_actual - total_planned,
+        'total_dds_income':  total_dds_income,
+        'total_dds_expense': total_dds_expense,
+        'total_dds_balance': total_dds_income - total_dds_expense,
+        'total_debt':        total_debt,
+        'total_sqm':         total_sqm,
+        'chart_labels':  json.dumps([b['block'].name for b in block_stats]),
+        'chart_planned': json.dumps([float(b['planned'])     for b in block_stats]),
+        'chart_actual':  json.dumps([float(b['actual'])      for b in block_stats]),
+        'chart_dds_out': json.dumps([float(b['dds_expense']) for b in block_stats]),
     }
     return render(request, 'projects/complex_detail.html', context)
 
@@ -320,6 +416,25 @@ def block_detail(request, pk):
     dds_balance = dds_income - dds_expense
     has_dds = dds_income > 0 or dds_expense > 0
 
+    # ── Анализ трёх счётчиков ─────────────────────────────────────────────────
+    # план-факт факт (материальный счётчик)
+    pf_actual = estimate_total_fact if estimate_total_fact else total_actual
+    # Δ-долг (ДДС − П/Ф): >0 переплатили (нам должны работу), <0 получили без оплаты (мы должны)
+    debt = dds_expense - pf_actual
+
+    sqm = block_obj.square_meters
+    # Себестоимость м²
+    pf_cost_per_sqm  = (pf_actual    / sqm).quantize(Decimal('1')) if sqm and pf_actual    else None
+    dds_cost_per_sqm = (dds_expense  / sqm).quantize(Decimal('1')) if sqm and dds_expense  else None
+    # Средняя продажная цена м² (если задана у ЖК)
+    rc = block_obj.residential_complex
+    avg_sale_sqm = None
+    margin_rc = None
+    if rc.square_meters and rc.total_planned_cost:
+        avg_sale_sqm = (rc.total_planned_cost / rc.square_meters).quantize(Decimal('1'))
+    if rc.total_planned_cost:
+        margin_rc = rc.total_planned_cost - rc.total_actual_expenses
+
     context = {
         'block_obj': block_obj,
         'stage_stats': stage_stats,
@@ -335,6 +450,14 @@ def block_detail(request, pk):
         'dds_balance': dds_balance,
         'dds_by_op': dds_by_op,
         'has_dds': has_dds,
+        # три счётчика
+        'pf_actual': pf_actual,
+        'debt': debt,
+        'sqm': sqm,
+        'pf_cost_per_sqm':  pf_cost_per_sqm,
+        'dds_cost_per_sqm': dds_cost_per_sqm,
+        'avg_sale_sqm': avg_sale_sqm,
+        'margin_rc': margin_rc,
         'chart_labels': json.dumps([x['stage'].name for x in stage_stats]),
         'chart_planned': json.dumps([float(x['planned']) for x in stage_stats]),
         'chart_actual': json.dumps([float(x['actual']) for x in stage_stats]),

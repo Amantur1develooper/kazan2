@@ -23,6 +23,96 @@
 {% endblock %}
 
 {% block content %}
+
+{# ── Три счётчика: Смета | ДДС | План-факт | Δ-долг ── #}
+<div class="card-section p-3 mb-4" style="border-left:4px solid #3b82f6">
+  <div class="row g-3 align-items-stretch">
+
+    {# Смета #}
+    <div class="col-6 col-md-3">
+      <div class="text-center p-3 rounded" style="background:#eff6ff">
+        <div class="small text-primary fw-semibold mb-1"><i class="bi bi-clipboard-check me-1"></i>Смета (план)</div>
+        <div class="fw-bold text-money fs-6">{% if estimate_total_plan %}{{ estimate_total_plan|currency }}{% else %}{{ total_planned|currency }}{% endif %}</div>
+        {% if estimate_total_plan %}<div class="text-muted" style="font-size:.7rem">загруженная смета</div>{% endif %}
+      </div>
+    </div>
+
+    {# ДДС расход #}
+    <div class="col-6 col-md-3">
+      <div class="text-center p-3 rounded" style="background:#fef2f2">
+        <div class="small text-danger fw-semibold mb-1"><i class="bi bi-cash-stack me-1"></i>ДДС расход</div>
+        <div class="fw-bold text-money fs-6 text-danger">{{ dds_expense|currency }}</div>
+        {% if dds_income > 0 %}<div class="text-muted" style="font-size:.7rem">приход: {{ dds_income|currency }}</div>{% endif %}
+      </div>
+    </div>
+
+    {# План-факт (материальный) #}
+    <div class="col-6 col-md-3">
+      <div class="text-center p-3 rounded" style="background:#fefce8">
+        <div class="small text-warning fw-semibold mb-1" style="color:#92400e!important"><i class="bi bi-tools me-1"></i>План-факт</div>
+        <div class="fw-bold text-money fs-6">{{ pf_actual|currency }}</div>
+        <div class="text-muted" style="font-size:.7rem">материальный учёт</div>
+      </div>
+    </div>
+
+    {# Δ-долг #}
+    <div class="col-6 col-md-3">
+      <div class="text-center p-3 rounded {% if debt > 0 %}bg-success bg-opacity-10{% elif debt < 0 %}bg-danger bg-opacity-10{% else %}bg-light{% endif %}">
+        <div class="small fw-semibold mb-1 {% if debt > 0 %}text-success{% elif debt < 0 %}text-danger{% else %}text-muted{% endif %}">
+          <i class="bi bi-arrow-left-right me-1"></i>Δ-долг (ДДС − П/Ф)
+        </div>
+        <div class="fw-bold text-money fs-6 {% if debt > 0 %}text-success{% elif debt < 0 %}text-danger{% else %}text-muted{% endif %}">
+          {% if debt > 0 %}+{% endif %}{{ debt|currency }}
+        </div>
+        <div class="text-muted" style="font-size:.7rem">
+          {% if debt > 0 %}переплатили → нам должны работу
+          {% elif debt < 0 %}получили без оплаты → мы должны
+          {% else %}в балансе{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Себестоимость м² и маржа #}
+  {% if sqm or margin_rc or avg_sale_sqm %}
+  <hr class="my-3">
+  <div class="row g-3">
+    {% if sqm %}
+    <div class="col-6 col-md-3">
+      <div class="text-muted small">Площадь блока</div>
+      <div class="fw-semibold">{{ sqm }} м²</div>
+    </div>
+    {% endif %}
+    {% if pf_cost_per_sqm %}
+    <div class="col-6 col-md-3">
+      <div class="text-muted small">Себестоимость м² (П/Ф)</div>
+      <div class="fw-bold text-primary">{{ pf_cost_per_sqm|currency }}</div>
+    </div>
+    {% endif %}
+    {% if dds_cost_per_sqm %}
+    <div class="col-6 col-md-3">
+      <div class="text-muted small">Себестоимость м² (ДДС)</div>
+      <div class="fw-bold text-danger">{{ dds_cost_per_sqm|currency }}</div>
+    </div>
+    {% endif %}
+    {% if avg_sale_sqm %}
+    <div class="col-6 col-md-3">
+      <div class="text-muted small">Ср. продажная цена м² (ЖК)</div>
+      <div class="fw-bold text-success">{{ avg_sale_sqm|currency }}</div>
+    </div>
+    {% endif %}
+    {% if margin_rc %}
+    <div class="col-6 col-md-3">
+      <div class="text-muted small">Маржа ЖК (реализация − факт)</div>
+      <div class="fw-bold {% if margin_rc >= 0 %}text-success{% else %}text-danger{% endif %}">
+        {% if margin_rc > 0 %}+{% endif %}{{ margin_rc|currency }}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
 <!-- Stats -->
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
