@@ -13,6 +13,8 @@ urlpatterns = [
     path('imports/', include('apps.imports.urls')),
     path('estimates/', include('apps.estimates.urls')),
     path('dds/', include('apps.dds.urls')),
+    path('vehicles/', include('apps.vehicles.urls')),
+    path('apartments/', include('apps.apartments.urls')),
 ]
 
 if settings.DEBUG:

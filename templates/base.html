@@ -146,6 +146,13 @@
       <i class="bi bi-link-45deg"></i> Нераспределённые
     </a>
 
+    <a href="{% url 'vehicle_list' %}" class="sidebar-link {% if 'vehicle' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-car-front"></i> Склад авто
+    </a>
+    <a href="{% url 'apartment_list' %}" class="sidebar-link {% if 'apartment' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-house-door"></i> Квартиры
+    </a>
+
     <div class="sidebar-section-title">Данные</div>
     <a href="{% url 'import_list' %}" class="sidebar-link {% if 'import' in request.resolver_match.url_name and 'dds' not in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-file-earmark-excel"></i> Импорт из 1С

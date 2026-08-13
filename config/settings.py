@@ -22,6 +22,8 @@ INSTALLED_APPS = [
     'apps.imports',
     'apps.estimates',
     'apps.dds',
+    'apps.vehicles',
+    'apps.apartments',
 ]
 
 MIDDLEWARE = [

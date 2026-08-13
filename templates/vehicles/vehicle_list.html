@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Склад авто{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-car-front me-2 text-primary"></i>Склад авто</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Учёт автомобилей как расчётного средства</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'vehicle_import' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Импорт Excel
+    </a>
+    <a href="{% url 'vehicle_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ── Итоговые карточки ── #}
+<div class="row g-3 mb-4">
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Всего операций</div>
+          <div class="value">{{ transactions|length }}</div>
+        </div>
+        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-list-ul"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Приход (реализация)</div>
+          <div class="value text-money text-success">{{ total_in|currency }}</div>
+        </div>
+        <div class="icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-down-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Расход (услуги)</div>
+          <div class="value text-money text-danger">{{ total_out|currency }}</div>
+        </div>
+        <div class="icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Убыток (разница)</div>
+          <div class="value text-money {% if total_loss < 0 %}text-danger{% elif total_loss > 0 %}text-success{% else %}text-muted{% endif %}">
+            {% if total_loss > 0 %}+{% endif %}{{ total_loss|currency }}
+          </div>
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-graph-down"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Фильтры ── #}
+<form method="get" class="mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-3">
+      <label class="form-label small text-muted mb-1">Компания</label>
+      <select name="org" class="form-select form-select-sm">
+        <option value="">Все компании</option>
+        {% for o in orgs %}
+        <option value="{{ o.pk }}" {% if filter_org == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label small text-muted mb-1">Блок</label>
+      <select name="block" class="form-select form-select-sm">
+        <option value="">Все блоки</option>
+        {% for b in blocks %}
+        <option value="{{ b.pk }}" {% if filter_block == b.pk|stringformat:"s" %}selected{% endif %}>
+          {{ b.residential_complex.name }} / Блок {{ b.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-4">
+      <label class="form-label small text-muted mb-1">Поиск по авто / подрядчику</label>
+      <input type="text" name="q" value="{{ filter_q }}" class="form-control form-control-sm" placeholder="Марка, подрядчик, назначение…">
+    </div>
+    <div class="col-sm-2 d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Найти</button>
+      <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary btn-sm">×</a>
+    </div>
+  </div>
+</form>
+
+{# ── В балансе (не реализованные) ── #}
+{% if in_balance %}
+<div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" style="font-size:.875rem">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>В балансе (не реализовано): <strong>{{ in_balance|length }} авто</strong> —
+  {% for t in in_balance %}<span class="badge bg-info text-dark me-1">{{ t.vehicle_name|truncatechars:35 }}</span>{% endfor %}
+  </span>
+</div>
+{% endif %}
+
+{# ── Таблица ── #}
+<div class="data-table">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Операции</span>
+    <small class="text-muted">{{ transactions|length }} записей</small>
+  </div>
+  {% if transactions %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size:.83rem">
+      <thead class="table-light">
+        <tr>
+          <th>Дата</th>
+          <th>Авто</th>
+          <th>Объект поступления</th>
+          <th class="text-end text-success">Приход</th>
+          <th class="text-end text-danger">Расход</th>
+          <th class="text-end">Убыток</th>
+          <th>Подрядчик</th>
+          <th>Объект расхода</th>
+          <th>За что</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr {% if t.in_balance %}class="table-info"{% endif %}>
+          <td class="text-muted text-nowrap">{{ t.date|date:"d.m.Y" }}</td>
+          <td>
+            <span class="fw-semibold">{{ t.vehicle_name|truncatechars:40 }}</span>
+            {% if t.organization %}<div class="text-muted" style="font-size:.72rem">{{ t.organization.name }}</div>{% endif %}
+            {% if t.in_balance %}<span class="badge bg-info text-dark" style="font-size:.65rem">в балансе</span>{% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if t.source_block %}
+              <a href="{% url 'block_detail' t.source_block.pk %}" class="text-decoration-none text-muted">
+                {{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}
+              </a>
+            {% else %}
+              {{ t.source_text|truncatechars:25 }}
+            {% endif %}
+          </td>
+          <td class="text-end text-money {% if t.amount_in > 0 %}text-success{% elif t.amount_in < 0 %}text-danger{% else %}text-muted{% endif %}">
+            {% if t.amount_in != 0 %}{{ t.amount_in|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-money {% if t.amount_out < 0 %}text-danger{% else %}text-muted{% endif %}">
+            {% if t.amount_out != 0 %}{{ t.amount_out|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-money fw-semibold {% if t.loss < 0 %}text-danger{% elif t.loss > 0 %}text-success{% else %}text-muted{% endif %}">
+            {% if t.loss != 0 %}{% if t.loss > 0 %}+{% endif %}{{ t.loss|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-muted small">{{ t.counterparty|truncatechars:30 }}</td>
+          <td class="text-muted small">
+            {% if t.target_block %}
+              <a href="{% url 'block_detail' t.target_block.pk %}" class="text-decoration-none text-muted">
+                {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}
+              </a>
+            {% else %}
+              {{ t.target_text|truncatechars:20 }}
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ t.purpose|truncatechars:30 }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'vehicle_edit' t.pk %}" class="btn btn-xs btn-outline-secondary">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'vehicle_delete' t.pk %}"
+                    onsubmit="return confirm('Удалить операцию?')" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-semibold">
+        <tr>
+          <td colspan="3">Итого</td>
+          <td class="text-end text-money text-success">{{ total_in|currency }}</td>
+          <td class="text-end text-money text-danger">{{ total_out|currency }}</td>
+          <td class="text-end text-money {% if total_loss < 0 %}text-danger{% elif total_loss > 0 %}text-success{% endif %}">
+            {% if total_loss > 0 %}+{% endif %}{{ total_loss|currency }}
+          </td>
+          <td colspan="4"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-5 text-center text-muted">
+    <i class="bi bi-car-front fs-2 d-block mb-3"></i>
+    Операций нет.
+    <a href="{% url 'vehicle_import' %}">Импортировать из Excel</a> или
+    <a href="{% url 'vehicle_create' %}">добавить вручную</a>.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

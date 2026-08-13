@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'vehicle_list' %}">Склад авто</a></li>
+      <li class="breadcrumb-item active">{{ title }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-car-front me-2 text-primary"></i>{{ title }}</h1>
+  </div>
+  <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card-section p-4">
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Компания</label>
+            <select name="organization" class="form-select">
+              <option value="">— Не указана —</option>
+              {% for o in orgs %}
+              <option value="{{ o.pk }}" {% if obj and obj.organization_id == o.pk %}selected{% endif %}>{{ o.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Дата <span class="text-danger">*</span></label>
+            <input type="date" name="date" class="form-control" required
+                   value="{{ obj.date|date:'Y-m-d'|default:'' }}">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Марка / описание авто <span class="text-danger">*</span></label>
+          <input type="text" name="vehicle_name" class="form-control"
+                 placeholder="Например: Хонда Аккорд черный 2003г (гос номер 609)"
+                 value="{{ obj.vehicle_name|default:'' }}" required>
+        </div>
+
+        <hr>
+        <div class="section-title mb-3"><i class="bi bi-arrow-down-circle me-1 text-success"></i>Поступление</div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Объект поступления (блок)</label>
+            <select name="source_block" class="form-select">
+              <option value="">— Не привязан —</option>
+              {% for b in blocks %}
+              <option value="{{ b.pk }}" {% if obj and obj.source_block_id == b.pk %}selected{% endif %}>
+                {{ b.residential_complex.name }} / Блок {{ b.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Объект поступления (текст)</label>
+            <input type="text" name="source_text" class="form-control"
+                   placeholder="Эко-В, Блок-К и т.д."
+                   value="{{ obj.source_text|default:'' }}">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Приход (сом)</label>
+            <input type="number" name="amount_in" class="form-control" step="0.01"
+                   value="{{ obj.amount_in|default:'0' }}">
+            <small class="text-muted">За сколько реализована машина</small>
+          </div>
+        </div>
+
+        <hr>
+        <div class="section-title mb-3"><i class="bi bi-arrow-up-circle me-1 text-danger"></i>Расход</div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Объект расхода (блок)</label>
+            <select name="target_block" class="form-select">
+              <option value="">— Не привязан —</option>
+              {% for b in blocks %}
+              <option value="{{ b.pk }}" {% if obj and obj.target_block_id == b.pk %}selected{% endif %}>
+                {{ b.residential_complex.name }} / Блок {{ b.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Объект расхода (текст)</label>
+            <input type="text" name="target_text" class="form-control"
+                   value="{{ obj.target_text|default:'' }}">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Расход (сом)</label>
+            <input type="number" name="amount_out" class="form-control" step="0.01"
+                   value="{{ obj.amount_out|default:'0' }}">
+            <small class="text-muted">Сумма оплаты подрядчику (отрицательная если уплачено)</small>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Подрядчик / кому ушло</label>
+            <input type="text" name="counterparty" class="form-control"
+                   placeholder="ИП Иванов, ОсОО «Альфа»…"
+                   value="{{ obj.counterparty|default:'' }}">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">За что / куда ушло</label>
+          <input type="text" name="purpose" class="form-control"
+                 placeholder="Услуга фасада, кладка газоблока, возврат клиенту…"
+                 value="{{ obj.purpose|default:'' }}">
+        </div>
+
+        <hr>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Примечания</label>
+          <textarea name="notes" class="form-control" rows="2">{{ obj.notes|default:'' }}</textarea>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary">Отмена</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if obj %}Сохранить{% else %}Добавить{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

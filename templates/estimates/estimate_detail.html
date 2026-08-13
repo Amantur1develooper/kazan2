@@ -601,6 +601,103 @@
 </div>
 {% endif %}
 
+<!-- ── Расходы не входящие в смету ────────────────────────────────── -->
+<div class="data-table mt-4" id="extra-expenses-section">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">
+      <i class="bi bi-exclamation-square me-1 text-warning"></i>
+      Расходы не входящие в смету
+      {% if extra_total > 0 %}
+        <span class="badge bg-warning text-dark ms-2">{{ extra_total|currency }}</span>
+      {% endif %}
+    </span>
+    <button class="btn btn-sm btn-outline-warning"
+            data-bs-toggle="modal" data-bs-target="#addExtraModal">
+      <i class="bi bi-plus-lg me-1"></i>Добавить расход
+    </button>
+  </div>
+
+  {% if extra_expenses %}
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.875rem">
+      <thead class="table-light">
+        <tr>
+          <th>Статья расхода</th>
+          <th>Дата</th>
+          <th class="text-end">Сумма</th>
+          <th>Примечание</th>
+          <th style="width:90px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for exp in extra_expenses %}
+        <tr>
+          <td class="fw-semibold">{{ exp.name }}</td>
+          <td class="text-muted small">{{ exp.date|default:"—" }}</td>
+          <td class="text-end text-money text-danger fw-semibold">{{ exp.amount|currency }}</td>
+          <td class="text-muted small">{{ exp.description|truncatechars:60 }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-xs btn-outline-secondary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editExtraModal"
+                      data-pk="{{ exp.pk }}"
+                      data-name="{{ exp.name }}"
+                      data-amount="{{ exp.amount }}"
+                      data-date="{{ exp.date|default:'' }}"
+                      data-desc="{{ exp.description }}">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" action="{% url 'extra_expense_delete' exp.pk %}"
+                    onsubmit="return confirm('Удалить «{{ exp.name }}»?')" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="2">Итого внесметных расходов</td>
+          <td class="text-end text-money text-danger">{{ extra_total|currency }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-4 text-center text-muted" style="font-size:.875rem">
+    <i class="bi bi-info-circle me-1"></i>
+    Внесметных расходов нет. Добавьте расходы, которые не включены в смету (земля, реклама, разрешения и т.д.)
+  </div>
+  {% endif %}
+</div>
+
+{# ── Итоговая маржа с учётом внесметных расходов ── #}
+{% if extra_total > 0 %}
+<div class="card-section p-3 mt-3" style="border-left:4px solid #f59e0b">
+  <div class="row g-3 align-items-center">
+    <div class="col-auto text-muted small"><i class="bi bi-calculator me-1"></i>Итоговые затраты</div>
+    <div class="col-auto">
+      <span class="text-muted small">Смета П/Ф:</span>
+      <span class="fw-semibold ms-1">{{ total_actual|currency }}</span>
+    </div>
+    <div class="col-auto">
+      <span class="text-muted small">+ Внесметные:</span>
+      <span class="fw-semibold text-warning ms-1">{{ extra_total|currency }}</span>
+    </div>
+    <div class="col-auto">
+      <span class="text-muted small">= Всего затрат:</span>
+      <span class="fw-bold text-danger ms-1">{{ total_extra_grand|currency }}</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if versions %}
 <!-- Import History -->
 <div class="data-table mt-4">
@@ -699,5 +796,97 @@ function pfAccToggle(hd) {
     hd.querySelector('.pf-chev').style.transform = 'rotate(90deg)';
   }
 }
+
+// Edit Extra Expense modal
+document.addEventListener('DOMContentLoaded', function () {
+  var editModal = document.getElementById('editExtraModal');
+  if (!editModal) return;
+  editModal.addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    editModal.querySelector('[name=name]').value       = btn.dataset.name   || '';
+    editModal.querySelector('[name=amount]').value     = btn.dataset.amount || '';
+    editModal.querySelector('[name=date]').value       = btn.dataset.date   || '';
+    editModal.querySelector('[name=description]').value = btn.dataset.desc  || '';
+    editModal.querySelector('form').action = '/estimates/extra/' + btn.dataset.pk + '/edit/';
+  });
+});
 </script>
+
+{# ── Модал: добавить внесметный расход ── #}
+<div class="modal fade" id="addExtraModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'extra_expense_create' estimate.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-exclamation-square me-2 text-warning"></i>Добавить внесметный расход</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Статья расхода <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" placeholder="Например: Разрешение на строительство" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-7">
+              <label class="form-label fw-semibold">Сумма (сом) <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control" placeholder="0" step="0.01" min="0" required>
+            </div>
+            <div class="col-5">
+              <label class="form-label fw-semibold">Дата</label>
+              <input type="date" name="date" class="form-control">
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Примечание</label>
+            <textarea name="description" class="form-control" rows="2" placeholder="Необязательно"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-warning"><i class="bi bi-plus-lg me-1"></i>Добавить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ── Модал: редактировать внесметный расход ── #}
+<div class="modal fade" id="editExtraModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Редактировать расход</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Статья расхода</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-7">
+              <label class="form-label fw-semibold">Сумма (сом)</label>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
+            </div>
+            <div class="col-5">
+              <label class="form-label fw-semibold">Дата</label>
+              <input type="date" name="date" class="form-control">
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Примечание</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}

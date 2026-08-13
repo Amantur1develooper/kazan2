@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Удалить операцию{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'vehicle_list' %}">Склад авто</a></li>
+      <li class="breadcrumb-item active">Удалить</li>
+    </ol></nav>
+    <h1><i class="bi bi-trash me-2 text-danger"></i>Удалить операцию</h1>
+  </div>
+  <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card-section p-4 text-center">
+      <div class="mb-3">
+        <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:2.5rem"></i>
+      </div>
+      <h4 class="mb-2">Удалить операцию?</h4>
+      <p class="text-muted mb-1">{{ obj.vehicle_name }}</p>
+      <p class="text-muted small mb-4">{{ obj.date|date:"d.m.Y" }}{% if obj.organization %} · {{ obj.organization.name }}{% endif %}</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="d-flex gap-2 justify-content-center">
+          <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary">Отмена</a>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>Удалить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

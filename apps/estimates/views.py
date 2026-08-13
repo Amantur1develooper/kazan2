@@ -14,7 +14,7 @@ from .models import (
     Estimate, EstimateSection, EstimateItem,
     Nomenclature, NomenclatureAlias, NomenclatureGroup,
     EstimateVersion, EstimateChangeLog, EstimateItemExpenseLink,
-    ExpenseAllocation,
+    ExpenseAllocation, ExtraBlockExpense,
 )
 from .forms import EstimateImportForm, EstimateItemForm, EstimateSectionForm, NomenclatureForm
 from .estimate_parser import parse_estimate_excel, apply_estimate_import
@@ -292,6 +292,10 @@ def estimate_detail(request, pk):
         total_dds = Decimal('0')
         has_dds = False
 
+    # ── Внесметные расходы ───────────────────────────────────────────────────────
+    extra_expenses = list(ExtraBlockExpense.objects.filter(block=estimate.block).order_by('-date', '-created_at'))
+    extra_total    = sum(e.amount for e in extra_expenses)
+
     context = {
         'estimate': estimate,
         'estimate_block': estimate.block,
@@ -304,6 +308,9 @@ def estimate_detail(request, pk):
         'has_dds': has_dds,
         'versions': versions,
         'linked_item_ids': linked_item_ids,
+        'extra_expenses': extra_expenses,
+        'extra_total': extra_total,
+        'total_extra_grand': total_actual + extra_total,
     }
     return render(request, 'estimates/estimate_detail.html', context)
 
@@ -938,3 +945,63 @@ def nomenclature_delete(request, pk):
         nom.save(update_fields=['is_active'])
         messages.success(request, 'Номенклатура деактивирована.')
     return redirect('nomenclature_list')
+
+
+# ── ExtraBlockExpense ──────────────────────────────────────────────────────────
+
+@editor_required
+def extra_expense_create(request, estimate_pk):
+    estimate = get_object_or_404(Estimate, pk=estimate_pk)
+    if request.method == 'POST':
+        name   = request.POST.get('name', '').strip()
+        amount = request.POST.get('amount', '').strip()
+        date   = request.POST.get('date', '').strip() or None
+        desc   = request.POST.get('description', '').strip()
+        if name and amount:
+            try:
+                ExtraBlockExpense.objects.create(
+                    block=estimate.block,
+                    name=name,
+                    amount=Decimal(amount.replace(' ', '').replace(',', '.')),
+                    date=date,
+                    description=desc,
+                )
+                messages.success(request, f'Расход «{name}» добавлен.')
+            except Exception as e:
+                messages.error(request, f'Ошибка: {e}')
+        else:
+            messages.error(request, 'Заполните название и сумму.')
+    return redirect('estimate_detail', pk=estimate_pk)
+
+
+@editor_required
+def extra_expense_edit(request, pk):
+    exp = get_object_or_404(ExtraBlockExpense, pk=pk)
+    estimate = get_object_or_404(Estimate, block=exp.block)
+    if request.method == 'POST':
+        name   = request.POST.get('name', '').strip()
+        amount = request.POST.get('amount', '').strip()
+        date   = request.POST.get('date', '').strip() or None
+        desc   = request.POST.get('description', '').strip()
+        if name and amount:
+            try:
+                exp.name   = name
+                exp.amount = Decimal(amount.replace(' ', '').replace(',', '.'))
+                exp.date   = date
+                exp.description = desc
+                exp.save()
+                messages.success(request, f'Расход «{name}» обновлён.')
+            except Exception as e:
+                messages.error(request, f'Ошибка: {e}')
+    return redirect('estimate_detail', pk=estimate.pk)
+
+
+@editor_required
+def extra_expense_delete(request, pk):
+    exp = get_object_or_404(ExtraBlockExpense, pk=pk)
+    estimate = get_object_or_404(Estimate, block=exp.block)
+    if request.method == 'POST':
+        name = exp.name
+        exp.delete()
+        messages.success(request, f'Расход «{name}» удалён.')
+    return redirect('estimate_detail', pk=estimate.pk)

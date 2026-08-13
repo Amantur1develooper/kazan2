@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт квартир{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'apartment_list' %}">Квартиры</a></li>
+      <li class="breadcrumb-item active">Импорт</li>
+    </ol></nav>
+    <h1><i class="bi bi-upload me-2 text-success"></i>Импорт квартир из Excel</h1>
+  </div>
+  <a href="{% url 'apartment_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+<script id="blocks-by-rc-json" type="application/json">{{ blocks_by_rc_json|safe }}</script>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">ЖК <span class="text-danger">*</span></label>
+            <select name="rc" id="rc_sel" class="form-select" required>
+              <option value="">— Выберите ЖК —</option>
+              {% for r in rcs %}
+              <option value="{{ r.pk }}">{{ r.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Блок <span class="text-danger">*</span></label>
+            <select name="block" id="block_sel" class="form-select" required>
+              <option value="">— Сначала выберите ЖК —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Файл Excel (.xls / .xlsx) <span class="text-danger">*</span></label>
+          <input type="file" name="file" class="form-control" accept=".xls,.xlsx" required>
+          <small class="text-muted">Формат «ЭКО А.xls» — первая строка заголовки</small>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="update_existing" id="upd_ex" checked>
+              <label class="form-check-label" for="upd_ex">Обновлять существующие квартиры</label>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="create_missing" id="crt_ms" checked>
+              <label class="form-check-label" for="crt_ms">Создавать отсутствующие квартиры</label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">
+          <i class="bi bi-upload me-2"></i>Загрузить
+        </button>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3" style="font-size:.85rem">
+      <div class="section-title mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Ожидаемые колонки</div>
+      <table class="table table-sm table-borderless mb-0">
+        <tbody>
+          <tr><td class="text-muted">Предварительный номер</td><td>Номер квартиры (ключ)</td></tr>
+          <tr><td class="text-muted">Этаж</td><td>Этаж</td></tr>
+          <tr><td class="text-muted">Количество комнат</td><td>Комнатность</td></tr>
+          <tr><td class="text-muted">Общая площадь ориентировочно</td><td>Площадь м²</td></tr>
+          <tr><td class="text-muted">Ф.И.О.</td><td>Клиент (пусто = свободна)</td></tr>
+          <tr><td class="text-muted">Цена за 1 м.кв.</td><td>Цена м²</td></tr>
+          <tr><td class="text-muted">Сумма договора</td><td>Сумма по договору</td></tr>
+          <tr><td class="text-muted">Оплачено</td><td>Фактически поступило</td></tr>
+          <tr><td class="text-muted">Остаток на оплату</td><td>Долг клиента</td></tr>
+          <tr><td class="text-muted">Тип сделки</td><td>Обычный / Бронь / Бартер</td></tr>
+          <tr><td class="text-muted">Телефон</td><td>Телефон клиента</td></tr>
+          <tr><td class="text-muted">Дата договора</td><td>дд-мм-гггг / дд.мм.гггг</td></tr>
+        </tbody>
+      </table>
+      <div class="mt-2 text-muted" style="font-size:.78rem">
+        <i class="bi bi-info-circle me-1"></i>
+        Строки без номера квартиры пропускаются. При повторном импорте система детектирует ВОЗВРАТЫ и ПЕРЕПРОДАЖИ.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const blocksByRc = JSON.parse(document.getElementById('blocks-by-rc-json').textContent);
+const rcSel    = document.getElementById('rc_sel');
+const blockSel = document.getElementById('block_sel');
+
+function rebuildBlocks() {
+  const rcId = rcSel.value;
+  blockSel.innerHTML = '<option value="">— Выберите блок —</option>';
+  (blocksByRc[rcId] || []).forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = b.name;
+    blockSel.appendChild(opt);
+  });
+}
+rcSel.addEventListener('change', rebuildBlocks);
+</script>
+{% endblock %}

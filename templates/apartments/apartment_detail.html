@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ apt.apartment_number }} — {{ apt.block }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'apartment_list' %}">Квартиры</a></li>
+      <li class="breadcrumb-item text-muted">{{ apt.block.residential_complex.name }} / Блок {{ apt.block.name }}</li>
+      <li class="breadcrumb-item active">{{ apt.apartment_number }}</li>
+    </ol></nav>
+    <h1>
+      <i class="bi bi-house-door me-2 text-primary"></i>
+      Кв. {{ apt.apartment_number }}
+      <span class="badge text-bg-{{ apt.status_color }} ms-2" style="font-size:.85rem">{{ apt.status_display }}</span>
+    </h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'apartment_edit' apt.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Редактировать
+    </a>
+    <a href="{% url 'apartment_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  {# ── Левая колонка — основная информация ── #}
+  <div class="col-lg-7">
+
+    {# Общая информация #}
+    <div class="card-section p-4 mb-4">
+      <div class="section-title mb-3"><i class="bi bi-info-circle me-1 text-primary"></i>Основное</div>
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <div class="text-muted small">ЖК / Блок</div>
+          <div class="fw-semibold">
+            <a href="{% url 'complex_detail' apt.block.residential_complex.pk %}" class="text-decoration-none">
+              {{ apt.block.residential_complex.name }}
+            </a>
+            /
+            <a href="{% url 'block_detail' apt.block.pk %}" class="text-decoration-none">
+              Блок {{ apt.block.name }}
+            </a>
+          </div>
+        </div>
+        <div class="col-sm-3">
+          <div class="text-muted small">Этаж</div>
+          <div class="fw-semibold">{{ apt.floor }}</div>
+        </div>
+        <div class="col-sm-3">
+          <div class="text-muted small">Комнат</div>
+          <div class="fw-semibold">{{ apt.rooms }}к</div>
+        </div>
+        <div class="col-sm-4">
+          <div class="text-muted small">Площадь</div>
+          <div class="fw-semibold text-money">{{ apt.area|floatformat:2 }} м²</div>
+        </div>
+        <div class="col-sm-4">
+          <div class="text-muted small">Плановая цена м²</div>
+          <div class="fw-semibold text-money">
+            {% if apt.planned_price_per_m2 %}{{ apt.planned_price_per_m2|currency }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="text-muted small">Факт. цена м²</div>
+          <div class="fw-semibold text-money">
+            {% if apt.fact_price_per_m2 %}{{ apt.fact_price_per_m2|currency }}{% else %}—{% endif %}
+          </div>
+        </div>
+        {% if apt.contract_type %}
+        <div class="col-sm-6">
+          <div class="text-muted small">Тип сделки</div>
+          <div>{{ apt.contract_type }}</div>
+        </div>
+        {% endif %}
+        {% if apt.curator %}
+        <div class="col-sm-6">
+          <div class="text-muted small">Куратор</div>
+          <div>{{ apt.curator }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Сделка #}
+    {% if apt.is_sold or apt.is_reserved or apt.is_barter %}
+    <div class="card-section p-4 mb-4">
+      <div class="section-title mb-3"><i class="bi bi-file-text me-1 text-success"></i>Сделка</div>
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <div class="text-muted small">Клиент</div>
+          <div class="fw-semibold">{{ apt.client_name|default:'—' }}</div>
+        </div>
+        <div class="col-sm-3">
+          <div class="text-muted small">Телефон</div>
+          <div>{{ apt.phone|default:'—' }}</div>
+        </div>
+        <div class="col-sm-3">
+          <div class="text-muted small">Дата договора</div>
+          <div>{{ apt.deal_date|date:"d.m.Y"|default:'—' }}</div>
+        </div>
+        {% if apt.deal_number %}
+        <div class="col-sm-6">
+          <div class="text-muted small">Номер договора</div>
+          <div>{{ apt.deal_number }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <hr class="my-3">
+
+      {# Финансовый прогресс #}
+      <div class="row g-3">
+        <div class="col-sm-4">
+          <div class="text-muted small">Сумма договора</div>
+          <div class="fw-semibold text-money fs-6">{{ apt.deal_amount_contract|currency }}</div>
+        </div>
+        <div class="col-sm-4">
+          <div class="text-muted small">Оплачено</div>
+          <div class="fw-semibold text-money text-success fs-6">{{ apt.deal_amount_paid|currency }}</div>
+        </div>
+        <div class="col-sm-4">
+          <div class="text-muted small">Остаток</div>
+          <div class="fw-semibold text-money {% if apt.deal_amount_remaining > 0 %}text-danger{% else %}text-muted{% endif %} fs-6">
+            {{ apt.deal_amount_remaining|currency }}
+          </div>
+        </div>
+      </div>
+      {% if apt.deal_amount_contract > 0 %}
+      {% with pct=apt.deal_amount_paid|percent:apt.deal_amount_contract %}
+      <div class="mt-3">
+        <div class="d-flex justify-content-between mb-1">
+          <small class="text-muted">Оплачено</small>
+          <small class="fw-semibold">{{ pct }}%</small>
+        </div>
+        <div class="progress" style="height:8px">
+          <div class="progress-bar bg-success" style="width:{% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></div>
+        </div>
+      </div>
+      {% endwith %}
+      {% endif %}
+      {% if apt.discount > 0 %}
+      <div class="mt-2 text-muted small">
+        <i class="bi bi-tag me-1"></i>Скидка: {{ apt.discount|currency }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if apt.notes %}
+    <div class="card-section p-4">
+      <div class="section-title mb-2"><i class="bi bi-chat-text me-1 text-muted"></i>Примечания</div>
+      <div style="white-space:pre-wrap;font-size:.88rem">{{ apt.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Правая колонка — боковые карточки ── #}
+  <div class="col-lg-5">
+    <div class="card-section p-4 mb-4">
+      <div class="section-title mb-3">Статус квартиры</div>
+      <div class="text-center py-3">
+        <span class="badge text-bg-{{ apt.status_color }}" style="font-size:1.1rem;padding:.5em 1.2em">
+          {{ apt.status_display }}
+        </span>
+        {% if apt.is_barter %}
+        <div class="text-muted mt-2" style="font-size:.8rem">Бартерная сделка</div>
+        {% endif %}
+      </div>
+      <hr>
+      <div class="row g-2 text-center">
+        <div class="col-4">
+          <div class="text-muted small">Этаж</div>
+          <div class="fw-bold">{{ apt.floor }}</div>
+        </div>
+        <div class="col-4">
+          <div class="text-muted small">Комнат</div>
+          <div class="fw-bold">{{ apt.rooms }}</div>
+        </div>
+        <div class="col-4">
+          <div class="text-muted small">Площадь</div>
+          <div class="fw-bold">{{ apt.area|floatformat:1 }} м²</div>
+        </div>
+      </div>
+    </div>
+
+    {% if apt.is_sold or apt.is_barter %}
+    <div class="card-section p-4 mb-4" style="border-left:4px solid #22c55e">
+      <div class="section-title mb-3">Финансы</div>
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted small">Плановая стоимость</span>
+        <span class="text-money fw-semibold">{{ apt.planned_deal_amount|currency }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted small">Сумма договора</span>
+        <span class="text-money fw-semibold">{{ apt.deal_amount_contract|currency }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted small text-success">Оплачено</span>
+        <span class="text-money text-success fw-semibold">{{ apt.deal_amount_paid|currency }}</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span class="text-muted small {% if apt.deal_amount_remaining > 0 %}text-danger{% endif %}">Остаток</span>
+        <span class="text-money {% if apt.deal_amount_remaining > 0 %}text-danger{% else %}text-muted{% endif %} fw-semibold">
+          {{ apt.deal_amount_remaining|currency }}
+        </span>
+      </div>
+    </div>
+    {% else %}
+    <div class="card-section p-4 mb-4">
+      <div class="section-title mb-2">Плановая стоимость</div>
+      <div class="text-money fw-bold fs-5 text-primary">{{ apt.planned_deal_amount|currency }}</div>
+      <div class="text-muted small mt-1">{{ apt.area|floatformat:1 }} м² × {{ apt.planned_price_per_m2|currency }} м²</div>
+    </div>
+    {% endif %}
+
+    <div class="card-section p-4">
+      <div class="section-title mb-3">Действия</div>
+      <div class="d-grid gap-2">
+        <a href="{% url 'apartment_edit' apt.pk %}" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-pencil me-1"></i>Редактировать
+        </a>
+        <form method="post" action="{% url 'apartment_delete' apt.pk %}"
+              onsubmit="return confirm('Удалить квартиру {{ apt.apartment_number }}?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-trash me-1"></i>Удалить
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

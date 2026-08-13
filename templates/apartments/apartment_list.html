@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Квартиры{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Floor plan grid ── */
+  .floorplan-wrap {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .floorplan-table {
+    border-collapse: separate;
+    border-spacing: 4px;
+    min-width: max-content;
+  }
+  .floor-label {
+    font-size: .72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-align: right;
+    padding-right: 10px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .apt-cell {
+    width: 108px;
+    min-width: 108px;
+    height: 80px;
+    border-radius: 8px;
+    padding: 6px 7px;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    transition: transform .1s, box-shadow .1s;
+    position: relative;
+    border: 1.5px solid transparent;
+  }
+  .apt-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    z-index: 10;
+  }
+  .apt-cell.status-free     { background:#dcfce7; border-color:#86efac; }
+  .apt-cell.status-sold     { background:#dbeafe; border-color:#93c5fd; }
+  .apt-cell.status-reserved { background:#fef3c7; border-color:#fcd34d; }
+  .apt-cell.status-barter   { background:#f1f5f9; border-color:#cbd5e1; }
+
+  .apt-num   { font-size:.72rem; font-weight:700; color:#0f172a; line-height:1.2; }
+  .apt-rooms { font-size:.65rem; color:#64748b; }
+  .apt-area  { font-size:.65rem; color:#64748b; }
+  .apt-name  { font-size:.6rem;  color:#374151; margin-top:3px; line-height:1.25;
+               overflow:hidden; display:-webkit-box; -webkit-line-clamp:2;
+               -webkit-box-orient:vertical; }
+  .apt-badge {
+    position:absolute; bottom:5px; right:6px;
+    font-size:.55rem; font-weight:700; letter-spacing:.3px;
+    padding:1px 5px; border-radius:4px;
+  }
+  .apt-badge.free     { background:#16a34a; color:#fff; }
+  .apt-badge.sold     { background:#2563eb; color:#fff; }
+  .apt-badge.reserved { background:#d97706; color:#fff; }
+  .apt-badge.barter   { background:#64748b; color:#fff; }
+
+  /* legend */
+  .legend-dot { width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0; }
+
+  /* view toggle */
+  .view-btn.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-house-door me-2 text-primary"></i>
+      Квартиры{% if block_obj %} — Блок {{ block_obj.name }}{% endif %}
+    </h1>
+    {% if block_obj %}
+    <p class="text-muted mb-0" style="font-size:.9rem">
+      <a href="{% url 'complex_detail' block_obj.residential_complex.pk %}" class="text-muted text-decoration-none">
+        {{ block_obj.residential_complex.name }}
+      </a>
+      /
+      <a href="{% url 'block_detail' block_obj.pk %}" class="text-muted text-decoration-none">
+        Блок {{ block_obj.name }}
+      </a>
+    </p>
+    {% else %}
+    <p class="text-muted mb-0" style="font-size:.9rem">Учёт квартир по блокам ЖК</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'apartment_import' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Импорт Excel
+    </a>
+    <a href="{% url 'apartment_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ── Статистика ── #}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center">
+      <div class="label">Всего</div>
+      <div class="value">{{ total_count }}</div>
+      <div class="text-muted" style="font-size:.72rem">квартир</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center" style="border-top:3px solid #22c55e">
+      <div class="label">Свободных</div>
+      <div class="value text-success">{{ free_count }}</div>
+      <div class="text-muted" style="font-size:.72rem">{{ free_area|floatformat:1 }} м²</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center" style="border-top:3px solid #f59e0b">
+      <div class="label">Бронь</div>
+      <div class="value text-warning">{{ reserved_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center" style="border-top:3px solid #3b82f6">
+      <div class="label">Продано</div>
+      <div class="value text-primary">{{ sold_count }}</div>
+      <div class="text-muted" style="font-size:.72rem">{{ sold_area|floatformat:1 }} м²</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center" style="border-top:3px solid #64748b">
+      <div class="label">Бартер</div>
+      <div class="value text-secondary">{{ barter_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-4 col-xl-2">
+    <div class="stat-card text-center" style="border-top:3px solid #10b981">
+      <div class="label">Оплачено</div>
+      <div class="value text-success" style="font-size:1.1rem">{{ total_paid|currency }}</div>
+      <div class="text-muted" style="font-size:.72rem">остаток {{ total_remaining|currency }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Фильтры ── #}
+<form method="get" class="mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">Компания</label>
+      <select name="org" class="form-select form-select-sm">
+        <option value="">Все</option>
+        {% for o in orgs %}
+        <option value="{{ o.pk }}" {% if filter_org == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">ЖК</label>
+      <select name="rc" class="form-select form-select-sm">
+        <option value="">Все ЖК</option>
+        {% for r in rcs %}
+        <option value="{{ r.pk }}" {% if filter_rc == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">Блок</label>
+      <select name="block" class="form-select form-select-sm">
+        <option value="">Все блоки</option>
+        {% for b in blocks %}
+        <option value="{{ b.pk }}" {% if filter_block == b.pk|stringformat:"s" %}selected{% endif %}>
+          {{ b.residential_complex.name }} / Блок {{ b.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">Статус</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">Все статусы</option>
+        <option value="free"     {% if filter_status == 'free'     %}selected{% endif %}>Свободна</option>
+        <option value="reserved" {% if filter_status == 'reserved' %}selected{% endif %}>Бронь</option>
+        <option value="sold"     {% if filter_status == 'sold'     %}selected{% endif %}>Продана</option>
+        <option value="barter"   {% if filter_status == 'barter'   %}selected{% endif %}>Бартер</option>
+      </select>
+    </div>
+    <div class="col-sm-1">
+      <label class="form-label small text-muted mb-1">Комнат</label>
+      <select name="rooms" class="form-select form-select-sm">
+        <option value="">Все</option>
+        {% for n in "12345" %}
+        <option value="{{ n }}" {% if filter_rooms == n %}selected{% endif %}>{{ n }}к</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">Поиск</label>
+      <input type="text" name="q" value="{{ filter_q }}" class="form-control form-control-sm" placeholder="Номер, клиент, телефон…">
+    </div>
+    <div class="col-sm-1 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Найти</button>
+      <a href="{% url 'apartment_list' %}{% if filter_block %}?block={{ filter_block }}{% endif %}" class="btn btn-outline-secondary btn-sm">×</a>
+    </div>
+  </div>
+</form>
+
+{# ── Планировка блока (только когда выбран конкретный блок) ── #}
+{% if floors_grid %}
+<div class="card-section mb-4" id="section-grid">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <span class="section-title"><i class="bi bi-grid-3x3-gap me-1 text-primary"></i>Планировка блока</span>
+      <div class="d-flex align-items-center gap-2" style="font-size:.75rem">
+        <span class="legend-dot" style="background:#dcfce7;border:1.5px solid #86efac"></span> Свободна
+        <span class="legend-dot ms-1" style="background:#fef3c7;border:1.5px solid #fcd34d"></span> Бронь
+        <span class="legend-dot ms-1" style="background:#dbeafe;border:1.5px solid #93c5fd"></span> Продана
+        <span class="legend-dot ms-1" style="background:#f1f5f9;border:1.5px solid #cbd5e1"></span> Бартер
+      </div>
+    </div>
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary view-btn active" id="btn-grid" onclick="showView('grid')">
+        <i class="bi bi-grid-3x3-gap"></i> Планировка
+      </button>
+      <button type="button" class="btn btn-outline-secondary view-btn" id="btn-list" onclick="showView('list')">
+        <i class="bi bi-list-ul"></i> Список
+      </button>
+    </div>
+  </div>
+  <div class="p-3 floorplan-wrap" id="view-grid">
+    <table class="floorplan-table">
+      <tbody>
+        {% for floor_num, floor_apts in floors_grid %}
+        <tr>
+          <td class="floor-label">{{ floor_num }}&nbsp;эт.</td>
+          {% for a in floor_apts %}
+          <td>
+            <a href="{% url 'apartment_detail' a.pk %}" class="apt-cell status-{{ a.status }}"
+               title="{{ a.apartment_number }} — {{ a.rooms }}к, {{ a.area|floatformat:1 }} м²{% if a.client_name %} / {{ a.client_name }}{% endif %}">
+              <div class="apt-num">{{ a.apartment_number }}</div>
+              <div class="apt-rooms">{{ a.rooms }}к · {{ a.area|floatformat:0 }} м²</div>
+              {% if a.client_name %}
+              <div class="apt-name">{{ a.client_name|truncatechars:28 }}</div>
+              {% endif %}
+              <span class="apt-badge {{ a.status }}">
+                {% if a.status == 'free' %}СВОБ
+                {% elif a.status == 'reserved' %}БРОНЬ
+                {% elif a.status == 'barter' %}БАРТЕР
+                {% else %}ПРОДАНА{% endif %}
+              </span>
+            </a>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Таблица ── #}
+<div class="data-table" id="view-list" {% if floors_grid %}style="display:none"{% endif %}>
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">Квартиры</span>
+    <div class="d-flex align-items-center gap-3">
+      <small class="text-muted">{{ apartments|length }} записей</small>
+      {% if floors_grid %}
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary view-btn" id="btn-grid2" onclick="showView('grid')">
+          <i class="bi bi-grid-3x3-gap"></i> Планировка
+        </button>
+        <button type="button" class="btn btn-outline-secondary view-btn active" id="btn-list2" onclick="showView('list')">
+          <i class="bi bi-list-ul"></i> Список
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% if apartments %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size:.82rem">
+      <thead class="table-light">
+        <tr>
+          <th>Номер</th>
+          {% if not block_obj %}<th>Блок / ЖК</th>{% endif %}
+          <th class="text-center">Эт.</th>
+          <th class="text-center">Комн.</th>
+          <th class="text-end">Площадь</th>
+          <th>Статус</th>
+          <th>Клиент</th>
+          <th class="text-end">Цена м²</th>
+          <th class="text-end">Договор</th>
+          <th class="text-end text-success">Оплачено</th>
+          <th class="text-end text-danger">Остаток</th>
+          <th style="width:70px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in apartments %}
+        <tr>
+          <td>
+            <a href="{% url 'apartment_detail' a.pk %}" class="fw-semibold text-decoration-none text-dark">
+              {{ a.apartment_number }}
+            </a>
+          </td>
+          {% if not block_obj %}
+          <td class="text-muted small">
+            {{ a.block.residential_complex.name }} / Блок {{ a.block.name }}
+          </td>
+          {% endif %}
+          <td class="text-center text-muted">{{ a.floor }}</td>
+          <td class="text-center text-muted">{{ a.rooms }}к</td>
+          <td class="text-end text-money">{{ a.area|floatformat:1 }} м²</td>
+          <td><span class="badge text-bg-{{ a.status_color }}">{{ a.status_display }}</span></td>
+          <td>
+            {% if a.client_name %}
+            <span class="fw-semibold" style="font-size:.8rem">{{ a.client_name|truncatechars:30 }}</span>
+            {% if a.phone %}<div class="text-muted" style="font-size:.72rem">{{ a.phone }}</div>{% endif %}
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-money text-muted">
+            {% if a.fact_price_per_m2 %}{{ a.fact_price_per_m2|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-money">
+            {% if a.deal_amount_contract %}{{ a.deal_amount_contract|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-money {% if a.deal_amount_paid > 0 %}text-success{% else %}text-muted{% endif %}">
+            {% if a.deal_amount_paid %}{{ a.deal_amount_paid|currency }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-money {% if a.deal_amount_remaining > 0 %}text-danger{% else %}text-muted{% endif %}">
+            {% if a.deal_amount_remaining %}{{ a.deal_amount_remaining|currency }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'apartment_edit' a.pk %}" class="btn btn-sm btn-outline-secondary py-0 px-1">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'apartment_delete' a.pk %}"
+                    onsubmit="return confirm('Удалить квартиру {{ a.apartment_number }}?')" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-semibold">
+        <tr>
+          <td colspan="{% if block_obj %}3{% else %}4{% endif %}">Итого</td>
+          <td class="text-end text-money">{{ total_area|floatformat:1 }} м²</td>
+          <td colspan="3"></td>
+          <td class="text-end text-money">{{ total_contract|currency }}</td>
+          <td class="text-end text-money text-success">{{ total_paid|currency }}</td>
+          <td class="text-end text-money text-danger">{{ total_remaining|currency }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-5 text-center text-muted">
+    <i class="bi bi-house-door fs-2 d-block mb-3"></i>
+    Квартир нет.
+    <a href="{% url 'apartment_import' %}">Импортировать из Excel</a> или
+    <a href="{% url 'apartment_create' %}">добавить вручную</a>.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if floors_grid %}
+<script>
+function showView(v) {
+  const gridSection = document.getElementById('section-grid');
+  const listSection = document.getElementById('view-list');
+  const isGrid = v === 'grid';
+
+  // The floor plan card stays visible always (it contains the toggle button)
+  // We show/hide only the inner floorplan div
+  document.getElementById('view-grid').style.display = isGrid ? '' : 'none';
+  listSection.style.display = isGrid ? 'none' : '';
+
+  // Update all toggle buttons
+  ['btn-grid','btn-grid2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', isGrid);
+  });
+  ['btn-list','btn-list2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', !isGrid);
+  });
+
+  localStorage.setItem('apt_view_{{ filter_block }}', v);
+}
+
+// Restore last view
+const saved = localStorage.getItem('apt_view_{{ filter_block }}');
+if (saved === 'list') showView('list');
+</script>
+{% endif %}
+{% endblock %}

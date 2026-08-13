@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт склада авто{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'vehicle_list' %}">Склад авто</a></li>
+      <li class="breadcrumb-item active">Импорт</li>
+    </ol></nav>
+    <h1><i class="bi bi-upload me-2 text-success"></i>Импорт склада авто</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Загрузите файл «Склад Авто» в формате .xls</p>
+  </div>
+  <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Компания <span class="text-danger">*</span></label>
+          <select name="organization" class="form-select" required>
+            <option value="">— Выберите —</option>
+            {% for o in orgs %}
+            <option value="{{ o.pk }}">{{ o.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Файл Excel (.xls / .xlsx) <span class="text-danger">*</span></label>
+          <input type="file" name="file" class="form-control" accept=".xls,.xlsx" required>
+          <small class="text-muted d-block mt-1">Формат: «Склад Авто (шаблон).xls»</small>
+        </div>
+        <button type="submit" class="btn btn-success w-100">
+          <i class="bi bi-upload me-2"></i>Загрузить
+        </button>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3" style="font-size:.85rem">
+      <div class="section-title mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Ожидаемые колонки</div>
+      <table class="table table-sm table-borderless mb-0">
+        <tbody>
+          <tr><td class="text-muted">Дата</td><td>Дата операции</td></tr>
+          <tr><td class="text-muted">Объект поступления</td><td>Откуда пришла машина (блок/ЖК)</td></tr>
+          <tr><td class="text-muted">Приход</td><td>За сколько реализована машина</td></tr>
+          <tr><td class="text-muted">Расход</td><td>Сумма оплаты подрядчику (отрицательная)</td></tr>
+          <tr><td class="text-muted">Назначение ухода</td><td>Подрядчик / кому ушло</td></tr>
+          <tr><td class="text-muted">Назначение авто</td><td>Марка, цвет, год, гос. номер</td></tr>
+          <tr><td class="text-muted">Объект расхода</td><td>На какой блок/ЖК ушли услуги</td></tr>
+          <tr><td class="text-muted">Куда ушло</td><td>Что было оплачено (за что)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

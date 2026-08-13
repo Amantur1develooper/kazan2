@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'apartment_list' %}">Квартиры</a></li>
+      <li class="breadcrumb-item active">{{ title }}</li>
+    </ol></nav>
+    <h1><i class="bi bi-house-door me-2 text-primary"></i>{{ title }}</h1>
+  </div>
+  <a href="{% url 'apartment_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="card-section p-4">
+      <form method="post">
+        {% csrf_token %}
+
+        {# ── Основное ── #}
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Блок <span class="text-danger">*</span></label>
+            <select name="block" class="form-select" required>
+              <option value="">— Выберите —</option>
+              {% for b in blocks %}
+              <option value="{{ b.pk }}" {% if obj and obj.block_id == b.pk %}selected{% endif %}>
+                {{ b.residential_complex.name }} / Блок {{ b.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Номер квартиры <span class="text-danger">*</span></label>
+            <input type="text" name="apartment_number" class="form-control" required
+                   value="{{ obj.apartment_number|default:'' }}" placeholder="В-4.2.2">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Этаж</label>
+            <input type="number" name="floor" class="form-control"
+                   value="{{ obj.floor|default:'1' }}" min="1">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Комнат</label>
+            <input type="number" name="rooms" class="form-control"
+                   value="{{ obj.rooms|default:'1' }}" min="1" max="10">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Площадь (м²) <span class="text-danger">*</span></label>
+            <input type="number" name="area" class="form-control" step="0.01" required
+                   value="{{ obj.area|default:'' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Плановая цена м²</label>
+            <input type="number" name="planned_price_per_m2" class="form-control" step="0.01"
+                   value="{{ obj.planned_price_per_m2|default:'0' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Факт. цена м²</label>
+            <input type="number" name="fact_price_per_m2" class="form-control" step="0.01"
+                   value="{{ obj.fact_price_per_m2|default:'0' }}">
+          </div>
+        </div>
+
+        <hr>
+        <div class="section-title mb-3"><i class="bi bi-flag me-1 text-primary"></i>Статус</div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_sold" id="is_sold"
+                     {% if obj and obj.is_sold %}checked{% endif %}>
+              <label class="form-check-label" for="is_sold">Продана</label>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_reserved" id="is_reserved"
+                     {% if obj and obj.is_reserved %}checked{% endif %}>
+              <label class="form-check-label" for="is_reserved">Бронь</label>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_barter" id="is_barter"
+                     {% if obj and obj.is_barter %}checked{% endif %}>
+              <label class="form-check-label" for="is_barter">Бартер</label>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+        <div class="section-title mb-3"><i class="bi bi-person me-1 text-success"></i>Клиент и сделка</div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">ФИО клиента</label>
+            <input type="text" name="client_name" class="form-control"
+                   value="{{ obj.client_name|default:'' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Телефон</label>
+            <input type="text" name="phone" class="form-control"
+                   value="{{ obj.phone|default:'' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Дата договора</label>
+            <input type="date" name="deal_date" class="form-control"
+                   value="{{ obj.deal_date|date:'Y-m-d'|default:'' }}">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Номер договора</label>
+            <input type="text" name="deal_number" class="form-control"
+                   value="{{ obj.deal_number|default:'' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Сумма договора</label>
+            <input type="number" name="deal_amount_contract" class="form-control" step="0.01"
+                   value="{{ obj.deal_amount_contract|default:'0' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Оплачено</label>
+            <input type="number" name="deal_amount_paid" class="form-control" step="0.01"
+                   value="{{ obj.deal_amount_paid|default:'0' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Остаток к оплате</label>
+            <input type="number" name="deal_amount_remaining" class="form-control" step="0.01"
+                   value="{{ obj.deal_amount_remaining|default:'0' }}">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Скидка</label>
+            <input type="number" name="discount" class="form-control" step="0.01"
+                   value="{{ obj.discount|default:'0' }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Тип сделки</label>
+            <select name="contract_type" class="form-select">
+              <option value="">—</option>
+              <option value="Обычный"         {% if obj and obj.contract_type == 'Обычный' %}selected{% endif %}>Обычный</option>
+              <option value="Бронь"           {% if obj and obj.contract_type == 'Бронь' %}selected{% endif %}>Бронь</option>
+              <option value="Бартер"          {% if obj and obj.contract_type == 'Бартер' %}selected{% endif %}>Бартер</option>
+              <option value="Бронь на хадию"  {% if obj and obj.contract_type == 'Бронь на хадию' %}selected{% endif %}>Бронь на хадию</option>
+              <option value="Бронь на бартер" {% if obj and obj.contract_type == 'Бронь на бартер' %}selected{% endif %}>Бронь на бартер</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label fw-semibold">Куратор</label>
+            <input type="text" name="curator" class="form-control"
+                   value="{{ obj.curator|default:'' }}">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Примечания</label>
+          <textarea name="notes" class="form-control" rows="2">{{ obj.notes|default:'' }}</textarea>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <a href="{% url 'apartment_list' %}" class="btn btn-outline-secondary">Отмена</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if obj %}Сохранить{% else %}Добавить{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

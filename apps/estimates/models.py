@@ -269,3 +269,24 @@ class EstimateChangeLog(models.Model):
 
     def __str__(self):
         return f'{self.get_action_display()} {self.item_code} {self.item_name[:40]}'
+
+
+class ExtraBlockExpense(models.Model):
+    """Расходы не входящие в смету — учитываются в расчёте маржи блока."""
+    block = models.ForeignKey(
+        'projects.Block', on_delete=models.CASCADE,
+        related_name='extra_expenses', verbose_name='Блок'
+    )
+    name = models.CharField('Статья расхода', max_length=255)
+    amount = models.DecimalField('Сумма', max_digits=15, decimal_places=2)
+    date = models.DateField('Дата', null=True, blank=True)
+    description = models.TextField('Примечание', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Внесметный расход'
+        verbose_name_plural = 'Внесметные расходы'
+        ordering = ['-date', '-created_at']
+
+    def __str__(self):
+        return f'{self.name} — {self.amount}'

@@ -422,10 +422,17 @@ def block_detail(request, pk):
     # Δ-долг (ДДС − П/Ф): >0 переплатили (нам должны работу), <0 получили без оплаты (мы должны)
     debt = dds_expense - pf_actual
 
+    # Внесметные расходы
+    from apps.estimates.models import ExtraBlockExpense
+    extra_expenses = list(ExtraBlockExpense.objects.filter(block=block_obj).order_by('-date', '-created_at'))
+    extra_total    = sum(e.amount for e in extra_expenses)
+    total_with_extra = pf_actual + extra_total
+
     sqm = block_obj.square_meters
-    # Себестоимость м²
-    pf_cost_per_sqm  = (pf_actual    / sqm).quantize(Decimal('1')) if sqm and pf_actual    else None
-    dds_cost_per_sqm = (dds_expense  / sqm).quantize(Decimal('1')) if sqm and dds_expense  else None
+    # Себестоимость м² (с учётом внесметных)
+    pf_cost_per_sqm        = (pf_actual        / sqm).quantize(Decimal('1')) if sqm and pf_actual        else None
+    total_cost_per_sqm     = (total_with_extra  / sqm).quantize(Decimal('1')) if sqm and total_with_extra else None
+    dds_cost_per_sqm       = (dds_expense       / sqm).quantize(Decimal('1')) if sqm and dds_expense      else None
     # Средняя продажная цена м² (если задана у ЖК)
     rc = block_obj.residential_complex
     avg_sale_sqm = None
@@ -433,7 +440,7 @@ def block_detail(request, pk):
     if rc.square_meters and rc.total_planned_cost:
         avg_sale_sqm = (rc.total_planned_cost / rc.square_meters).quantize(Decimal('1'))
     if rc.total_planned_cost:
-        margin_rc = rc.total_planned_cost - rc.total_actual_expenses
+        margin_rc = rc.total_planned_cost - rc.total_actual_expenses - extra_total
 
     context = {
         'block_obj': block_obj,
@@ -454,10 +461,14 @@ def block_detail(request, pk):
         'pf_actual': pf_actual,
         'debt': debt,
         'sqm': sqm,
-        'pf_cost_per_sqm':  pf_cost_per_sqm,
-        'dds_cost_per_sqm': dds_cost_per_sqm,
-        'avg_sale_sqm': avg_sale_sqm,
-        'margin_rc': margin_rc,
+        'pf_cost_per_sqm':    pf_cost_per_sqm,
+        'total_cost_per_sqm': total_cost_per_sqm,
+        'dds_cost_per_sqm':   dds_cost_per_sqm,
+        'avg_sale_sqm':   avg_sale_sqm,
+        'margin_rc':      margin_rc,
+        'extra_expenses': extra_expenses,
+        'extra_total':    extra_total,
+        'total_with_extra': total_with_extra,
         'chart_labels': json.dumps([x['stage'].name for x in stage_stats]),
         'chart_planned': json.dumps([float(x['planned']) for x in stage_stats]),
         'chart_actual': json.dumps([float(x['actual']) for x in stage_stats]),

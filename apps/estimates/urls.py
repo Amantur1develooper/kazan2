@@ -17,6 +17,11 @@ urlpatterns = [
     path('items/<int:pk>/edit/', views.section_item_edit, name='section_item_edit'),
     path('items/<int:pk>/delete/', views.section_item_delete, name='section_item_delete'),
 
+    # Extra (out-of-estimate) expenses
+    path('<int:estimate_pk>/extra/add/', views.extra_expense_create, name='extra_expense_create'),
+    path('extra/<int:pk>/edit/', views.extra_expense_edit, name='extra_expense_edit'),
+    path('extra/<int:pk>/delete/', views.extra_expense_delete, name='extra_expense_delete'),
+
     # Nomenclature
     path('nomenclature/', views.nomenclature_list, name='nomenclature_list'),
     path('nomenclature/add/', views.nomenclature_create, name='nomenclature_create'),
