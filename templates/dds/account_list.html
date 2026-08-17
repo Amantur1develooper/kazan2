@@ -26,6 +26,64 @@
 </div>
 {% else %}
 
+{# ── Фильтр по датам + итог ── #}
+<div class="card-section p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-sm-3 col-md-2">
+      <label class="form-label small text-muted mb-1">Дата с</label>
+      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+    </div>
+    <div class="col-sm-3 col-md-2">
+      <label class="form-label small text-muted mb-1">Дата по</label>
+      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-funnel me-1"></i>Применить
+      </button>
+      {% if is_filtered %}
+      <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-x-lg me-1"></i>Сбросить
+      </a>
+      {% endif %}
+    </div>
+    <div class="col ms-auto d-flex gap-3 justify-content-end align-items-center flex-wrap">
+      {% if is_filtered %}
+      <span class="badge bg-info text-dark px-3 py-2" style="font-size:.8rem">
+        <i class="bi bi-funnel-fill me-1"></i>
+        {% if date_from %}с {{ date_from }}{% endif %}
+        {% if date_to %} по {{ date_to }}{% endif %}
+      </span>
+      {% endif %}
+      <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2" style="font-size:.85rem">
+        <i class="bi bi-arrow-down me-1"></i>{{ total_income|currency }}
+      </span>
+      <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger px-3 py-2" style="font-size:.85rem">
+        <i class="bi bi-arrow-up me-1"></i>{{ total_expense|currency }}
+      </span>
+      <span class="badge rounded-pill {% if total_balance >= 0 %}bg-primary bg-opacity-10 text-primary{% else %}bg-danger bg-opacity-10 text-danger{% endif %} px-3 py-2 fw-bold" style="font-size:.85rem">
+        Итого: {{ total_balance|currency }}
+      </span>
+    </div>
+  </form>
+</div>
+
+{% if has_chart_data %}
+<div class="card-section p-4 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <span class="section-title"><i class="bi bi-bar-chart-line me-1 text-primary"></i>Движение по дням</span>
+    <div class="d-flex gap-3" style="font-size:.78rem">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,.7);margin-right:3px"></span>Приход</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,.7);margin-right:3px"></span>Расход</span>
+      <span><span style="display:inline-block;width:10px;height:3px;background:#3b82f6;margin-right:3px;vertical-align:middle"></span>Баланс</span>
+    </div>
+  </div>
+  <div style="position:relative;height:260px">
+    <canvas id="ddsChart"></canvas>
+  </div>
+</div>
+{% endif %}
+
 {% for section in rc_summary %}
 <div class="mb-4">
 
@@ -180,6 +238,21 @@
 </div>{# /section #}
 {% endfor %}
 
+{% if has_block_chart %}
+<div class="card-section p-4 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <span class="section-title"><i class="bi bi-building me-1 text-primary"></i>ДДС по блокам</span>
+    <div class="d-flex gap-3" style="font-size:.78rem">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,.7);margin-right:3px"></span>Приход</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,.7);margin-right:3px"></span>Расход</span>
+    </div>
+  </div>
+  <div style="position:relative;height:280px">
+    <canvas id="blockChart"></canvas>
+  </div>
+</div>
+{% endif %}
+
 {% if unlinked_no_block or unlinked_no_item %}
 <div class="alert alert-warning d-flex align-items-center gap-3 mt-2" style="font-size:.875rem">
   <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
@@ -198,5 +271,140 @@
 </div>
 {% endif %}
 
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_chart_data or has_block_chart %}
+<script>
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+const fmt = v => new Intl.NumberFormat('ru-RU', {notation:'compact', maximumFractionDigits:1}).format(v);
+const fmtFull = v => new Intl.NumberFormat('ru-RU').format(v) + ' сом';
+
+new Chart(document.getElementById('ddsChart'), {
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Приход',
+        data: {{ chart_income|safe }},
+        backgroundColor: 'rgba(34,197,94,0.65)',
+        borderColor: 'rgba(34,197,94,0.9)',
+        borderWidth: 1,
+        borderRadius: 3,
+        order: 2,
+      },
+      {
+        type: 'bar',
+        label: 'Расход',
+        data: {{ chart_expense|safe }},
+        backgroundColor: 'rgba(239,68,68,0.65)',
+        borderColor: 'rgba(239,68,68,0.9)',
+        borderWidth: 1,
+        borderRadius: 3,
+        order: 2,
+      },
+      {
+        type: 'line',
+        label: 'Баланс (нарастающий)',
+        data: {{ chart_balance|safe }},
+        borderColor: 'rgba(59,130,246,0.9)',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.3,
+        yAxisID: 'y2',
+        order: 1,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ' ' + ctx.dataset.label + ': ' + fmtFull(ctx.parsed.y)
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 11 }, maxRotation: 45 }
+      },
+      y: {
+        position: 'left',
+        beginAtZero: true,
+        grid: { color: '#f1f5f9' },
+        ticks: { callback: fmt, font: { size: 11 } },
+        title: { display: true, text: 'Приход / Расход', font: { size: 11 }, color: '#94a3b8' }
+      },
+      y2: {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: { callback: fmt, font: { size: 11 } },
+        title: { display: true, text: 'Баланс', font: { size: 11 }, color: '#3b82f6' }
+      }
+    }
+  }
+});
+
+{% if has_block_chart %}
+new Chart(document.getElementById('blockChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ block_chart_labels|safe }},
+    datasets: [
+      {
+        label: 'Приход',
+        data: {{ block_chart_income|safe }},
+        backgroundColor: 'rgba(34,197,94,0.65)',
+        borderColor: 'rgba(34,197,94,0.9)',
+        borderWidth: 1,
+        borderRadius: 3,
+      },
+      {
+        label: 'Расход',
+        data: {{ block_chart_expense|safe }},
+        backgroundColor: 'rgba(239,68,68,0.65)',
+        borderColor: 'rgba(239,68,68,0.9)',
+        borderWidth: 1,
+        borderRadius: 3,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ' ' + ctx.dataset.label + ': ' + fmtFull(ctx.parsed.y)
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 10 }, maxRotation: 40 }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: '#f1f5f9' },
+        ticks: { callback: fmt, font: { size: 11 } }
+      }
+    }
+  }
+});
+{% endif %}
+</script>
 {% endif %}
 {% endblock %}

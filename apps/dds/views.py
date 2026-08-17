@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -274,18 +275,30 @@ def dds_account_list(request):
     """List all cash accounts grouped by ЖК with per-ЖК totals and block breakdown."""
     from collections import defaultdict
 
-    # Accounts with annotated totals in one query
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to',   '').strip()
+
+    # Build date Q for record-level filtering (field: operation_date)
+    rec_date_q = Q()
+    if date_from:
+        rec_date_q &= Q(records__operation_date__gte=date_from)
+    if date_to:
+        rec_date_q &= Q(records__operation_date__lte=date_to)
+
+    # Accounts with annotated totals — date filter applied inside Sum()
     accounts = list(
         CashAccount.objects
         .select_related('residential_complex', 'block')
         .annotate(
             record_count=Count('records'),
             ann_income=Coalesce(
-                Sum('records__amount', filter=Q(records__direction='in')),
+                Sum('records__amount',
+                    filter=Q(records__direction='in') & rec_date_q),
                 Value(Decimal('0'))
             ),
             ann_expense=Coalesce(
-                Sum('records__amount', filter=Q(records__direction='out')),
+                Sum('records__amount',
+                    filter=Q(records__direction='out') & rec_date_q),
                 Value(Decimal('0'))
             ),
         )
@@ -296,15 +309,19 @@ def dds_account_list(request):
         acc.disp_expense = acc.ann_expense
         acc.disp_balance = acc.ann_income - acc.ann_expense
 
-    # Block breakdown per ЖК: one query, grouped by (rc, block, direction)
+    # Block breakdown — apply same date filter at record level
+    block_qs = CashFlowRecord.objects.filter(direction__in=['in', 'out'])
+    if date_from:
+        block_qs = block_qs.filter(operation_date__gte=date_from)
+    if date_to:
+        block_qs = block_qs.filter(operation_date__lte=date_to)
+
     block_rows = list(
-        CashFlowRecord.objects
-        .filter(direction__in=['in', 'out'])
+        block_qs
         .values('account__residential_complex_id', 'block_id', 'block__name', 'direction')
         .annotate(total=Sum('amount'))
         .order_by('account__residential_complex_id', 'block__name')
     )
-    # rc_id → block_id → {name, income, expense}
     rc_block_map = defaultdict(lambda: defaultdict(lambda: {'name': '', 'income': Decimal('0'), 'expense': Decimal('0')}))
     for row in block_rows:
         rc_id = row['account__residential_complex_id']
@@ -361,16 +378,93 @@ def dds_account_list(request):
             'blocks':  [],
         })
 
-    unlinked_no_block = CashFlowRecord.objects.filter(block__isnull=True).count()
-    unlinked_no_item  = CashFlowRecord.objects.filter(
+    unlinked_qs = CashFlowRecord.objects
+    if date_from:
+        unlinked_qs = unlinked_qs.filter(operation_date__gte=date_from)
+    if date_to:
+        unlinked_qs = unlinked_qs.filter(operation_date__lte=date_to)
+    unlinked_no_block = unlinked_qs.filter(block__isnull=True).count()
+    unlinked_no_item  = unlinked_qs.filter(
         block__isnull=False, direction='out', estimate_item__isnull=True
     ).count()
 
+    total_income  = sum(s['income']  for s in rc_summary)
+    total_expense = sum(s['expense'] for s in rc_summary)
+
+    # Block chart data — flatten all blocks across all RCs, skip "Без блока"
+    block_chart_items = []
+    for section in rc_summary:
+        rc_name = section['rc'].name if section['rc'] else 'Без ЖК'
+        for blk in section['blocks']:
+            if blk['id'] == '__none__':
+                continue
+            label = f"{rc_name} / {blk['name']}" if len(rc_summary) > 1 else blk['name']
+            block_chart_items.append({
+                'label':   label,
+                'income':  float(blk['income']),
+                'expense': float(blk['expense']),
+                'balance': float(blk['balance']),
+            })
+    block_chart_items.sort(key=lambda x: x['expense'], reverse=True)
+
+    block_chart_labels  = json.dumps([b['label']   for b in block_chart_items])
+    block_chart_income  = json.dumps([b['income']  for b in block_chart_items])
+    block_chart_expense = json.dumps([b['expense'] for b in block_chart_items])
+    block_chart_balance = json.dumps([b['balance'] for b in block_chart_items])
+
+    # Daily chart data (respects active date filter)
+    daily_qs = CashFlowRecord.objects.filter(direction__in=['in', 'out'])
+    if date_from:
+        daily_qs = daily_qs.filter(operation_date__gte=date_from)
+    if date_to:
+        daily_qs = daily_qs.filter(operation_date__lte=date_to)
+    daily_rows = list(
+        daily_qs
+        .values('operation_date', 'direction')
+        .annotate(total=Sum('amount'))
+        .order_by('operation_date')
+    )
+    # Build per-date dicts
+    daily_map = {}
+    for row in daily_rows:
+        d = str(row['operation_date'])
+        if d not in daily_map:
+            daily_map[d] = {'in': 0.0, 'out': 0.0}
+        daily_map[d][row['direction']] += float(row['total'])
+    sorted_dates = sorted(daily_map)
+    # Cumulative balance
+    running = 0.0
+    daily_balance = []
+    for d in sorted_dates:
+        running += daily_map[d]['in'] - daily_map[d]['out']
+        daily_balance.append(round(running, 2))
+
+    chart_labels  = json.dumps(sorted_dates)
+    chart_income  = json.dumps([round(daily_map[d]['in'],  2) for d in sorted_dates])
+    chart_expense = json.dumps([round(daily_map[d]['out'], 2) for d in sorted_dates])
+    chart_balance = json.dumps(daily_balance)
+
     return render(request, 'dds/account_list.html', {
         'rc_summary':        rc_summary,
-        'accounts':          accounts,   # kept for the empty-state check
+        'accounts':          accounts,
         'unlinked_no_block': unlinked_no_block,
         'unlinked_no_item':  unlinked_no_item,
+        'total_income':      total_income,
+        'total_expense':     total_expense,
+        'total_balance':     total_income - total_expense,
+        'date_from':         date_from,
+        'date_to':           date_to,
+        'is_filtered':       bool(date_from or date_to),
+        'chart_labels':       chart_labels,
+        'chart_income':       chart_income,
+        'chart_expense':      chart_expense,
+        'chart_balance':      chart_balance,
+        'has_chart_data':     bool(sorted_dates),
+        'block_chart_labels': block_chart_labels,
+        'block_chart_income': block_chart_income,
+        'block_chart_expense':block_chart_expense,
+        'block_chart_balance':block_chart_balance,
+        'has_block_chart':    bool(block_chart_items),
     })
 
 
@@ -473,6 +567,47 @@ def dds_account_detail(request, pk):
         _item_choices_json[_bid] = _choices
     item_choices_json = _json.dumps(_item_choices_json, ensure_ascii=False)
 
+    # Daily chart — same queryset as records table (respects all filters)
+    chart_qs = CashFlowRecord.objects.filter(account=account, direction__in=['in', 'out'])
+    if date_from:
+        try:
+            from datetime import datetime as _dt
+            chart_qs = chart_qs.filter(operation_date__gte=_dt.strptime(date_from, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            from datetime import datetime as _dt
+            chart_qs = chart_qs.filter(operation_date__lte=_dt.strptime(date_to, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if block_filter and block_filter.isdigit():
+        chart_qs = chart_qs.filter(block_id=int(block_filter))
+
+    daily_rows = list(
+        chart_qs
+        .values('operation_date', 'direction')
+        .annotate(total=Sum('amount'))
+        .order_by('operation_date')
+    )
+    daily_map = {}
+    for row in daily_rows:
+        d = str(row['operation_date'])
+        if d not in daily_map:
+            daily_map[d] = {'in': 0.0, 'out': 0.0}
+        daily_map[d][row['direction']] += float(row['total'])
+    sorted_dates = sorted(daily_map)
+    running, daily_balance = 0.0, []
+    for d in sorted_dates:
+        running += daily_map[d]['in'] - daily_map[d]['out']
+        daily_balance.append(round(running, 2))
+
+    import json as _json2
+    chart_labels  = _json2.dumps(sorted_dates)
+    chart_income  = _json2.dumps([round(daily_map[d]['in'],  2) for d in sorted_dates])
+    chart_expense = _json2.dumps([round(daily_map[d]['out'], 2) for d in sorted_dates])
+    chart_balance = _json2.dumps(daily_balance)
+
     return render(request, 'dds/account_detail.html', {
         'account': account,
         'records': records,
@@ -486,12 +621,16 @@ def dds_account_detail(request, pk):
         'all_rc': all_rc,
         'all_blocks_edit': all_blocks_edit,
         'item_choices_json': item_choices_json,
-        # filter state
         'f_direction': direction,
         'f_block': block_filter,
         'f_date_from': date_from,
         'f_date_to': date_to,
         'f_q': search,
+        'chart_labels':  chart_labels,
+        'chart_income':  chart_income,
+        'chart_expense': chart_expense,
+        'chart_balance': chart_balance,
+        'has_chart_data': bool(sorted_dates),
     })
 
 

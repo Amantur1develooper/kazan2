@@ -81,6 +81,22 @@
   </div>
 </div>
 
+{% if has_chart_data %}
+<div class="card-section p-4 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <span class="section-title"><i class="bi bi-bar-chart-line me-1 text-primary"></i>Движение по дням</span>
+    <div class="d-flex gap-3" style="font-size:.78rem">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,.7);margin-right:3px"></span>Приход</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,.7);margin-right:3px"></span>Расход</span>
+      <span><span style="display:inline-block;width:10px;height:3px;background:#3b82f6;margin-right:3px;vertical-align:middle"></span>Баланс</span>
+    </div>
+  </div>
+  <div style="position:relative;height:240px">
+    <canvas id="acctChart"></canvas>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-4">
   <!-- Filters + Table -->
   <div class="col-xl-9">
@@ -541,6 +557,49 @@
 
 {% block scripts %}
 <script id="dds-item-opts-json" type="application/json">{{ item_choices_json|safe }}</script>
+{% if has_chart_data %}
+<script>
+(function () {
+  Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+  const fmt     = v => new Intl.NumberFormat('ru-RU', {notation:'compact', maximumFractionDigits:1}).format(v);
+  const fmtFull = v => new Intl.NumberFormat('ru-RU').format(v) + ' сом';
+  new Chart(document.getElementById('acctChart'), {
+    data: {
+      labels: {{ chart_labels|safe }},
+      datasets: [
+        { type:'bar',  label:'Приход',  data:{{ chart_income|safe }},
+          backgroundColor:'rgba(34,197,94,0.65)', borderColor:'rgba(34,197,94,0.9)',
+          borderWidth:1, borderRadius:3, order:2 },
+        { type:'bar',  label:'Расход',  data:{{ chart_expense|safe }},
+          backgroundColor:'rgba(239,68,68,0.65)', borderColor:'rgba(239,68,68,0.9)',
+          borderWidth:1, borderRadius:3, order:2 },
+        { type:'line', label:'Баланс',  data:{{ chart_balance|safe }},
+          borderColor:'rgba(59,130,246,0.9)', backgroundColor:'rgba(59,130,246,0.07)',
+          borderWidth:2, pointRadius:3, pointHoverRadius:5,
+          fill:true, tension:0.3, yAxisID:'y2', order:1 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: ctx => ' '+ctx.dataset.label+': '+fmtFull(ctx.parsed.y) }}
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:11}, maxRotation:45} },
+        y:{ position:'left', beginAtZero:true, grid:{color:'#f1f5f9'},
+            ticks:{callback:fmt, font:{size:11}},
+            title:{display:true, text:'Приход / Расход', font:{size:10}, color:'#94a3b8'} },
+        y2:{ position:'right', grid:{drawOnChartArea:false},
+             ticks:{callback:fmt, font:{size:11}},
+             title:{display:true, text:'Баланс', font:{size:10}, color:'#3b82f6'} }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
 <script>
 // ── Add-operation modal: default date today ───────────────────────────────────
 document.getElementById('opDate').valueAsDate = new Date();
