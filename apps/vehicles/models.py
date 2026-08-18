@@ -41,6 +41,8 @@ class VehicleTransaction(models.Model):
     target_text = models.CharField('Объект расхода (текст)', max_length=200, blank=True)
     purpose     = models.CharField('За что / куда ушло', max_length=300, blank=True)
 
+    is_sold     = models.BooleanField('Продана', default=False)
+
     notes       = models.TextField('Примечания', blank=True)
     source_file = models.CharField('Файл-источник', max_length=255, blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)

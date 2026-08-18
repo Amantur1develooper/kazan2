@@ -6,5 +6,6 @@ urlpatterns = [
     path('import/',       views.vehicle_import, name='vehicle_import'),
     path('add/',          views.vehicle_create, name='vehicle_create'),
     path('<int:pk>/edit/',   views.vehicle_edit,   name='vehicle_edit'),
-    path('<int:pk>/delete/', views.vehicle_delete, name='vehicle_delete'),
+    path('<int:pk>/delete/',      views.vehicle_delete,      name='vehicle_delete'),
+    path('<int:pk>/toggle-sold/', views.vehicle_toggle_sold, name='vehicle_toggle_sold'),
 ]

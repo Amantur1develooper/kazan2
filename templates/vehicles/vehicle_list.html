@@ -36,10 +36,10 @@
     <div class="stat-card">
       <div class="d-flex justify-content-between">
         <div>
-          <div class="label">Всего операций</div>
-          <div class="value">{{ transactions|length }}</div>
+          <div class="label">Всего / В наличии</div>
+          <div class="value">{{ transactions|length }} / {{ in_balance|length }}</div>
         </div>
-        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-list-ul"></i></div>
+        <div class="icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-car-front"></i></div>
       </div>
     </div>
   </div>
@@ -83,7 +83,7 @@
 {# ── Фильтры ── #}
 <form method="get" class="mb-3">
   <div class="row g-2 align-items-end">
-    <div class="col-sm-3">
+    <div class="col-sm-2">
       <label class="form-label small text-muted mb-1">Компания</label>
       <select name="org" class="form-select form-select-sm">
         <option value="">Все компании</option>
@@ -92,7 +92,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-sm-3">
+    <div class="col-sm-2">
       <label class="form-label small text-muted mb-1">Блок</label>
       <select name="block" class="form-select form-select-sm">
         <option value="">Все блоки</option>
@@ -101,6 +101,14 @@
           {{ b.residential_complex.name }} / Блок {{ b.name }}
         </option>
         {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label small text-muted mb-1">Статус</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">Все</option>
+        <option value="available" {% if filter_status == 'available' %}selected{% endif %}>В наличии</option>
+        <option value="sold" {% if filter_status == 'sold' %}selected{% endif %}>Продана</option>
       </select>
     </div>
     <div class="col-sm-4">
@@ -114,11 +122,11 @@
   </div>
 </form>
 
-{# ── В балансе (не реализованные) ── #}
-{% if in_balance %}
+{# ── В наличии ── #}
+{% if in_balance and not filter_status %}
 <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" style="font-size:.875rem">
   <i class="bi bi-info-circle-fill"></i>
-  <span>В балансе (не реализовано): <strong>{{ in_balance|length }} авто</strong> —
+  <span>В наличии (не продано): <strong>{{ in_balance|length }} авто</strong> —
   {% for t in in_balance %}<span class="badge bg-info text-dark me-1">{{ t.vehicle_name|truncatechars:35 }}</span>{% endfor %}
   </span>
 </div>
@@ -136,8 +144,8 @@
       <thead class="table-light">
         <tr>
           <th>Дата</th>
-          <th>Авто</th>
-          <th>Объект поступления</th>
+          <th>Авто / откуда поступила</th>
+          <th>Статус</th>
           <th class="text-end text-success">Приход</th>
           <th class="text-end text-danger">Расход</th>
           <th class="text-end">Убыток</th>
@@ -149,20 +157,52 @@
       </thead>
       <tbody>
         {% for t in transactions %}
-        <tr {% if t.in_balance %}class="table-info"{% endif %}>
+        <tr {% if not t.is_sold %}class="table-info"{% endif %}>
           <td class="text-muted text-nowrap">{{ t.date|date:"d.m.Y" }}</td>
           <td>
-            <span class="fw-semibold">{{ t.vehicle_name|truncatechars:40 }}</span>
+            <span class="fw-semibold">{{ t.vehicle_name|truncatechars:45 }}</span>
             {% if t.organization %}<div class="text-muted" style="font-size:.72rem">{{ t.organization.name }}</div>{% endif %}
-            {% if t.in_balance %}<span class="badge bg-info text-dark" style="font-size:.65rem">в балансе</span>{% endif %}
+            <div class="text-muted" style="font-size:.75rem">
+              <i class="bi bi-arrow-down-circle text-success me-1"></i>
+              {% if t.source_block %}
+                <a href="{% url 'block_detail' t.source_block.pk %}" class="text-decoration-none text-muted">
+                  {{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}
+                </a>
+              {% elif t.source_text %}
+                {{ t.source_text|truncatechars:40 }}
+              {% else %}
+                <span class="fst-italic">откуда не указано</span>
+              {% endif %}
+            </div>
+            {% if t.is_sold or t.target_block or t.target_text or t.counterparty %}
+            <div class="text-muted" style="font-size:.75rem">
+              <i class="bi bi-arrow-up-circle text-danger me-1"></i>
+              {% if t.target_block %}
+                <a href="{% url 'block_detail' t.target_block.pk %}" class="text-decoration-none text-muted">
+                  {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}
+                </a>
+              {% elif t.target_text %}
+                {{ t.target_text|truncatechars:30 }}
+              {% endif %}
+              {% if t.counterparty %}<span class="ms-1 text-muted fst-italic">— {{ t.counterparty|truncatechars:25 }}</span>{% endif %}
+            </div>
+            {% endif %}
           </td>
-          <td class="text-muted small">
-            {% if t.source_block %}
-              <a href="{% url 'block_detail' t.source_block.pk %}" class="text-decoration-none text-muted">
-                {{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}
-              </a>
+          <td>
+            {% if t.is_sold %}
+              <button type="button" class="btn btn-sm btn-danger toggle-sold-btn" style="min-width:90px"
+                      data-action="{% url 'vehicle_toggle_sold' t.pk %}"
+                      data-name="{{ t.vehicle_name|truncatechars:50 }}"
+                      data-direction="available">
+                <i class="bi bi-check-circle-fill me-1"></i>Продана
+              </button>
             {% else %}
-              {{ t.source_text|truncatechars:25 }}
+              <button type="button" class="btn btn-sm btn-success toggle-sold-btn" style="min-width:90px"
+                      data-action="{% url 'vehicle_toggle_sold' t.pk %}"
+                      data-name="{{ t.vehicle_name|truncatechars:50 }}"
+                      data-direction="sold">
+                <i class="bi bi-circle me-1"></i>В наличии
+              </button>
             {% endif %}
           </td>
           <td class="text-end text-money {% if t.amount_in > 0 %}text-success{% elif t.amount_in < 0 %}text-danger{% else %}text-muted{% endif %}">
@@ -225,4 +265,65 @@
   {% endif %}
 </div>
 
+{# ── Модал подтверждения смены статуса ── #}
+<div class="modal fade" id="toggleSoldModal" tabindex="-1" aria-labelledby="toggleSoldModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" id="toggleSoldModalHeader">
+        <h5 class="modal-title" id="toggleSoldModalLabel"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="toggleSoldModalBody" class="mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <form method="post" id="toggleSoldForm" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn" id="toggleSoldConfirmBtn">Подтвердить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}{{ block.super }}
+<script>
+(function () {
+  document.querySelectorAll('.toggle-sold-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var name      = btn.dataset.name;
+      var direction = btn.dataset.direction;
+      var action    = btn.dataset.action;
+      var modal     = document.getElementById('toggleSoldModal');
+      var header    = document.getElementById('toggleSoldModalHeader');
+      var label     = document.getElementById('toggleSoldModalLabel');
+      var body      = document.getElementById('toggleSoldModalBody');
+      var confirmBtn= document.getElementById('toggleSoldConfirmBtn');
+      var form      = document.getElementById('toggleSoldForm');
+
+      form.action = action;
+
+      if (direction === 'sold') {
+        header.className = 'modal-header bg-danger bg-opacity-10';
+        label.textContent = 'Отметить как проданную';
+        body.innerHTML = 'Отметить <strong>' + name + '</strong> как <span class="text-danger fw-semibold">Продана</span>?';
+        confirmBtn.className = 'btn btn-danger';
+        confirmBtn.textContent = 'Да, продана';
+      } else {
+        header.className = 'modal-header bg-success bg-opacity-10';
+        label.textContent = 'Вернуть в наличие';
+        body.innerHTML = 'Вернуть <strong>' + name + '</strong> в статус <span class="text-success fw-semibold">В наличии</span>?';
+        confirmBtn.className = 'btn btn-success';
+        confirmBtn.textContent = 'Да, вернуть';
+      }
+
+      new bootstrap.Modal(modal).show();
+    });
+  });
+})();
+</script>
 {% endblock %}

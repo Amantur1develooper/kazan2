@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load finance_filters %}
+{% load finance_filters l10n %}
 
 {% block title %}{{ title }}{% endblock %}
 
@@ -57,6 +57,28 @@
                  value="{{ obj.vehicle_name|default:'' }}" required>
         </div>
 
+        {# ── Суммы — главные поля, сразу видны ── #}
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold text-success">
+              <i class="bi bi-arrow-down-circle me-1"></i>За сколько пришла (сом)
+            </label>
+            <input type="number" name="amount_in" class="form-control form-control-lg border-success" step="0.01"
+                   placeholder="0"
+                   value="{% if obj %}{{ obj.amount_in|unlocalize }}{% else %}0{% endif %}">
+            <small class="text-muted">Стоимость машины при поступлении</small>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold text-danger">
+              <i class="bi bi-arrow-up-circle me-1"></i>За сколько ушла / расход (сом)
+            </label>
+            <input type="number" name="amount_out" class="form-control form-control-lg border-danger" step="0.01"
+                   placeholder="0"
+                   value="{% if obj %}{{ obj.amount_out|unlocalize }}{% else %}0{% endif %}">
+            <small class="text-muted">Сумма оплаты подрядчику</small>
+          </div>
+        </div>
+
         <hr>
         <div class="section-title mb-3"><i class="bi bi-arrow-down-circle me-1 text-success"></i>Поступление</div>
         <div class="row g-3 mb-3">
@@ -78,17 +100,9 @@
                    value="{{ obj.source_text|default:'' }}">
           </div>
         </div>
-        <div class="row g-3 mb-3">
-          <div class="col-sm-6">
-            <label class="form-label fw-semibold">Приход (сом)</label>
-            <input type="number" name="amount_in" class="form-control" step="0.01"
-                   value="{{ obj.amount_in|default:'0' }}">
-            <small class="text-muted">За сколько реализована машина</small>
-          </div>
-        </div>
 
         <hr>
-        <div class="section-title mb-3"><i class="bi bi-arrow-up-circle me-1 text-danger"></i>Расход</div>
+        <div class="section-title mb-3"><i class="bi bi-arrow-up-circle me-1 text-danger"></i>Расход / куда ушла</div>
         <div class="row g-3 mb-3">
           <div class="col-sm-6">
             <label class="form-label fw-semibold">Объект расхода (блок)</label>
@@ -109,26 +123,29 @@
         </div>
         <div class="row g-3 mb-3">
           <div class="col-sm-6">
-            <label class="form-label fw-semibold">Расход (сом)</label>
-            <input type="number" name="amount_out" class="form-control" step="0.01"
-                   value="{{ obj.amount_out|default:'0' }}">
-            <small class="text-muted">Сумма оплаты подрядчику (отрицательная если уплачено)</small>
-          </div>
-          <div class="col-sm-6">
             <label class="form-label fw-semibold">Подрядчик / кому ушло</label>
             <input type="text" name="counterparty" class="form-control"
                    placeholder="ИП Иванов, ОсОО «Альфа»…"
                    value="{{ obj.counterparty|default:'' }}">
           </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">За что / куда ушло</label>
-          <input type="text" name="purpose" class="form-control"
-                 placeholder="Услуга фасада, кладка газоблока, возврат клиенту…"
-                 value="{{ obj.purpose|default:'' }}">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">За что / куда ушло</label>
+            <input type="text" name="purpose" class="form-control"
+                   placeholder="Услуга фасада, кладка газоблока, возврат клиенту…"
+                   value="{{ obj.purpose|default:'' }}">
+          </div>
         </div>
 
         <hr>
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="is_sold" name="is_sold"
+                   {% if obj and obj.is_sold %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="is_sold">Машина продана</label>
+          </div>
+          <small class="text-muted">Отметьте, если автомобиль уже реализован</small>
+        </div>
+
         <div class="mb-3">
           <label class="form-label fw-semibold">Примечания</label>
           <textarea name="notes" class="form-control" rows="2">{{ obj.notes|default:'' }}</textarea>

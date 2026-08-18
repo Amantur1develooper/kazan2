@@ -43,9 +43,10 @@ def _match_block(text, bmap):
 # ── List / overview ───────────────────────────────────────────────────────────
 
 def vehicle_list(request):
-    org_id = request.GET.get('org')
+    org_id   = request.GET.get('org')
     block_id = request.GET.get('block')
-    q = request.GET.get('q', '').strip()
+    status   = request.GET.get('status', '')
+    q        = request.GET.get('q', '').strip()
 
     qs = VehicleTransaction.objects.select_related(
         'organization', 'source_block__residential_complex',
@@ -55,6 +56,10 @@ def vehicle_list(request):
         qs = qs.filter(organization_id=org_id)
     if block_id:
         qs = qs.filter(Q(source_block_id=block_id) | Q(target_block_id=block_id))
+    if status == 'available':
+        qs = qs.filter(is_sold=False)
+    elif status == 'sold':
+        qs = qs.filter(is_sold=True)
     if q:
         qs = qs.filter(
             Q(vehicle_name__icontains=q) |
@@ -69,7 +74,7 @@ def vehicle_list(request):
     total_in    = sum(t.amount_in  for t in transactions if t.amount_in  > 0)
     total_out   = sum(abs(t.amount_out) for t in transactions if t.amount_out < 0)
     total_loss  = sum(t.loss for t in transactions)
-    in_balance  = [t for t in transactions if t.in_balance]
+    in_balance  = [t for t in transactions if not t.is_sold]
 
     orgs   = Organization.objects.order_by('name')
     blocks = Block.objects.select_related('residential_complex').order_by(
@@ -77,16 +82,17 @@ def vehicle_list(request):
     )
 
     context = {
-        'transactions': transactions,
-        'total_in':    total_in,
-        'total_out':   total_out,
-        'total_loss':  total_loss,
-        'in_balance':  in_balance,
-        'orgs':   orgs,
-        'blocks': blocks,
-        'filter_org':   org_id,
-        'filter_block': block_id,
-        'filter_q':     q,
+        'transactions':   transactions,
+        'total_in':       total_in,
+        'total_out':      total_out,
+        'total_loss':     total_loss,
+        'in_balance':     in_balance,
+        'orgs':           orgs,
+        'blocks':         blocks,
+        'filter_org':     org_id,
+        'filter_block':   block_id,
+        'filter_status':  status,
+        'filter_q':       q,
     }
     return render(request, 'vehicles/vehicle_list.html', context)
 
@@ -169,6 +175,7 @@ def vehicle_create(request):
                 target_block_id = p.get('target_block') or None,
                 target_text     = p.get('target_text', '').strip(),
                 purpose         = p.get('purpose', '').strip(),
+                is_sold         = 'is_sold' in p,
                 notes           = p.get('notes', '').strip(),
             )
             messages.success(request, 'Операция добавлена.')
@@ -200,6 +207,7 @@ def vehicle_edit(request, pk):
             obj.target_block_id = p.get('target_block') or None
             obj.target_text     = p.get('target_text', '').strip()
             obj.purpose         = p.get('purpose', '').strip()
+            obj.is_sold         = 'is_sold' in p
             obj.notes           = p.get('notes', '').strip()
             obj.save()
             messages.success(request, 'Операция обновлена.')
@@ -209,6 +217,15 @@ def vehicle_edit(request, pk):
     return render(request, 'vehicles/vehicle_form.html', {
         'orgs': orgs, 'blocks': blocks, 'obj': obj, 'title': 'Редактировать операцию',
     })
+
+
+def vehicle_toggle_sold(request, pk):
+    obj = get_object_or_404(VehicleTransaction, pk=pk)
+    if request.method == 'POST':
+        obj.is_sold = not obj.is_sold
+        obj.save(update_fields=['is_sold'])
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or 'vehicle_list'
+    return redirect(next_url)
 
 
 def vehicle_delete(request, pk):

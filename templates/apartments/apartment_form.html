@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load finance_filters %}
+{% load finance_filters l10n %}
 
 {% block title %}{{ title }}{% endblock %}
 
@@ -54,7 +54,7 @@
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Этаж</label>
             <input type="number" name="floor" class="form-control"
-                   value="{{ obj.floor|default:'1' }}" min="1">
+                   value="{% if obj %}{{ obj.floor|unlocalize }}{% else %}1{% endif %}" min="1">
           </div>
         </div>
 
@@ -62,22 +62,22 @@
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Комнат</label>
             <input type="number" name="rooms" class="form-control"
-                   value="{{ obj.rooms|default:'1' }}" min="1" max="10">
+                   value="{% if obj %}{{ obj.rooms|unlocalize }}{% else %}1{% endif %}" min="1" max="10">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Площадь (м²) <span class="text-danger">*</span></label>
             <input type="number" name="area" class="form-control" step="0.01" required
-                   value="{{ obj.area|default:'' }}">
+                   value="{% if obj %}{{ obj.area|unlocalize }}{% endif %}">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Плановая цена м²</label>
             <input type="number" name="planned_price_per_m2" class="form-control" step="0.01"
-                   value="{{ obj.planned_price_per_m2|default:'0' }}">
+                   value="{% if obj %}{{ obj.planned_price_per_m2|unlocalize }}{% else %}0{% endif %}">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Факт. цена м²</label>
             <input type="number" name="fact_price_per_m2" class="form-control" step="0.01"
-                   value="{{ obj.fact_price_per_m2|default:'0' }}">
+                   value="{% if obj %}{{ obj.fact_price_per_m2|unlocalize }}{% else %}0{% endif %}">
           </div>
         </div>
 
@@ -135,24 +135,24 @@
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Сумма договора</label>
             <input type="number" name="deal_amount_contract" class="form-control" step="0.01"
-                   value="{{ obj.deal_amount_contract|default:'0' }}">
+                   value="{% if obj %}{{ obj.deal_amount_contract|unlocalize }}{% else %}0{% endif %}">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Оплачено</label>
             <input type="number" name="deal_amount_paid" class="form-control" step="0.01"
-                   value="{{ obj.deal_amount_paid|default:'0' }}">
+                   value="{% if obj %}{{ obj.deal_amount_paid|unlocalize }}{% else %}0{% endif %}">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Остаток к оплате</label>
             <input type="number" name="deal_amount_remaining" class="form-control" step="0.01"
-                   value="{{ obj.deal_amount_remaining|default:'0' }}">
+                   value="{% if obj %}{{ obj.deal_amount_remaining|unlocalize }}{% else %}0{% endif %}">
           </div>
         </div>
         <div class="row g-3 mb-3">
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Скидка</label>
             <input type="number" name="discount" class="form-control" step="0.01"
-                   value="{{ obj.discount|default:'0' }}">
+                   value="{% if obj %}{{ obj.discount|unlocalize }}{% else %}0{% endif %}">
           </div>
           <div class="col-sm-3">
             <label class="form-label fw-semibold">Тип сделки</label>
