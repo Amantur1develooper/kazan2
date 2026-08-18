@@ -57,8 +57,8 @@ class VehicleTransaction(models.Model):
 
     @property
     def loss(self):
-        """Убыток = расход + приход (amount_out обычно отрицателен)."""
-        return self.amount_out + self.amount_in
+        """Разница: приход − расход. 0 если равны, отрицательный = убыток."""
+        return self.amount_in - self.amount_out
 
     @property
     def in_balance(self):

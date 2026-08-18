@@ -208,7 +208,7 @@
           <td class="text-end text-money {% if t.amount_in > 0 %}text-success{% elif t.amount_in < 0 %}text-danger{% else %}text-muted{% endif %}">
             {% if t.amount_in != 0 %}{{ t.amount_in|currency }}{% else %}—{% endif %}
           </td>
-          <td class="text-end text-money {% if t.amount_out < 0 %}text-danger{% else %}text-muted{% endif %}">
+          <td class="text-end text-money {% if t.amount_out > 0 %}text-danger{% else %}text-muted{% endif %}">
             {% if t.amount_out != 0 %}{{ t.amount_out|currency }}{% else %}—{% endif %}
           </td>
           <td class="text-end text-money fw-semibold {% if t.loss < 0 %}text-danger{% elif t.loss > 0 %}text-success{% else %}text-muted{% endif %}">

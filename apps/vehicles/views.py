@@ -71,9 +71,9 @@ def vehicle_list(request):
     transactions = list(qs.order_by('-date', '-created_at'))
 
     # Totals
-    total_in    = sum(t.amount_in  for t in transactions if t.amount_in  > 0)
-    total_out   = sum(abs(t.amount_out) for t in transactions if t.amount_out < 0)
-    total_loss  = sum(t.loss for t in transactions)
+    total_in   = sum(t.amount_in  for t in transactions)
+    total_out  = sum(t.amount_out for t in transactions)
+    total_loss = sum(t.loss       for t in transactions)
     in_balance  = [t for t in transactions if not t.is_sold]
 
     orgs   = Organization.objects.order_by('name')
