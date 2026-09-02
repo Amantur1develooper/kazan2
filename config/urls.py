@@ -15,6 +15,7 @@ urlpatterns = [
     path('dds/', include('apps.dds.urls')),
     path('vehicles/', include('apps.vehicles.urls')),
     path('apartments/', include('apps.apartments.urls')),
+    path('analytics/', include('apps.projects.analytics_urls')),
 ]
 
 if settings.DEBUG:

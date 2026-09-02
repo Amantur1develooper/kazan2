@@ -106,6 +106,91 @@
       </div>
     </div>
   </div>
+  <div class="col-sm-3">
+    <div class="stat-card {% if extra_total > 0 %}border-warning{% endif %}">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">Внесметные расходы</div>
+          <div class="value text-money {% if extra_total > 0 %}text-warning{% else %}text-muted{% endif %}">
+            {% if extra_total > 0 %}{{ extra_total|currency }}{% else %}—{% endif %}
+          </div>
+          {% if extra_total > 0 %}
+          <div class="text-muted mt-1" style="font-size:.72rem">{{ extra_expenses|length }} позиций</div>
+          {% endif %}
+        </div>
+        <div class="icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-square"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Внесметные расходы — компактный блок вверху ── #}
+<div class="data-table mb-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">
+      <i class="bi bi-exclamation-square me-1 text-warning"></i>
+      Расходы не входящие в смету
+      {% if extra_total > 0 %}
+        <span class="badge bg-warning text-dark ms-2">{{ extra_total|currency }}</span>
+      {% endif %}
+    </span>
+    <button class="btn btn-sm btn-outline-warning"
+            data-bs-toggle="modal" data-bs-target="#addExtraModal">
+      <i class="bi bi-plus-lg me-1"></i>Добавить
+    </button>
+  </div>
+  {% if extra_expenses %}
+  <div class="table-responsive">
+    <table class="table align-middle mb-0" style="font-size:.855rem">
+      <thead class="table-light">
+        <tr>
+          <th>Статья расхода</th>
+          <th>Дата</th>
+          <th class="text-end">Сумма</th>
+          <th>Примечание</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for exp in extra_expenses %}
+        <tr>
+          <td class="fw-semibold">{{ exp.name }}</td>
+          <td class="text-muted small">{{ exp.date|default:"—" }}</td>
+          <td class="text-end text-money text-danger fw-semibold">{{ exp.amount|currency }}</td>
+          <td class="text-muted small">{{ exp.description|truncatechars:60 }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-xs btn-outline-secondary"
+                      data-bs-toggle="modal" data-bs-target="#editExtraModal"
+                      data-pk="{{ exp.pk }}" data-name="{{ exp.name }}"
+                      data-amount="{{ exp.amount }}" data-date="{{ exp.date|default:'' }}"
+                      data-desc="{{ exp.description }}">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" action="{% url 'extra_expense_delete' exp.pk %}"
+                    onsubmit="return confirm('Удалить «{{ exp.name }}»?')" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="2">Итого внесметных</td>
+          <td class="text-end text-money text-danger">{{ extra_total|currency }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-3 text-center text-muted" style="font-size:.855rem">
+    <i class="bi bi-info-circle me-1"></i>Внесметных расходов нет (земля, реклама, разрешения и т.д.)
+  </div>
+  {% endif %}
 </div>
 
 {% if not flat_rows %}
@@ -601,85 +686,9 @@
 </div>
 {% endif %}
 
-<!-- ── Расходы не входящие в смету ────────────────────────────────── -->
-<div class="data-table mt-4" id="extra-expenses-section">
-  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-    <span class="section-title">
-      <i class="bi bi-exclamation-square me-1 text-warning"></i>
-      Расходы не входящие в смету
-      {% if extra_total > 0 %}
-        <span class="badge bg-warning text-dark ms-2">{{ extra_total|currency }}</span>
-      {% endif %}
-    </span>
-    <button class="btn btn-sm btn-outline-warning"
-            data-bs-toggle="modal" data-bs-target="#addExtraModal">
-      <i class="bi bi-plus-lg me-1"></i>Добавить расход
-    </button>
-  </div>
-
-  {% if extra_expenses %}
-  <div class="table-responsive">
-    <table class="table align-middle mb-0" style="font-size:.875rem">
-      <thead class="table-light">
-        <tr>
-          <th>Статья расхода</th>
-          <th>Дата</th>
-          <th class="text-end">Сумма</th>
-          <th>Примечание</th>
-          <th style="width:90px"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for exp in extra_expenses %}
-        <tr>
-          <td class="fw-semibold">{{ exp.name }}</td>
-          <td class="text-muted small">{{ exp.date|default:"—" }}</td>
-          <td class="text-end text-money text-danger fw-semibold">{{ exp.amount|currency }}</td>
-          <td class="text-muted small">{{ exp.description|truncatechars:60 }}</td>
-          <td>
-            <div class="d-flex gap-1">
-              <button class="btn btn-xs btn-outline-secondary"
-                      data-bs-toggle="modal"
-                      data-bs-target="#editExtraModal"
-                      data-pk="{{ exp.pk }}"
-                      data-name="{{ exp.name }}"
-                      data-amount="{{ exp.amount }}"
-                      data-date="{{ exp.date|default:'' }}"
-                      data-desc="{{ exp.description }}">
-                <i class="bi bi-pencil"></i>
-              </button>
-              <form method="post" action="{% url 'extra_expense_delete' exp.pk %}"
-                    onsubmit="return confirm('Удалить «{{ exp.name }}»?')" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-xs btn-outline-danger">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot class="table-light fw-bold">
-        <tr>
-          <td colspan="2">Итого внесметных расходов</td>
-          <td class="text-end text-money text-danger">{{ extra_total|currency }}</td>
-          <td colspan="2"></td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-  {% else %}
-  <div class="p-4 text-center text-muted" style="font-size:.875rem">
-    <i class="bi bi-info-circle me-1"></i>
-    Внесметных расходов нет. Добавьте расходы, которые не включены в смету (земля, реклама, разрешения и т.д.)
-  </div>
-  {% endif %}
-</div>
-
 {# ── Итоговая маржа с учётом внесметных расходов ── #}
 {% if extra_total > 0 %}
-<div class="card-section p-3 mt-3" style="border-left:4px solid #f59e0b">
+<div class="card-section p-3 mt-3 mb-4" style="border-left:4px solid #f59e0b">
   <div class="row g-3 align-items-center">
     <div class="col-auto text-muted small"><i class="bi bi-calculator me-1"></i>Итоговые затраты</div>
     <div class="col-auto">

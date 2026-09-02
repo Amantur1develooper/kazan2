@@ -98,7 +98,7 @@ class CashFlowRecord(models.Model):
     counterparty = models.CharField('Контрагент', max_length=255, blank=True)
     account_name = models.CharField('Счёт (1С)', max_length=255, blank=True)
     object_ref = models.CharField('Объект (1С)', max_length=255, blank=True)
-    description = models.CharField('Назначение', max_length=500, blank=True)
+    description = models.TextField('Назначение', blank=True)
 
     # Linked objects (set during distribution)
     account = models.ForeignKey(

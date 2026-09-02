@@ -9,9 +9,14 @@
     <h1><i class="bi bi-cash-stack me-2 text-success"></i>ДДС — Кассы и счета</h1>
     <p class="text-muted mb-0" style="font-size:.9rem">Движение денежных средств по кассам и банковским счетам</p>
   </div>
-  <a href="{% url 'dds_import_upload' %}" class="btn btn-success btn-sm">
-    <i class="bi bi-upload me-1"></i>Загрузить ДДС
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{% url 'dds_planfact_upload' %}" class="btn btn-warning btn-sm">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Загрузить план-факт
+    </a>
+    <a href="{% url 'dds_import_upload' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-upload me-1"></i>Загрузить ДДС
+    </a>
+  </div>
 </div>
 {% endblock %}
 
@@ -26,7 +31,7 @@
 </div>
 {% else %}
 
-{# ── Фильтр по датам + итог ── #}
+{# ── Фильтр ── #}
 <div class="card-section p-3 mb-4">
   <form method="get" class="row g-2 align-items-end">
     <div class="col-sm-3 col-md-2">
@@ -36,6 +41,17 @@
     <div class="col-sm-3 col-md-2">
       <label class="form-label small text-muted mb-1">Дата по</label>
       <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+    </div>
+    <div class="col-sm-4 col-md-3">
+      <label class="form-label small text-muted mb-1">Блок</label>
+      <select name="block" class="form-select form-select-sm">
+        <option value="">Все блоки</option>
+        {% for blk in all_blocks %}
+        <option value="{{ blk.pk }}" {% if block_filter == blk.pk|stringformat:"s" %}selected{% endif %}>
+          {{ blk.residential_complex.name }} / {{ blk.name }}
+        </option>
+        {% endfor %}
+      </select>
     </div>
     <div class="col-auto d-flex gap-2">
       <button type="submit" class="btn btn-primary btn-sm">
@@ -48,9 +64,14 @@
       {% endif %}
     </div>
     <div class="col ms-auto d-flex gap-3 justify-content-end align-items-center flex-wrap">
-      {% if is_filtered %}
+      {% if selected_block %}
+      <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2" style="font-size:.8rem">
+        <i class="bi bi-building me-1"></i>{{ selected_block.name }}
+      </span>
+      {% endif %}
+      {% if date_from or date_to %}
       <span class="badge bg-info text-dark px-3 py-2" style="font-size:.8rem">
-        <i class="bi bi-funnel-fill me-1"></i>
+        <i class="bi bi-calendar me-1"></i>
         {% if date_from %}с {{ date_from }}{% endif %}
         {% if date_to %} по {{ date_to }}{% endif %}
       </span>

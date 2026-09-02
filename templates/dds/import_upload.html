@@ -42,15 +42,17 @@
         <div class="mb-4">
           <label class="form-label fw-semibold">
             Блок
-            <span class="text-muted fw-normal" style="font-size:.85rem">— необязательно</span>
+            <span class="badge bg-warning text-dark ms-1" style="font-size:.72rem">Рекомендуется</span>
           </label>
           <select name="block" id="id_block" class="form-select">
             <option value="">— Не указывать блок (авто-привязка по объекту) —</option>
           </select>
-          <small class="text-muted d-block mt-1">
-            Если выбрать блок — <strong>все</strong> записи из файла сразу попадут в этот блок.
-            Удобно, когда файл содержит данные только одного блока.
-          </small>
+          <div id="no-block-warning" class="alert alert-warning py-2 px-3 mt-2 mb-0" style="font-size:.82rem;display:none">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <strong>Блок не выбран.</strong> Записи будут привязаны автоматически по полю «Объект».
+            Если объект в файле не совпадает с названием блока — записи останутся <strong>без блока</strong>
+            и не попадут в аналитику. Лучше выбрать блок явно, если файл относится к одному блоку.
+          </div>
         </div>
 
         <div class="mb-4">
@@ -92,6 +94,8 @@
   const rcSel   = document.getElementById('id_residential_complex');
   const blkSel  = document.getElementById('id_block');
 
+  const noBlockWarning = document.getElementById('no-block-warning');
+
   function rebuildBlocks() {
     const rcId = rcSel.value;
     const blocks = (rcId && blocksByRc[rcId]) ? blocksByRc[rcId] : [];
@@ -103,10 +107,24 @@
       blkSel.appendChild(opt);
     });
     blkSel.disabled = blocks.length === 0;
+    updateWarning();
   }
 
+  function updateWarning() {
+    noBlockWarning.style.display = blkSel.value ? 'none' : 'block';
+  }
+
+  blkSel.addEventListener('change', updateWarning);
   rcSel.addEventListener('change', rebuildBlocks);
   rebuildBlocks();
+
+  document.querySelector('form').addEventListener('submit', function (e) {
+    if (!blkSel.value) {
+      if (!confirm('Блок не выбран. Некоторые записи могут остаться без блока и не попасть в аналитику.\n\nПродолжить загрузку без блока?')) {
+        e.preventDefault();
+      }
+    }
+  });
 })();
 </script>
 {% endblock %}

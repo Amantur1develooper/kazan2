@@ -275,30 +275,39 @@ def dds_account_list(request):
     """List all cash accounts grouped by ЖК with per-ЖК totals and block breakdown."""
     from collections import defaultdict
 
-    date_from = request.GET.get('date_from', '').strip()
-    date_to   = request.GET.get('date_to',   '').strip()
+    date_from    = request.GET.get('date_from', '').strip()
+    date_to      = request.GET.get('date_to',   '').strip()
+    block_filter = request.GET.get('block', '').strip()
 
-    # Build date Q for record-level filtering (field: operation_date)
-    rec_date_q = Q()
+    selected_block = None
+    if block_filter and block_filter.isdigit():
+        selected_block = Block.objects.filter(pk=int(block_filter)).first()
+
+    all_blocks = list(Block.objects.select_related('residential_complex').order_by(
+        'residential_complex__name', 'name'
+    ))
+
+    # Q for annotated Sum() filters (traverse through records reverse FK)
+    rec_q = Q()
     if date_from:
-        rec_date_q &= Q(records__operation_date__gte=date_from)
+        rec_q &= Q(records__operation_date__gte=date_from)
     if date_to:
-        rec_date_q &= Q(records__operation_date__lte=date_to)
+        rec_q &= Q(records__operation_date__lte=date_to)
+    if selected_block:
+        rec_q &= Q(records__block=selected_block)
 
-    # Accounts with annotated totals — date filter applied inside Sum()
+    # Accounts with annotated totals
     accounts = list(
         CashAccount.objects
         .select_related('residential_complex', 'block')
         .annotate(
             record_count=Count('records'),
             ann_income=Coalesce(
-                Sum('records__amount',
-                    filter=Q(records__direction='in') & rec_date_q),
+                Sum('records__amount', filter=Q(records__direction='in') & rec_q),
                 Value(Decimal('0'))
             ),
             ann_expense=Coalesce(
-                Sum('records__amount',
-                    filter=Q(records__direction='out') & rec_date_q),
+                Sum('records__amount', filter=Q(records__direction='out') & rec_q),
                 Value(Decimal('0'))
             ),
         )
@@ -309,12 +318,14 @@ def dds_account_list(request):
         acc.disp_expense = acc.ann_expense
         acc.disp_balance = acc.ann_income - acc.ann_expense
 
-    # Block breakdown — apply same date filter at record level
+    # Block breakdown
     block_qs = CashFlowRecord.objects.filter(direction__in=['in', 'out'])
     if date_from:
         block_qs = block_qs.filter(operation_date__gte=date_from)
     if date_to:
         block_qs = block_qs.filter(operation_date__lte=date_to)
+    if selected_block:
+        block_qs = block_qs.filter(block=selected_block)
 
     block_rows = list(
         block_qs
@@ -339,6 +350,9 @@ def dds_account_list(request):
 
     for rc in all_rc:
         rc_accounts = [a for a in accounts if a.residential_complex_id == rc.pk]
+        # When filtering by block, skip accounts with zero activity for that block
+        if selected_block:
+            rc_accounts = [a for a in rc_accounts if a.disp_income or a.disp_expense]
         if not rc_accounts:
             continue
         seen_acc_ids.update(a.pk for a in rc_accounts)
@@ -365,7 +379,8 @@ def dds_account_list(request):
         })
 
     # Accounts not linked to any RC
-    no_rc = [a for a in accounts if a.pk not in seen_acc_ids]
+    no_rc = [a for a in accounts if a.pk not in seen_acc_ids
+             and (not selected_block or a.disp_income or a.disp_expense)]
     if no_rc:
         rc_income  = sum(a.disp_income  for a in no_rc)
         rc_expense = sum(a.disp_expense for a in no_rc)
@@ -383,7 +398,9 @@ def dds_account_list(request):
         unlinked_qs = unlinked_qs.filter(operation_date__gte=date_from)
     if date_to:
         unlinked_qs = unlinked_qs.filter(operation_date__lte=date_to)
-    unlinked_no_block = unlinked_qs.filter(block__isnull=True).count()
+    if selected_block:
+        unlinked_qs = unlinked_qs.filter(block=selected_block)
+    unlinked_no_block = unlinked_qs.filter(block__isnull=True).count() if not selected_block else 0
     unlinked_no_item  = unlinked_qs.filter(
         block__isnull=False, direction='out', estimate_item__isnull=True
     ).count()
@@ -391,7 +408,7 @@ def dds_account_list(request):
     total_income  = sum(s['income']  for s in rc_summary)
     total_expense = sum(s['expense'] for s in rc_summary)
 
-    # Block chart data — flatten all blocks across all RCs, skip "Без блока"
+    # Block chart data — flatten all blocks across all RCs
     block_chart_items = []
     for section in rc_summary:
         rc_name = section['rc'].name if section['rc'] else 'Без ЖК'
@@ -412,19 +429,20 @@ def dds_account_list(request):
     block_chart_expense = json.dumps([b['expense'] for b in block_chart_items])
     block_chart_balance = json.dumps([b['balance'] for b in block_chart_items])
 
-    # Daily chart data (respects active date filter)
+    # Daily chart data (respects all active filters)
     daily_qs = CashFlowRecord.objects.filter(direction__in=['in', 'out'])
     if date_from:
         daily_qs = daily_qs.filter(operation_date__gte=date_from)
     if date_to:
         daily_qs = daily_qs.filter(operation_date__lte=date_to)
+    if selected_block:
+        daily_qs = daily_qs.filter(block=selected_block)
     daily_rows = list(
         daily_qs
         .values('operation_date', 'direction')
         .annotate(total=Sum('amount'))
         .order_by('operation_date')
     )
-    # Build per-date dicts
     daily_map = {}
     for row in daily_rows:
         d = str(row['operation_date'])
@@ -432,7 +450,6 @@ def dds_account_list(request):
             daily_map[d] = {'in': 0.0, 'out': 0.0}
         daily_map[d][row['direction']] += float(row['total'])
     sorted_dates = sorted(daily_map)
-    # Cumulative balance
     running = 0.0
     daily_balance = []
     for d in sorted_dates:
@@ -454,7 +471,10 @@ def dds_account_list(request):
         'total_balance':     total_income - total_expense,
         'date_from':         date_from,
         'date_to':           date_to,
-        'is_filtered':       bool(date_from or date_to),
+        'block_filter':      block_filter,
+        'selected_block':    selected_block,
+        'all_blocks':        all_blocks,
+        'is_filtered':       bool(date_from or date_to or selected_block),
         'chart_labels':       chart_labels,
         'chart_income':       chart_income,
         'chart_expense':      chart_expense,
@@ -825,6 +845,96 @@ def dds_record_delete(request, pk):
         messages.success(request, 'Запись удалена.')
 
     return redirect('dds_account_detail', pk=account_pk)
+
+
+# ── Plan-fact upload → unlinked DDS records ──────────────────────────────────
+
+def dds_planfact_upload(request):
+    """
+    Upload a plan-fact Excel (floor-expense format) and create unlinked
+    CashFlowRecord entries (direction='out', block=selected, estimate_item=None).
+    They appear immediately in DDS unlinked → Tab 2 for item linking.
+    """
+    import tempfile, os
+    from datetime import date as _date
+
+    all_blocks = list(Block.objects.select_related('residential_complex').order_by(
+        'residential_complex__name', 'name'
+    ))
+
+    if request.method != 'POST':
+        return render(request, 'dds/import_planfact.html', {'all_blocks': all_blocks})
+
+    block_val = request.POST.get('block', '').strip()
+    uploaded  = request.FILES.get('file')
+
+    errors = []
+    if not block_val or not block_val.isdigit():
+        errors.append('Выберите блок.')
+    if not uploaded:
+        errors.append('Выберите файл.')
+
+    if errors:
+        for e in errors:
+            messages.error(request, e)
+        return render(request, 'dds/import_planfact.html', {'all_blocks': all_blocks})
+
+    block = Block.objects.filter(pk=int(block_val)).select_related('residential_complex').first()
+    if not block:
+        messages.error(request, 'Блок не найден.')
+        return render(request, 'dds/import_planfact.html', {'all_blocks': all_blocks})
+
+    ext = uploaded.name.rsplit('.', 1)[-1].lower()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}') as tmp:
+        for chunk in uploaded.chunks():
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
+    try:
+        from apps.imports.floor_parser import parse_floor_excel
+        parsed = parse_floor_excel(tmp_path)
+        items  = parsed.get('items', [])
+        today  = _date.today()
+
+        to_create = []
+        skipped   = 0
+        for item in items:
+            amount = item.get('total_amount', Decimal('0'))
+            if amount <= 0:
+                skipped += 1
+                continue
+            op_date = item.get('expense_date') or today
+            name    = item.get('name', '') or ''
+            code    = item.get('item_code', '') or ''
+            desc    = f'{code} {name}'.strip() if code else name
+
+            to_create.append(CashFlowRecord(
+                operation_date  = op_date,
+                bank_or_cash    = 'Расход',
+                operation_type  = 'Расход (план-факт)',
+                direction       = 'out',
+                amount          = amount,
+                transfer_amount = Decimal('0'),
+                counterparty    = '',
+                account_name    = 'Расход план-факт',
+                object_ref      = f'Блок {block.name}',
+                description     = desc,
+                block           = block,
+            ))
+
+        CashFlowRecord.objects.bulk_create(to_create)
+        msg = f'Импортировано {len(to_create)} расходов в блок «{block.name}» — ожидают привязки к смете.'
+        if skipped:
+            msg += f' Пропущено {skipped} строк с нулевой суммой.'
+        messages.success(request, msg)
+
+    except Exception as e:
+        messages.error(request, f'Ошибка импорта: {e}')
+        return render(request, 'dds/import_planfact.html', {'all_blocks': all_blocks})
+    finally:
+        os.unlink(tmp_path)
+
+    return redirect('dds_unlinked')
 
 
 # ── Unlinked DDS records ──────────────────────────────────────────────────────

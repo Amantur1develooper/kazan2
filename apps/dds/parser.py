@@ -50,64 +50,139 @@ def _parse_date_cell(ws, r, c, datemode):
     return None
 
 
+def _parse_date_value(val) -> 'date | None':
+    """Parse a date from an openpyxl cell value (datetime, date, or string)."""
+    if val is None:
+        return None
+    from datetime import datetime as _dt, date as _date
+    if isinstance(val, _dt):
+        return val.date()
+    if isinstance(val, _date):
+        return val
+    s = str(val).strip()
+    m = re.search(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', s)
+    if m:
+        try:
+            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return None
+    return None
+
+
 def _str(v) -> str:
     if v is None:
         return ''
     return str(v).strip()
 
 
-def parse_dds_excel(filepath: str) -> list:
-    """Parse 1С ДДС Excel file. Returns list of record dicts."""
+def _has_transfer_col(header_row) -> bool:
+    """Return True if the header contains a 'Сумма перемещения' column."""
+    return any('перемещен' in str(h).lower() for h in header_row if h)
+
+
+def _extract_row_fields(values, has_transfer):
+    """
+    Extract (amount_raw, transfer_raw, counterparty, account_name, object_ref, description)
+    from a value tuple, adjusting for whether the transfer column is present.
+    """
+    n = len(values)
+    amount_raw = _to_decimal(values[3] if n > 3 else None)
+    if has_transfer:
+        transfer_raw  = _to_decimal(values[4] if n > 4 else None)
+        counterparty  = _str(values[5] if n > 5 else None)
+        account_name  = _str(values[6] if n > 6 else None)
+        object_ref    = _str(values[7] if n > 7 else None)
+        description   = _str(values[8] if n > 8 else None)
+    else:
+        transfer_raw  = Decimal('0')
+        counterparty  = _str(values[4] if n > 4 else None)
+        account_name  = _str(values[5] if n > 5 else None)
+        object_ref    = _str(values[6] if n > 6 else None)
+        description   = _str(values[7] if n > 7 else None)
+    return amount_raw, transfer_raw, counterparty, account_name, object_ref, description
+
+
+def _parse_dds_xls(filepath: str) -> list:
     import xlrd
     wb = xlrd.open_workbook(filepath)
     ws = wb.sheet_by_index(0)
-
+    header = [ws.cell_value(0, c) for c in range(ws.ncols)]
+    has_transfer = _has_transfer_col(header)
     records = []
-    for r in range(1, ws.nrows):  # skip header row 0
+    for r in range(1, ws.nrows):
         row_date = _parse_date_cell(ws, r, 0, wb.datemode)
         if not row_date:
             continue
-
         bank_or_cash = _str(ws.cell_value(r, 1))
         op_type = _str(ws.cell_value(r, 2))
         if not op_type:
             continue
-
-        amount_raw = _to_decimal(ws.cell_value(r, 3) if ws.ncols > 3 else None)
-        transfer_raw = _to_decimal(ws.cell_value(r, 4) if ws.ncols > 4 else None)
-        counterparty = _str(ws.cell_value(r, 5) if ws.ncols > 5 else None)
-        account_name = _str(ws.cell_value(r, 6) if ws.ncols > 6 else None)
-        object_ref = _str(ws.cell_value(r, 7) if ws.ncols > 7 else None)
-        description = _str(ws.cell_value(r, 8) if ws.ncols > 8 else None)
-
-        # Determine direction
-        op_lower = op_type.lower()
-        if 'перемещение' in op_lower or (transfer_raw != 0 and amount_raw == 0):
-            direction = 'transfer'
-            amount = abs(transfer_raw)
-        elif amount_raw > 0:
-            direction = 'in'
-            amount = amount_raw
-        elif amount_raw < 0:
-            direction = 'out'
-            amount = abs(amount_raw)
-        else:
-            continue  # zero amount, skip
-
-        records.append({
-            'operation_date': row_date,
-            'bank_or_cash': bank_or_cash,
-            'operation_type': op_type,
-            'direction': direction,
-            'amount': amount,
-            'transfer_amount': abs(transfer_raw),
-            'counterparty': counterparty,
-            'account_name': account_name,
-            'object_ref': object_ref,
-            'description': description,
-        })
-
+        values = tuple(ws.cell_value(r, c) for c in range(ws.ncols))
+        amount_raw, transfer_raw, counterparty, account_name, object_ref, description = \
+            _extract_row_fields(values, has_transfer)
+        _append_record(records, row_date, bank_or_cash, op_type, amount_raw, transfer_raw,
+                       counterparty, account_name, object_ref, description)
     return records
+
+
+def _parse_dds_xlsx(filepath: str) -> list:
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    if not rows:
+        return []
+    has_transfer = _has_transfer_col(rows[0])
+    records = []
+    for row in rows[1:]:
+        row_date = _parse_date_value(row[0] if row else None)
+        if not row_date:
+            continue
+        bank_or_cash = _str(row[1] if len(row) > 1 else None)
+        op_type = _str(row[2] if len(row) > 2 else None)
+        if not op_type:
+            continue
+        amount_raw, transfer_raw, counterparty, account_name, object_ref, description = \
+            _extract_row_fields(row, has_transfer)
+        _append_record(records, row_date, bank_or_cash, op_type, amount_raw, transfer_raw,
+                       counterparty, account_name, object_ref, description)
+    return records
+
+
+def _append_record(records, row_date, bank_or_cash, op_type, amount_raw, transfer_raw,
+                   counterparty, account_name, object_ref, description):
+    op_lower = op_type.lower()
+    if 'перемещение' in op_lower or (transfer_raw != 0 and amount_raw == 0):
+        direction = 'transfer'
+        amount = abs(transfer_raw)
+    elif amount_raw > 0:
+        direction = 'in'
+        amount = amount_raw
+    elif amount_raw < 0:
+        direction = 'out'
+        amount = abs(amount_raw)
+    else:
+        return
+    records.append({
+        'operation_date': row_date,
+        'bank_or_cash': bank_or_cash,
+        'operation_type': op_type,
+        'direction': direction,
+        'amount': amount,
+        'transfer_amount': abs(transfer_raw),
+        'counterparty': counterparty,
+        'account_name': account_name,
+        'object_ref': object_ref,
+        'description': description,
+    })
+
+
+def parse_dds_excel(filepath: str) -> list:
+    """Parse 1С ДДС Excel file (.xls or .xlsx). Returns list of record dicts."""
+    if filepath.lower().endswith('.xlsx'):
+        return _parse_dds_xlsx(filepath)
+    return _parse_dds_xls(filepath)
 
 
 def auto_match_block(object_ref: str, blocks) -> object:

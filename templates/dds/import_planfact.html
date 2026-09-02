@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Загрузка план-факт расходов{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1" style="font-size:.8rem">
+      <li class="breadcrumb-item"><a href="{% url 'dds_account_list' %}">ДДС</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'dds_unlinked' %}">Нераспределённые</a></li>
+      <li class="breadcrumb-item active">Загрузка план-факт</li>
+    </ol></nav>
+    <h1><i class="bi bi-file-earmark-spreadsheet me-2 text-warning"></i>Загрузка план-факт расходов</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">
+      Расходы из файла попадут в ДДС блока как нераспределённые — без привязки к смете.
+      Затем их можно распределить по позициям сметы на странице нераспределённых.
+    </p>
+  </div>
+  <a href="{% url 'dds_unlinked' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Нераспределённые
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+
+    <div class="card-section p-4">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Блок <span class="text-danger">*</span></label>
+          <select name="block" class="form-select" required>
+            <option value="">— Выберите блок —</option>
+            {% for blk in all_blocks %}
+            <option value="{{ blk.pk }}">{{ blk.residential_complex.name }} / {{ blk.name }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted d-block mt-1">
+            Все расходы из файла будут привязаны к этому блоку и появятся в нераспределённых.
+          </small>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Файл расходов (.xls / .xlsx) <span class="text-danger">*</span></label>
+          <input type="file" name="file" class="form-control" accept=".xls,.xlsx" required>
+          <small class="text-muted d-block mt-1">
+            Форматы 1С: «Перемещение запасов», «Приход на склад» или табличный формат.
+          </small>
+        </div>
+
+        <button type="submit" class="btn btn-warning w-100 fw-semibold">
+          <i class="bi bi-upload me-2"></i>Загрузить расходы в блок
+        </button>
+      </form>
+    </div>
+
+    <div class="card-section p-4 mt-3" style="font-size:.85rem">
+      <div class="section-title mb-3">
+        <i class="bi bi-info-circle me-1 text-primary"></i>Как это работает
+      </div>
+      <div class="d-flex flex-column gap-3">
+        <div class="d-flex gap-3 align-items-start">
+          <div class="rounded-circle bg-warning bg-opacity-20 text-warning fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:28px;height:28px;font-size:.78rem">1</div>
+          <div>
+            <div class="fw-semibold">Загрузка</div>
+            <div class="text-muted">Выбираете блок и файл план-факт расходов из 1С</div>
+          </div>
+        </div>
+        <div class="d-flex gap-3 align-items-start">
+          <div class="rounded-circle bg-warning bg-opacity-20 text-warning fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:28px;height:28px;font-size:.78rem">2</div>
+          <div>
+            <div class="fw-semibold">Нераспределённые</div>
+            <div class="text-muted">Расходы появляются в ДДС → блок есть, позиция сметы — нет</div>
+          </div>
+        </div>
+        <div class="d-flex gap-3 align-items-start">
+          <div class="rounded-circle bg-warning bg-opacity-20 text-warning fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:28px;height:28px;font-size:.78rem">3</div>
+          <div>
+            <div class="fw-semibold">Привязка к смете</div>
+            <div class="text-muted">На странице нераспределённых привязываете каждый расход к позиции сметы</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

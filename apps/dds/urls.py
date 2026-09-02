@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('import/', views.dds_import_upload, name='dds_import_upload'),
+    path('import/planfact/', views.dds_planfact_upload, name='dds_planfact_upload'),
     path('import/<int:pk>/preview/', views.dds_import_preview, name='dds_import_preview'),
     path('import/<int:pk>/distribute/', views.dds_distribute, name='dds_distribute'),
     path('accounts/', views.dds_account_list, name='dds_account_list'),

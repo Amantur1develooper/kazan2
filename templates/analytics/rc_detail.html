@@ -1,0 +1,989 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Аналитика — {{ rc.name }}{% endblock %}
+
+{# ═══════════════════════════════════════════════════════════════════ EXTRA HEAD #}
+{% block extra_head %}
+<style>
+  /* ── KPI cards ── */
+  .kpi-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    border-left-width: 4px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    padding: 1.1rem 1.25rem;
+    height: 100%;
+    transition: box-shadow .15s;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.10); }
+  .kpi-card.border-green  { border-left-color: #22c55e; }
+  .kpi-card.border-orange { border-left-color: #f59e0b; }
+  .kpi-card.border-red    { border-left-color: #ef4444; }
+  .kpi-card.border-blue   { border-left-color: #3b82f6; }
+  .kpi-card .kpi-label {
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: #64748b; margin-bottom: .3rem;
+  }
+  .kpi-card .kpi-value {
+    font-size: 1.45rem; font-weight: 800; color: #0f172a;
+    line-height: 1.15; font-variant-numeric: tabular-nums;
+  }
+  .kpi-card .kpi-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; flex-shrink: 0;
+  }
+  .kpi-card.negative-balance .kpi-value { color: #ef4444; }
+
+  /* ── Analysis cards ── */
+  .analysis-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    height: 100%;
+  }
+  .analysis-card .card-header-inner {
+    padding: .9rem 1.1rem .6rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-weight: 700; font-size: .9rem; color: #0f172a;
+    display: flex; align-items: center; gap: .5rem;
+  }
+  .analysis-card .card-body-inner { padding: .75rem 1.1rem 1rem; }
+
+  /* ── Metric rows ── */
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: .28rem 0; font-size: .85rem; gap: .5rem;
+  }
+  .metric-row .m-label { color: #64748b; flex-shrink: 0; }
+  .metric-row .m-value {
+    font-weight: 600; color: #0f172a;
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .metric-row .m-value.text-green  { color: #16a34a; }
+  .metric-row .m-value.text-red    { color: #dc2626; }
+  .metric-row .m-value.text-orange { color: #d97706; }
+  .metric-row .m-value.text-muted-val { color: #94a3b8; }
+  .metric-row.bold-row .m-label,
+  .metric-row.bold-row .m-value { font-weight: 700; color: #0f172a; }
+  .metric-sep { border-top: 1px dashed #e2e8f0; margin: .4rem 0; }
+
+  /* ── Margin column ── */
+  .margin-block {
+    border-radius: 12px; padding: 1rem 1.1rem;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    height: 100%;
+  }
+  .margin-block .mb-title {
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: #64748b; margin-bottom: .5rem;
+  }
+  .margin-block .mb-value {
+    font-size: 1.35rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+  }
+  .margin-block .mb-sub { font-size: .75rem; color: #64748b; margin-top: .2rem; }
+  .margin-positive { color: #16a34a; }
+  .margin-negative { color: #dc2626; }
+  .margin-neutral  { color: #64748b; }
+
+  /* ── Progress bars ── */
+  .prog-wrap { margin-bottom: .85rem; }
+  .prog-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: .78rem; margin-bottom: .3rem;
+  }
+  .prog-label span:first-child { color: #475569; }
+  .prog-label span:last-child  { font-weight: 700; color: #0f172a; }
+  .progress { height: 8px; border-radius: 99px; background: #f1f5f9; }
+  .progress-bar { border-radius: 99px; }
+
+  /* ── Chart cards ── */
+  .chart-card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    height: 100%;
+  }
+  .chart-card .chart-title {
+    padding: .9rem 1.1rem .5rem;
+    font-weight: 700; font-size: .9rem; color: #0f172a;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .chart-card .chart-body { padding: .75rem 1rem 1rem; }
+
+  /* ── KPI section labels ── */
+  .kpi-section-label {
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .7px; color: #475569; margin-bottom: .4rem;
+    display: flex; align-items: center;
+  }
+
+  /* ── RC switcher pills ── */
+  .rc-pills { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .25rem; flex-wrap: nowrap; }
+  .rc-pills::-webkit-scrollbar { height: 4px; }
+  .rc-pills::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .rc-pill {
+    white-space: nowrap; padding: .35rem .85rem;
+    border-radius: 99px; font-size: .82rem; font-weight: 600;
+    text-decoration: none; border: 1px solid #e2e8f0;
+    color: #475569; background: #fff; transition: all .15s;
+    flex-shrink: 0;
+  }
+  .rc-pill:hover { background: #f1f5f9; color: #0f172a; }
+  .rc-pill.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  /* ── Active filter badges ── */
+  .filter-badge {
+    display: inline-flex; align-items: center; gap: .3rem;
+    background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+    border-radius: 99px; font-size: .75rem; font-weight: 600;
+    padding: .2rem .65rem;
+  }
+
+  /* ── Page filter bar ── */
+  .filter-bar {
+    display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  }
+  .filter-bar .form-control,
+  .filter-bar .form-select {
+    font-size: .82rem; padding: .3rem .65rem; height: auto;
+    border-color: #cbd5e1; border-radius: 8px;
+  }
+  .filter-bar .btn { font-size: .82rem; padding: .3rem .75rem; border-radius: 8px; }
+
+  /* ── Price comparison row ── */
+  .price-compare {
+    background: #f8fafc; border-radius: 10px;
+    border: 1px solid #e2e8f0; padding: .75rem 1rem;
+    display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center;
+  }
+  .price-compare .pc-item { text-align: center; }
+  .price-compare .pc-label { font-size: .7rem; color: #64748b; text-transform: uppercase; letter-spacing: .5px; }
+  .price-compare .pc-val { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 576px) {
+    .kpi-card .kpi-value { font-size: 1.15rem; }
+    .margin-block .mb-value { font-size: 1.1rem; }
+  }
+</style>
+{% endblock %}
+
+{# ═══════════════════════════════════════════════════════════════════ PAGE HEADER #}
+{% block page_header %}
+<div class="page-header flex-wrap gap-2">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}" class="text-decoration-none text-secondary">Главная</a></li>
+        <li class="breadcrumb-item active text-secondary">Аналитика</li>
+      </ol>
+    </nav>
+    <h1 class="mb-0">{{ rc.name }}</h1>
+    {% if is_filtered %}
+    <div class="d-flex flex-wrap gap-1 mt-1">
+      {% if date_from %}<span class="filter-badge"><i class="bi bi-calendar3"></i> от {{ date_from }}</span>{% endif %}
+      {% if date_to %}<span class="filter-badge"><i class="bi bi-calendar3"></i> до {{ date_to }}</span>{% endif %}
+      {% if selected_block %}<span class="filter-badge"><i class="bi bi-building"></i> {{ selected_block.name }}</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <form method="get" class="filter-bar">
+    <input type="date" name="date_from" class="form-control" style="width:140px"
+           value="{{ date_from }}" placeholder="Дата от">
+    <input type="date" name="date_to" class="form-control" style="width:140px"
+           value="{{ date_to }}" placeholder="Дата до">
+    {% if all_blocks %}
+    <select name="block" class="form-select" style="width:160px">
+      <option value="">Все блоки</option>
+      {% for b in all_blocks %}
+      <option value="{{ b.pk }}" {% if block_filter == b.pk|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Фильтр</button>
+    {% if is_filtered %}
+    <a href="{% url 'rc_analytics' rc.pk %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>Сбросить</a>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
+
+{# ═══════════════════════════════════════════════════════════════════ CONTENT #}
+{% block content %}
+
+{# ── A. RC Switcher ── #}
+{% if all_rcs|length > 1 %}
+<div class="mb-4">
+  <div class="rc-pills">
+    {% for r in all_rcs %}
+    <a href="{% url 'rc_analytics' r.pk %}{% if date_from or date_to or block_filter %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% endif %}"
+       class="rc-pill {% if r.pk == rc.pk %}active{% endif %}">
+      <i class="bi bi-buildings me-1"></i>{{ r.name }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── B. KPI Cards ── #}
+
+{# ── Секция 1: Поступления ── #}
+<div class="kpi-section-label">
+  <i class="bi bi-arrow-down-circle text-success me-1"></i>Поступления от клиентов
+</div>
+<div class="row g-2 mb-1">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-green">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label">Поступления от покупателей</div>
+        <div class="kpi-icon bg-success bg-opacity-10 text-success"><i class="bi bi-cash-coin"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1">{{ buyer_income|currency }}</div>
+      <div style="font-size:.72rem;color:#64748b;margin-top:.35rem">Все приходы кроме возвратов от поставщиков</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card" style="border-left:4px solid #f59e0b">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label">— Возврат клиенту</div>
+        <div class="kpi-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-arrow-return-left"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1" style="color:#d97706">{{ dds_returns|currency }}</div>
+      <div style="font-size:.72rem;color:#d97706;margin-top:.35rem">Расход с пометкой «возврат»</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card kpi-result" style="border-left:4px solid #0ea5e9;background:#f0f9ff">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label" style="color:#0369a1">= Итого факт поступлений</div>
+        <div class="kpi-icon" style="background:#e0f2fe;color:#0369a1"><i class="bi bi-check2-circle"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1" style="color:#0369a1">{{ net_income|currency }}</div>
+      <div style="font-size:.72rem;color:#0369a1;margin-top:.35rem">{{ buyer_income|currency }} − {{ dds_returns|currency }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Секция 2: Расходы ── #}
+<div class="kpi-section-label mt-3">
+  <i class="bi bi-arrow-up-circle text-danger me-1"></i>Расходы на объект
+</div>
+<div class="row g-2 mb-1">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-red">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label">Расходы на объект</div>
+        <div class="kpi-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-up-circle"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1">{{ proj_expense|currency }}</div>
+      <div style="font-size:.72rem;color:#64748b;margin-top:.35rem">Все расходы кроме возвратов покупателям</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card" style="border-left:4px solid #22c55e">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label">— Возврат с объекта</div>
+        <div class="kpi-icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-return-right"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1" style="color:#16a34a">{{ returns_incoming|currency }}</div>
+      <div style="font-size:.72rem;color:#16a34a;margin-top:.35rem">Приход с пометкой «возврат»</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card kpi-result" style="border-left:4px solid #f43f5e;background:#fff1f2">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="kpi-label" style="color:#be123c">= Итого факт расходов</div>
+        <div class="kpi-icon" style="background:#ffe4e6;color:#be123c"><i class="bi bi-check2-circle"></i></div>
+      </div>
+      <div class="kpi-value text-money mt-1" style="color:#be123c">{{ net_expense|currency }}</div>
+      <div style="font-size:.72rem;color:#be123c;margin-top:.35rem">{{ proj_expense|currency }} − {{ returns_incoming|currency }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Секция 3: Долг кассы ── #}
+<div class="kpi-section-label mt-3">
+  <i class="bi bi-bar-chart-steps text-primary me-1"></i>Баланс
+</div>
+<div class="row g-2 mb-4">
+  <div class="col-12">
+    <div class="kpi-card {% if wip_balance >= 0 %}border-green{% else %}border-red{% endif %}"
+         style="background:{% if wip_balance >= 0 %}#f0fdf4{% else %}#fff1f2{% endif %}">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="kpi-label" style="color:{% if wip_balance >= 0 %}#166534{% else %}#be123c{% endif %}">
+            Факт поступлений − Факт расходов = <strong>Долг кассы</strong>
+          </div>
+          <div class="kpi-value text-money mt-1"
+               style="font-size:1.7rem;color:{% if wip_balance >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+            {{ wip_balance|currency }}
+          </div>
+          <div style="font-size:.75rem;color:#64748b;margin-top:.3rem">
+            ({{ buyer_income|currency }} − {{ dds_returns|currency }}) − ({{ proj_expense|currency }} − {{ returns_incoming|currency }})
+          </div>
+        </div>
+        <div class="d-flex gap-4 flex-wrap">
+          <div style="text-align:center">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Поступления</div>
+            <div style="font-size:1.05rem;font-weight:700;color:#0369a1" class="text-money">{{ net_income|currency }}</div>
+          </div>
+          <div style="font-size:1.4rem;color:#cbd5e1;align-self:center">−</div>
+          <div style="text-align:center">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Расходы</div>
+            <div style="font-size:1.05rem;font-weight:700;color:#be123c" class="text-money">{{ net_expense|currency }}</div>
+          </div>
+          <div style="font-size:1.4rem;color:#cbd5e1;align-self:center">=</div>
+          <div style="text-align:center">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Долг кассы</div>
+            <div style="font-size:1.05rem;font-weight:700;color:{% if wip_balance >= 0 %}#16a34a{% else %}#dc2626{% endif %}" class="text-money">{{ wip_balance|currency }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Секция 4: Будущие расходы + Дебиторка ── #}
+<div class="kpi-section-label mt-3">
+  <i class="bi bi-hourglass-split text-purple me-1" style="color:#7c3aed"></i>Прогноз
+</div>
+<div class="row g-2 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card" style="border-left:4px solid #7c3aed;background:#faf5ff">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="kpi-label" style="color:#6d28d9">Будущие расходы</div>
+          <div class="kpi-value text-money mt-1" style="color:#7c3aed">
+            {% if future_budget %}{{ future_budget|currency }}{% else %}—{% endif %}
+          </div>
+          <div style="font-size:.72rem;color:#7c3aed;margin-top:.35rem">
+            Смета — Итого факт расходов (ДДС)
+            {% if estimate_plan and net_expense %}
+            <span class="text-money">({{ estimate_plan|currency }} − {{ net_expense|currency }})</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="kpi-icon" style="background:#ede9fe;color:#7c3aed;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0">
+          <i class="bi bi-calendar-event"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card" style="border-left:4px solid #f59e0b;background:#fffbeb">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="kpi-label" style="color:#b45309">Долг покупателей (дебиторка)</div>
+          <div class="kpi-value text-money mt-1" style="color:#d97706">
+            {% if receivables %}{{ receivables|currency }}{% else %}—{% endif %}
+          </div>
+          <div style="font-size:.72rem;color:#d97706;margin-top:.35rem">
+            Остаток оплаты по договорам продажи
+          </div>
+        </div>
+        <div class="kpi-icon" style="background:#fef3c7;color:#d97706;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0">
+          <i class="bi bi-person-check"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card" style="border-left:4px solid #0ea5e9;background:#f0f9ff">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="kpi-label" style="color:#0369a1">Потенциал непроданных квартир</div>
+          <div class="kpi-value text-money mt-1" style="color:#0284c7">
+            {% if free_potential %}{{ free_potential|currency }}{% else %}—{% endif %}
+          </div>
+          <div style="font-size:.72rem;color:#0369a1;margin-top:.35rem">
+            {{ apt_free }} кв. × план. цена м² — ожидаемая выручка
+          </div>
+        </div>
+        <div class="kpi-icon" style="background:#e0f2fe;color:#0284c7;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0">
+          <i class="bi bi-house-add"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── C. Analysis Cards ── #}
+<div class="row g-3 mb-4">
+
+  {# Card 1 — Квартиры #}
+  <div class="col-lg-4">
+    <div class="analysis-card">
+      <div class="card-header-inner">
+        <i class="bi bi-house-door text-primary"></i> Квартиры
+        {% if selected_block %}<span class="badge bg-primary bg-opacity-10 text-primary ms-auto" style="font-size:.7rem">{{ selected_block.name }}</span>{% endif %}
+      </div>
+      <div class="card-body-inner">
+
+        {% if apt_total %}
+        <div class="prog-wrap">
+          <div class="prog-label">
+            <span>Продано {{ apt_sold }} из {{ apt_total }} квартир</span>
+            <span>{{ sales_pct }}%</span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar bg-success" style="width:{{ sales_pct }}%"></div>
+          </div>
+        </div>
+
+        {% if contract_total %}
+        <div class="prog-wrap">
+          <div class="prog-label">
+            <span>Оплачено</span>
+            <span>{{ paid_pct }}%</span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar bg-primary" style="width:{{ paid_pct }}%"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <div class="metric-row">
+          <span class="m-label">Всего квартир</span>
+          <span class="m-value">{{ apt_total }}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Продано</span>
+          <span class="m-value text-green">{{ apt_sold }}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Свободно</span>
+          <span class="m-value">{% if apt_free %}{{ apt_free }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Бронь</span>
+          <span class="m-value text-orange">{% if apt_reserved %}{{ apt_reserved }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Бартер</span>
+          <span class="m-value text-muted-val">{% if apt_barter %}{{ apt_barter }}{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row">
+          <span class="m-label">Площадь всего</span>
+          <span class="m-value text-money">{% if area_total %}{{ area_total }} м²{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Площадь продана</span>
+          <span class="m-value text-money">{% if area_sold %}{{ area_sold }} м²{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Площадь свободна</span>
+          <span class="m-value text-money">{% if area_free %}{{ area_free }} м²{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row">
+          <span class="m-label">Договорная сумма</span>
+          <span class="m-value text-money">{% if contract_total %}{{ contract_total|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Оплачено</span>
+          <span class="m-value text-green text-money">{% if paid_total %}{{ paid_total|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Долг (остаток)</span>
+          <span class="m-value text-orange text-money">{% if receivables %}{{ receivables|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Потенциал свободных</span>
+          <span class="m-value text-money">{% if free_potential %}{{ free_potential|currency }}{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row bold-row">
+          <span class="m-label">Средняя цена м²</span>
+          <span class="m-value text-money">{% if avg_sale_price %}{{ avg_sale_price|currency }}{% else %}—{% endif %}</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  {# Card 2 — Расходы #}
+  <div class="col-lg-4">
+    <div class="analysis-card">
+      <div class="card-header-inner">
+        <i class="bi bi-receipt text-danger"></i> Расходы
+      </div>
+      <div class="card-body-inner">
+
+        {% if estimate_plan %}
+        <div class="prog-wrap">
+          <div class="prog-label">
+            <span>Освоено {{ budget_pct }}% сметы</span>
+            <span>{{ budget_pct }}%</span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar {% if budget_pct >= 90 %}bg-danger{% elif budget_pct >= 70 %}bg-warning{% else %}bg-info{% endif %}"
+                 style="width:{{ budget_pct }}%"></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="metric-row">
+          <span class="m-label">Смета (план)</span>
+          <span class="m-value text-money">{% if estimate_plan %}{{ estimate_plan|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Факт ПФ расходов</span>
+          <span class="m-value text-money">{% if pf_actual %}{{ pf_actual|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Остаток сметы (план)</span>
+          <span class="m-value {% if pf_remaining %}text-orange{% else %}text-muted-val{% endif %} text-money">
+            {% if pf_remaining %}{{ pf_remaining|currency }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Внесметные расходы</span>
+          <span class="m-value text-red text-money">{% if extra_total %}{{ extra_total|currency }}{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row bold-row">
+          <span class="m-label">Потрачено (факт)</span>
+          <span class="m-value text-money">{% if total_spend %}{{ total_spend|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row bold-row">
+          <span class="m-label">Прогноз до конца</span>
+          <span class="m-value text-money">{% if projected_total %}{{ projected_total|currency }}{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row">
+          <span class="m-label">Себест. м² (факт)</span>
+          <span class="m-value text-money" title="Только потраченное / площадь ЖК">
+            {% if cost_per_m2_actual %}{{ cost_per_m2_actual|currency }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="metric-row bold-row" style="background:#fff8f0;margin:0 -.5rem;padding:.3rem .5rem;border-radius:6px">
+          <span class="m-label" style="color:#92400e">Себест. м² (прогноз)</span>
+          <span class="m-value text-money" style="color:#b45309" title="(Смета план + Внесметные) / площадь ЖК">
+            {% if cost_per_m2 %}{{ cost_per_m2|currency }}{% else %}—{% endif %}
+          </span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  {# Card 3 — ДДС #}
+  <div class="col-lg-4">
+    <div class="analysis-card">
+      <div class="card-header-inner">
+        <i class="bi bi-cash-stack text-success"></i> ДДС
+      </div>
+      <div class="card-body-inner">
+
+        <div class="metric-row">
+          <span class="m-label">Приход</span>
+          <span class="m-value text-green text-money">{% if dds_income %}{{ dds_income|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Расход</span>
+          <span class="m-value text-red text-money">{% if dds_expense %}{{ dds_expense|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">
+            Возвраты
+            <span style="font-size:.7rem;color:#94a3b8">(вкл. в расход)</span>
+          </span>
+          <span class="m-value text-orange text-money">{% if dds_returns %}{{ dds_returns|currency }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="metric-row">
+          <span class="m-label">Перемещения</span>
+          <span class="m-value text-muted-val text-money">{% if dds_transfer %}{{ dds_transfer|currency }}{% else %}—{% endif %}</span>
+        </div>
+
+        <div class="metric-sep"></div>
+
+        <div class="metric-row bold-row">
+          <span class="m-label">Баланс ДДС</span>
+          <span class="m-value text-money {% if margin_cash >= 0 %}text-green{% else %}text-red{% endif %}">
+            {% if dds_income or dds_expense %}{{ margin_cash|currency }}{% else %}—{% endif %}
+          </span>
+        </div>
+
+        {% if dds_income or dds_expense %}
+        <div class="mt-3 pt-1" style="border-top:1px dashed #e2e8f0">
+          <div style="font-size:.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.5rem">Структура прихода</div>
+          {% if dds_income %}
+          <div class="d-flex align-items-center gap-2" style="font-size:.8rem">
+            <div class="progress flex-grow-1" style="height:6px">
+              <div class="progress-bar bg-success"
+                   style="width:{% widthratio dds_income dds_income 100 %}%"></div>
+            </div>
+            <span style="white-space:nowrap;color:#16a34a;font-weight:600">{{ dds_income|currency }}</span>
+          </div>
+          {% endif %}
+          {% if dds_expense and dds_income %}
+          <div class="d-flex align-items-center gap-2 mt-1" style="font-size:.8rem">
+            <div class="progress flex-grow-1" style="height:6px">
+              <div class="progress-bar bg-danger"
+                   style="width:{% widthratio dds_expense dds_income 100 %}%"></div>
+            </div>
+            <span style="white-space:nowrap;color:#dc2626;font-weight:600">{{ dds_expense|currency }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── D. Margin Card ── #}
+<div class="card-section mb-4">
+  <div style="padding:.9rem 1.25rem .7rem;border-bottom:1px solid #f1f5f9">
+    <span class="section-title"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Маржа и прибыльность</span>
+  </div>
+  <div style="padding:.9rem 1.25rem 1.1rem">
+
+    <div class="row g-3 mb-3">
+
+      <div class="col-md-4">
+        <div class="margin-block">
+          <div class="mb-title"><i class="bi bi-file-text me-1"></i>По договорам</div>
+          <div class="mb-value {% if margin_contract > 0 %}margin-positive{% elif margin_contract < 0 %}margin-negative{% else %}margin-neutral{% endif %} text-money">
+            {% if contract_total or estimate_plan %}{{ margin_contract|currency }}{% else %}—{% endif %}
+          </div>
+          <div class="mb-sub">Суммы договоров − план сметы</div>
+          {% if margin_contract > 0 %}
+          <div style="font-size:.75rem;color:#16a34a;margin-top:.4rem"><i class="bi bi-check-circle me-1"></i>Выручка превышает план</div>
+          {% elif margin_contract < 0 %}
+          <div style="font-size:.75rem;color:#dc2626;margin-top:.4rem"><i class="bi bi-exclamation-triangle me-1"></i>Выручка ниже плана</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="margin-block">
+          <div class="mb-title"><i class="bi bi-calculator me-1"></i>Фактическая</div>
+          <div class="mb-value {% if margin_actual > 0 %}margin-positive{% elif margin_actual < 0 %}margin-negative{% else %}margin-neutral{% endif %} text-money">
+            {% if paid_total or total_spend %}{{ margin_actual|currency }}{% else %}—{% endif %}
+          </div>
+          <div class="mb-sub">Оплачено − расходы факт</div>
+          {% if margin_actual > 0 %}
+          <div style="font-size:.75rem;color:#16a34a;margin-top:.4rem"><i class="bi bi-check-circle me-1"></i>Положительный результат</div>
+          {% elif margin_actual < 0 %}
+          <div style="font-size:.75rem;color:#dc2626;margin-top:.4rem"><i class="bi bi-exclamation-triangle me-1"></i>Расходы превышают оплату</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="margin-block">
+          <div class="mb-title"><i class="bi bi-cash-stack me-1"></i>ДДС</div>
+          <div class="mb-value {% if margin_cash > 0 %}margin-positive{% elif margin_cash < 0 %}margin-negative{% else %}margin-neutral{% endif %} text-money">
+            {% if dds_income or dds_expense %}{{ margin_cash|currency }}{% else %}—{% endif %}
+          </div>
+          <div class="mb-sub">Приход − расход ДДС</div>
+          {% if margin_cash > 0 %}
+          <div style="font-size:.75rem;color:#16a34a;margin-top:.4rem"><i class="bi bi-check-circle me-1"></i>Денежный поток положительный</div>
+          {% elif margin_cash < 0 %}
+          <div style="font-size:.75rem;color:#dc2626;margin-top:.4rem"><i class="bi bi-exclamation-triangle me-1"></i>Дефицит денежных средств</div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    {% if avg_sale_price or cost_per_m2 or cost_per_m2_actual %}
+    <div class="price-compare">
+
+      <div class="pc-item">
+        <div class="pc-label">Цена продажи м²</div>
+        <div class="pc-val text-primary">{% if avg_sale_price %}{{ avg_sale_price|currency }}{% else %}—{% endif %}</div>
+        <div style="font-size:.68rem;color:#94a3b8;margin-top:.1rem">средняя по договорам</div>
+      </div>
+
+      <div style="color:#cbd5e1;font-size:1.2rem">vs</div>
+
+      <div class="pc-item">
+        <div class="pc-label">Себест. м² (факт)</div>
+        <div class="pc-val" style="color:#64748b">{% if cost_per_m2_actual %}{{ cost_per_m2_actual|currency }}{% else %}—{% endif %}</div>
+        <div style="font-size:.68rem;color:#94a3b8;margin-top:.1rem">потрачено / площадь</div>
+      </div>
+
+      <div style="color:#cbd5e1;font-size:1.2rem">vs</div>
+
+      <div class="pc-item">
+        <div class="pc-label" style="color:#92400e">Себест. м² (прогноз)</div>
+        <div class="pc-val text-danger">{% if cost_per_m2 %}{{ cost_per_m2|currency }}{% else %}—{% endif %}</div>
+        <div style="font-size:.68rem;color:#94a3b8;margin-top:.1rem">смета + внесметные / площадь</div>
+      </div>
+
+      {% if avg_sale_price and cost_per_m2 %}
+      <div style="flex:1;min-width:200px;border-left:1px solid #e2e8f0;padding-left:1rem">
+        {% if avg_sale_price > cost_per_m2 %}
+        <div style="color:#16a34a;font-weight:700;font-size:.92rem">
+          <i class="bi bi-check-circle-fill me-1"></i>Продаёте выше прогноз. себестоимости
+        </div>
+        <div style="color:#64748b;font-size:.8rem;margin-top:.35rem">
+          Маржа на м²: <strong class="text-money" style="color:#16a34a">{{ margin_per_m2|currency }}</strong>
+        </div>
+        <div style="color:#64748b;font-size:.8rem;margin-top:.2rem">
+          Общая маржа: <strong class="text-money" style="color:#16a34a">{{ margin_contract|currency }}</strong>
+        </div>
+        {% elif avg_sale_price < cost_per_m2 %}
+        <div style="color:#dc2626;font-weight:700;font-size:.92rem">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>Продаёте ниже прогноз. себестоимости
+        </div>
+        <div style="color:#64748b;font-size:.8rem;margin-top:.35rem">
+          Убыток на м²: <strong class="text-money" style="color:#dc2626">{{ margin_per_m2|currency }}</strong>
+        </div>
+        <div style="color:#64748b;font-size:.8rem;margin-top:.2rem">
+          Договорная сумма − прогноз: <strong class="text-money" style="color:#dc2626">{{ margin_contract|currency }}</strong>
+        </div>
+        {% else %}
+        <div style="color:#64748b;font-weight:600;font-size:.92rem">Цена равна себестоимости</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{# ── E. Charts ── #}
+<div class="row g-3">
+
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <div class="chart-title"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Движение ДДС по месяцам</div>
+      <div class="chart-body">
+        {% if has_chart_data %}
+        <canvas id="monthlyChart" style="height:280px;max-height:280px"></canvas>
+        {% else %}
+        <div class="d-flex align-items-center justify-content-center text-secondary"
+             style="height:280px;flex-direction:column;gap:.5rem">
+          <i class="bi bi-bar-chart" style="font-size:2.5rem;opacity:.3"></i>
+          <span style="font-size:.85rem">Нет данных для отображения</span>
+          {% if is_filtered %}
+          <span style="font-size:.75rem;color:#94a3b8">Попробуйте расширить диапазон дат</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <div class="chart-title"><i class="bi bi-pie-chart me-2 text-primary"></i>Статус квартир</div>
+      <div class="chart-body">
+        {% if apt_total %}
+        <canvas id="pieChart" style="height:280px;max-height:280px"></canvas>
+        <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+          <span style="font-size:.75rem;display:flex;align-items:center;gap:.3rem">
+            <span style="width:10px;height:10px;border-radius:3px;background:#3b82f6;display:inline-block"></span>Продано ({{ apt_sold }})
+          </span>
+          <span style="font-size:.75rem;display:flex;align-items:center;gap:.3rem">
+            <span style="width:10px;height:10px;border-radius:3px;background:#22c55e;display:inline-block"></span>Свободно ({{ apt_free }})
+          </span>
+          <span style="font-size:.75rem;display:flex;align-items:center;gap:.3rem">
+            <span style="width:10px;height:10px;border-radius:3px;background:#f59e0b;display:inline-block"></span>Бронь ({{ apt_reserved }})
+          </span>
+          <span style="font-size:.75rem;display:flex;align-items:center;gap:.3rem">
+            <span style="width:10px;height:10px;border-radius:3px;background:#94a3b8;display:inline-block"></span>Бартер ({{ apt_barter }})
+          </span>
+        </div>
+        {% else %}
+        <div class="d-flex align-items-center justify-content-center text-secondary"
+             style="height:280px;flex-direction:column;gap:.5rem">
+          <i class="bi bi-pie-chart" style="font-size:2.5rem;opacity:.3"></i>
+          <span style="font-size:.85rem">Нет данных о квартирах</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{# ═══════════════════════════════════════════════════════════════════ SCRIPTS #}
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  // ── Compact number formatter ────────────────────────────────────────────────
+  function fmt(val) {
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000_000) return (val / 1_000_000_000).toFixed(1) + ' млрд';
+    if (abs >= 1_000_000)     return (val / 1_000_000).toFixed(1) + ' млн';
+    if (abs >= 1_000)         return (val / 1_000).toFixed(0) + ' тыс';
+    return val.toFixed(0);
+  }
+
+  // ── Monthly cash flow bar chart ─────────────────────────────────────────────
+  {% if has_chart_data %}
+  (function () {
+    const labels   = {{ chart_months_json|safe }};
+    const incomes  = {{ chart_income_json|safe }};
+    const expenses = {{ chart_expense_json|safe }};
+
+    const ctx = document.getElementById('monthlyChart');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Приход',
+            data: incomes,
+            backgroundColor: 'rgba(34, 197, 94, 0.70)',
+            borderColor:     'rgba(34, 197, 94, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
+            order: 1,
+          },
+          {
+            label: 'Расход',
+            data: expenses,
+            backgroundColor: 'rgba(239, 68, 68, 0.70)',
+            borderColor:     'rgba(239, 68, 68, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
+            order: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 12 },
+          },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y);
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              callback: function (val, idx) {
+                const lbl = labels[idx];
+                if (!lbl) return '';
+                const [y, m] = lbl.split('-');
+                const months = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+                return months[parseInt(m, 10) - 1] + ' ' + y.slice(2);
+              },
+            },
+          },
+          y: {
+            grid: { color: 'rgba(0,0,0,.05)' },
+            ticks: {
+              font: { size: 10 },
+              callback: (v) => fmt(v),
+            },
+          },
+        },
+      },
+    });
+  }());
+  {% endif %}
+
+  // ── Apartment status doughnut chart ────────────────────────────────────────
+  {% if apt_total %}
+  (function () {
+    const labels = {{ pie_labels_json|safe }};
+    const data   = {{ pie_data_json|safe }};
+    const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#94a3b8'];
+
+    const ctx = document.getElementById('pieChart');
+    if (!ctx) return;
+
+    const total = data.reduce((a, b) => a + b, 0);
+
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: colors,
+          hoverBackgroundColor: colors.map(c => c + 'dd'),
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+              },
+            },
+          },
+        },
+      },
+      plugins: [{
+        id: 'centerText',
+        afterDraw(chart) {
+          const { width, height, ctx } = chart;
+          ctx.save();
+          const cx = width / 2;
+          const cy = height / 2;
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 1.4rem Segoe UI, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(total, cx, cy - 10);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '0.7rem Segoe UI, system-ui, sans-serif';
+          ctx.fillText('квартир', cx, cy + 12);
+          ctx.restore();
+        },
+      }],
+    });
+  }());
+  {% endif %}
+
+}());
+</script>
+{% endblock %}
