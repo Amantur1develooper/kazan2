@@ -67,7 +67,11 @@
 
   <div class="data-table mb-4">
     <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-      <span class="section-title">Записи ДДС <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ total }}</span></span>
+      <span class="section-title">
+        Без блока
+        <span class="badge bg-warning text-dark ms-1">{{ unlinked_count }}</span>
+        <span class="text-muted fw-normal" style="font-size:.8rem">· страница {{ page }} из {{ total_pages }}</span>
+      </span>
       <div class="d-flex gap-2 align-items-center">
         <input type="text" id="rowSearch" class="form-control form-control-sm" placeholder="Поиск…" style="width:180px">
         <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
@@ -151,10 +155,23 @@
     </div>
   </div>
 
-  <div class="d-flex justify-content-between">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <a href="{% url 'dds_account_list' %}" class="btn btn-outline-secondary">
       <i class="bi bi-skip-forward me-1"></i>Пропустить
     </a>
+
+    {% if total_pages > 1 %}
+    <div class="d-flex gap-1 align-items-center">
+      {% if page > 1 %}
+      <a href="?page={{ page|add:'-1' }}" class="btn btn-outline-secondary btn-sm">‹ Назад</a>
+      {% endif %}
+      <span class="text-muted small px-2">{{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+      <a href="?page={{ page|add:'1' }}" class="btn btn-outline-primary btn-sm">Вперёд ›</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <button type="submit" class="btn btn-success btn-lg">
       <i class="bi bi-check-lg me-1"></i>Сохранить распределение
     </button>

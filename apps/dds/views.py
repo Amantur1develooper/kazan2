@@ -180,31 +180,53 @@ def dds_import_preview(request, pk):
 
 
 def dds_distribute(request, pk):
-    """Step 3: link records to blocks and estimate items."""
+    """Step 3: link records to blocks and estimate items. Shows only unlinked, paginated."""
     dds_import = get_object_or_404(
         DDSImport.objects.select_related('residential_complex'), pk=pk
     )
     rc = dds_import.residential_complex
 
-    # Records from this import that need block linking
-    records = list(
+    all_blocks = list(Block.objects.filter(residential_complex=rc).order_by('name'))
+
+    # Totals (cheap counts, no full fetch)
+    total        = dds_import.records.count()
+    linked_blocks = dds_import.records.filter(block__isnull=False).count()
+    unlinked     = total - linked_blocks
+
+    # If everything is linked — skip straight to accounts
+    if unlinked == 0 and request.method != 'POST':
+        messages.success(request, 'Все записи уже привязаны к блокам.')
+        first_account = CashAccount.objects.filter(residential_complex=rc).first()
+        if first_account:
+            return redirect('dds_account_detail', pk=first_account.pk)
+        return redirect('dds_account_list')
+
+    # Pagination — only unlinked records, 150 per page
+    PER_PAGE = 150
+    try:
+        page = max(1, int(request.GET.get('page', 1)))
+    except ValueError:
+        page = 1
+    offset = (page - 1) * PER_PAGE
+
+    unlinked_qs = (
         dds_import.records
+        .filter(block__isnull=True)
         .select_related('block', 'estimate_item', 'account')
         .order_by('direction', 'operation_date')
     )
+    unlinked_count = unlinked_qs.count()
+    records = list(unlinked_qs[offset: offset + PER_PAGE])
+    total_pages = max(1, (unlinked_count + PER_PAGE - 1) // PER_PAGE)
 
-    # All blocks for this ЖК
-    all_blocks = list(Block.objects.filter(residential_complex=rc).order_by('name'))
-
-    # All estimate items (for expense linking)
+    # Estimate item choices — only for blocks relevant to this import
     from apps.estimates.models import EstimateItem
+    relevant_blocks = [dds_import.block] if dds_import.block else all_blocks
     all_items = list(
-        EstimateItem.objects.filter(section__estimate__block__residential_complex=rc)
+        EstimateItem.objects.filter(section__estimate__block__in=relevant_blocks)
         .select_related('section__estimate__block')
         .order_by('section__estimate__block__name', 'section__code', 'order')
     )
-
-    # Build item choices grouped by block+section
     item_choices = []
     cur_block = None
     for item in all_items:
@@ -215,48 +237,41 @@ def dds_distribute(request, pk):
         label = f'{item.code} {item.name}'.strip() if item.code else item.name
         item_choices.append({'type': 'option', 'id': item.pk, 'label': label})
 
-    # Stats
-    total = len(records)
-    linked_blocks = sum(1 for r in records if r.block_id)
-    unlinked = total - linked_blocks
-
     if request.method == 'POST':
         saved = 0
-        for rec in records:
-            block_val = request.POST.get(f'block_{rec.pk}', '').strip()
-            item_val = request.POST.get(f'item_{rec.pk}', '').strip()
-
+        pks = [r.pk for r in records]
+        rec_map = {r.pk: r for r in records}
+        for rec_pk in pks:
+            rec = rec_map[rec_pk]
+            block_val = request.POST.get(f'block_{rec_pk}', '').strip()
+            item_val  = request.POST.get(f'item_{rec_pk}', '').strip()
             changed = False
+
             if block_val and block_val.isdigit():
                 new_block = next((b for b in all_blocks if b.pk == int(block_val)), None)
                 if new_block and rec.block_id != new_block.pk:
                     rec.block = new_block
                     changed = True
-            elif block_val == '':
-                if rec.block_id:
-                    rec.block = None
-                    changed = True
+            elif block_val == '' and rec.block_id:
+                rec.block = None
+                changed = True
 
             if item_val and item_val.isdigit():
                 item_pk = int(item_val)
                 if rec.estimate_item_id != item_pk:
                     rec.estimate_item_id = item_pk
                     changed = True
-            elif item_val == '':
-                if rec.estimate_item_id:
-                    rec.estimate_item = None
-                    changed = True
+            elif item_val == '' and rec.estimate_item_id:
+                rec.estimate_item = None
+                changed = True
 
             if changed:
                 rec.save(update_fields=['block', 'estimate_item'])
                 saved += 1
 
-        messages.success(request, f'Сохранено изменений: {saved}.')
-        # Redirect to the cash account of this import's ЖК
-        first_account = CashAccount.objects.filter(residential_complex=rc).first()
-        if first_account:
-            return redirect('dds_account_detail', pk=first_account.pk)
-        return redirect('dds_account_list')
+        messages.success(request, f'Сохранено: {saved} записей.')
+        next_page = page if saved == 0 else page  # stay on same page, unlinked shrinks
+        return redirect(f"{request.path}?page=1")
 
     return render(request, 'dds/distribute.html', {
         'dds_import': dds_import,
@@ -266,6 +281,10 @@ def dds_distribute(request, pk):
         'total': total,
         'linked_blocks': linked_blocks,
         'unlinked': unlinked,
+        'unlinked_count': unlinked_count,
+        'page': page,
+        'total_pages': total_pages,
+        'per_page': PER_PAGE,
     })
 
 
