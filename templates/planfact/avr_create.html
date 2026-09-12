@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Новый АВР — {{ floor_label }} / {{ category.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'avr_list' blk.pk floor_number category.pk %}">АВР — {{ floor_label }}</a></li>
+        <li class="breadcrumb-item active">Новый АВР</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-file-earmark-check me-2 text-success"></i>Новый АВР — {{ floor_label }} / {{ category.name }}</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width:720px">
+  {% csrf_token %}
+  <div class="card-section p-4 mb-4">
+    <h6 class="fw-bold mb-3" style="color:#0f172a;border-bottom:1px solid #f1f5f9;padding-bottom:.5rem">
+      Реквизиты акта
+    </h6>
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <label class="form-label fw-bold" style="font-size:.85rem">Номер акта</label>
+        <input type="text" name="doc_number" class="form-control form-control-sm" placeholder="01">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label fw-bold" style="font-size:.85rem">Дата акта</label>
+        <input type="date" name="doc_date" class="form-control form-control-sm"
+               value="{{ today|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-bold" style="font-size:.85rem">
+          % выполнения
+          <span style="font-weight:400;color:#64748b">(100 = полный акт)</span>
+        </label>
+        <input type="number" name="completion_pct" class="form-control form-control-sm"
+               min="1" max="100" step="0.1" value="100">
+        <div style="font-size:.76rem;color:#64748b;margin-top:4px">
+          <strong>100%</strong> — полный акт за всю работу.
+          Менее 100% — если подрядчик выполнил только часть и остановился.
+          {% if current_progress > 0 %}
+          Текущий прогресс по плану: <strong>{{ current_progress }}%</strong>.
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-bold" style="font-size:.85rem">Подрядчик ИП</label>
+        <input type="text" name="contractor" class="form-control form-control-sm"
+               placeholder="Иванов И.И.">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-bold" style="font-size:.85rem">Исполнитель</label>
+        <input type="text" name="executor" class="form-control form-control-sm"
+               placeholder="Петров П.П.">
+      </div>
+      <div class="col-12">
+        <div class="form-check" style="border-radius:8px;padding:8px 12px" id="rework-wrap">
+          <input type="hidden" name="is_rework" value="0">
+          <input type="checkbox" class="form-check-input" id="is_rework" name="is_rework" value="1"
+                 onchange="var w=document.getElementById('rework-wrap');w.style.background=this.checked?'#fff7ed':'transparent';w.style.border=this.checked?'1px solid #fed7aa':'none'">
+          <label class="form-check-label fw-bold" for="is_rework" style="font-size:.85rem;color:#64748b">
+            <i class="bi bi-wrench me-1"></i>Вне сметы (переделка)
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-section p-4 mb-4">
+    <h6 class="fw-bold mb-3" style="color:#0f172a;border-bottom:1px solid #f1f5f9;padding-bottom:.5rem">
+      Подписи
+    </h6>
+    <div class="row g-3">
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Начальник производства</label>
+        <input type="text" name="head_production" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Начальник участка</label>
+        <input type="text" name="head_section" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Прораб</label>
+        <input type="text" name="foreman" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Мастер</label>
+        <input type="text" name="master" class="form-control form-control-sm">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Исполнитель (подпись)</label>
+        <input type="text" name="executor_sign" class="form-control form-control-sm">
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'avr_list' blk.pk floor_number category.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+    <button type="submit" class="btn btn-success btn-lg">
+      <i class="bi bi-arrow-right me-1"></i>Далее — добавить работы
+    </button>
+  </div>
+</form>
+{% endblock %}

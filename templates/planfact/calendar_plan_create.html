@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Новый календарный план — Блок {{ blk.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'calendar_plan_list' blk.pk %}">Календарный план</a></li>
+        <li class="breadcrumb-item active">Новый план</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-calendar-plus me-2 text-primary"></i>Новый план</h1>
+  </div>
+  <a href="{% url 'calendar_plan_list' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width:600px">
+  {% csrf_token %}
+  <div class="card-section p-4 mb-4">
+    <div class="mb-3">
+      <label class="form-label fw-bold">Название плана</label>
+      <input type="text" name="name" class="form-control" required
+             placeholder="Например: Финансовый план блока К 2023–2025">
+    </div>
+    <div class="row g-3">
+      <div class="col-6">
+        <label class="form-label fw-bold">Начало — год</label>
+        <select name="start_year" class="form-select">
+          {% for y in years %}
+          <option value="{{ y }}" {% if y == 2023 %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-bold">Начало — месяц</label>
+        <select name="start_month" class="form-select">
+          {% for i, mname in months %}
+          <option value="{{ i }}" {% if i == 11 %}selected{% endif %}>{{ mname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-bold">Конец — год</label>
+        <select name="end_year" class="form-select">
+          {% for y in years %}
+          <option value="{{ y }}" {% if y == 2026 %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-bold">Конец — месяц</label>
+        <select name="end_month" class="form-select">
+          {% for i, mname in months %}
+          <option value="{{ i }}" {% if i == 12 %}selected{% endif %}>{{ mname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'calendar_plan_list' blk.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Отмена
+    </a>
+    <button type="submit" class="btn btn-primary btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Создать план
+    </button>
+  </div>
+</form>
+{% endblock %}

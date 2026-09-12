@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Акты — Блок {{ blk.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Акты</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-journal-text me-2 text-primary"></i>Акты — Блок {{ blk.name }}</h1>
+  </div>
+  <a href="{% url 'act_create' blk.pk %}" class="btn btn-success btn-sm">
+    <i class="bi bi-file-earmark-plus me-1"></i>Новый акт
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="data-table">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Номер</th><th>Тип</th><th>Дата</th><th>Подрядчик</th><th class="text-end">Сумма</th><th>Создал</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for act in acts %}
+      <tr>
+        <td class="fw-semibold">№{{ act.act_number }}</td>
+        <td>
+          <span class="badge {% if act.act_type == 'avr' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
+            {{ act.get_act_type_display }}
+          </span>
+        </td>
+        <td class="text-muted">{{ act.act_date|date:"d.m.Y" }}</td>
+        <td>{{ act.contractor|default:"—" }}</td>
+        <td class="text-end fw-semibold text-money">{{ act.total_amount|currency }}</td>
+        <td class="text-muted" style="font-size:.8rem">{{ act.created_by.username|default:"—" }}</td>
+        <td>
+          <a href="{% url 'act_print' act.pk %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-printer me-1"></i>Печать
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="text-center text-muted py-4">Актов пока нет.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

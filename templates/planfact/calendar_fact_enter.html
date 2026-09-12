@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Ввод план/факта — {{ month_name }} {{ year }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'calendar_plan_list' blk.pk %}">Календарный план</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'calendar_plan_detail' plan.pk %}">{{ plan.name }}</a></li>
+        <li class="breadcrumb-item active">Ввод факта</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-pencil-square me-2 text-success"></i>{{ month_name }} {{ year }}</h1>
+  </div>
+  <a href="{% url 'calendar_plan_detail' plan.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-table me-1"></i>Таблица
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Month navigation -->
+<div class="d-flex align-items-center gap-3 mb-4">
+  {% if in_range %}
+  <a href="{% url 'calendar_fact_enter' plan.pk %}?year={{ prev_y }}&month={{ prev_m }}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-chevron-left"></i> Предыдущий месяц
+  </a>
+  {% endif %}
+  <span class="fw-bold" style="font-size:1.1rem">{{ month_name }} {{ year }}</span>
+  <a href="{% url 'calendar_fact_enter' plan.pk %}?year={{ next_y }}&month={{ next_m }}"
+     class="btn btn-outline-secondary btn-sm">
+    Следующий месяц <i class="bi bi-chevron-right"></i>
+  </a>
+</div>
+
+{% if not in_range %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  Этот месяц за пределами диапазона плана ({{ plan.start_month }}/{{ plan.start_year }} — {{ plan.end_month }}/{{ plan.end_year }}).
+  Данные будут сохранены, но не отображаются в основной таблице.
+</div>
+{% endif %}
+
+{% if rows %}
+<form method="post">
+  {% csrf_token %}
+  <div class="card-section mb-4">
+    <div style="padding:.9rem 1.25rem .5rem;border-bottom:1px solid #f1f5f9">
+      <span class="section-title">{{ plan.name }}</span>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="table table-sm mb-0" style="min-width:560px">
+      <thead style="background:#f8fafc">
+        <tr>
+          <th style="width:40%">Наименование</th>
+          <th style="width:10%;text-align:center">Ед.</th>
+          <th style="width:20%">
+            <span style="color:#475569">План (сом)</span>
+          </th>
+          <th style="width:20%">
+            <span style="color:#16a34a">Факт (сом)</span>
+          </th>
+          <th style="width:20%">Примечание</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td style="vertical-align:middle;font-weight:500">{{ row.task.name }}</td>
+          <td style="text-align:center;color:#94a3b8;vertical-align:middle">{{ row.task.unit }}</td>
+          <td>
+            <input type="number" step="0.01" name="plan_{{ row.task.id }}"
+                   class="form-control form-control-sm"
+                   value="{{ row.plan_amt }}">
+          </td>
+          <td>
+            <input type="number" step="0.01" name="fact_{{ row.task.id }}"
+                   class="form-control form-control-sm border-success"
+                   value="{{ row.fact_amt }}">
+          </td>
+          <td>
+            <input type="text" name="notes_{{ row.task.id }}"
+                   class="form-control form-control-sm"
+                   value="{{ row.notes }}" placeholder="...">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'calendar_plan_detail' plan.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Отмена
+    </a>
+    <button type="submit" class="btn btn-primary btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Сохранить
+    </button>
+  </div>
+</form>
+{% else %}
+<div class="card-section p-5 text-center">
+  <p class="text-muted">В плане нет задач.</p>
+  <a href="{% url 'calendar_task_edit' plan.pk %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Добавить задачи
+  </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Строитель {{ builder.username }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'manage_users' %}">Строители</a></li>
+        <li class="breadcrumb-item active">{{ builder.username }}</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-person-gear me-2 text-primary"></i>{{ builder.username }}
+      {% if builder.get_full_name %}<small class="text-muted fw-normal" style="font-size:.65em">— {{ builder.get_full_name }}</small>{% endif %}
+    </h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:560px">
+
+  {# — Блоки — #}
+  <div class="card-section p-4 mb-4">
+    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-buildings me-1"></i>Доступ к блокам</h6>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_blocks">
+      <div class="row g-2 mb-3">
+        {% for blk in all_blocks %}
+        <div class="col-12 col-md-6">
+          <div class="form-check" style="padding:.6rem 1rem;border:1px solid #e2e8f0;border-radius:8px;
+               background:{% if blk.pk in current_ids %}#eff6ff{% else %}#fff{% endif %}">
+            <input class="form-check-input" type="checkbox" name="blocks" value="{{ blk.pk }}"
+                   id="blk_{{ blk.pk }}" {% if blk.pk in current_ids %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="blk_{{ blk.pk }}" style="font-size:.88rem">
+              {{ blk.residential_complex.name }} / Блок {{ blk.name }}
+            </label>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-muted">Блоки не найдены.</div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check me-1"></i>Сохранить доступ
+      </button>
+    </form>
+  </div>
+
+  {# — Смена пароля — #}
+  <div class="card-section p-4 mb-4">
+    <h6 class="fw-bold text-warning mb-3"><i class="bi bi-key me-1"></i>Сменить пароль</h6>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reset_password">
+      <div class="d-flex gap-2">
+        <input type="password" name="new_password" class="form-control" placeholder="Новый пароль"
+               autocomplete="new-password" required>
+        <button type="submit" class="btn btn-warning text-white flex-shrink-0">
+          <i class="bi bi-arrow-repeat me-1"></i>Изменить
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {# — Удаление — #}
+  <div class="card-section p-4 mb-4" style="border-left:3px solid #dc2626">
+    <h6 class="fw-bold text-danger mb-2"><i class="bi bi-trash me-1"></i>Удалить аккаунт</h6>
+    <p class="text-muted mb-3" style="font-size:.85rem">
+      Аккаунт «{{ builder.username }}» будет удалён. АСМ, созданные этим пользователем, сохранятся.
+    </p>
+    <form method="post" onsubmit="return confirm('Удалить пользователя {{ builder.username }}?')">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_user">
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Удалить
+      </button>
+    </form>
+  </div>
+
+  <a href="{% url 'manage_users' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Назад
+  </a>
+</div>
+{% endblock %}

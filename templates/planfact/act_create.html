@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Создать акт — Блок {{ blk.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Создать акт</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-file-earmark-plus me-2 text-success"></i>Создать акт — Блок {{ blk.name }}</h1>
+  </div>
+  <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Назад</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="row g-4">
+    <div class="col-lg-4">
+      <div class="card-section p-4">
+        <h6 class="section-title mb-3">Реквизиты акта</h6>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Тип акта</label>
+          <select name="act_type" class="form-select">
+            <option value="avr">АВР — Акт выполненных работ</option>
+            <option value="asm">АСМ — Акт списанных материалов</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Номер акта</label>
+          <input type="text" name="act_number" class="form-control" placeholder="Например: 001" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Дата акта</label>
+          <input type="date" name="act_date" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Подрядчик</label>
+          <input type="text" name="contractor" class="form-control" placeholder="Название компании">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Примечание</label>
+          <textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-success w-100 btn-lg">
+          <i class="bi bi-check-lg me-1"></i>Создать и открыть акт
+        </button>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card-section p-4 mb-3">
+        <h6 class="section-title mb-3">Работы по этажам (с фактом)</h6>
+        {% if floor_works %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover" style="font-size:.84rem">
+            <thead class="table-light">
+              <tr><th width="40"><input type="checkbox" id="checkAllFW"></th><th>Этаж</th><th>Вид работ</th><th>Подрядчик</th><th class="text-end">Факт кол-во</th><th class="text-end">Факт сумма</th></tr>
+            </thead>
+            <tbody>
+              {% for fw in floor_works %}
+              <tr>
+                <td><input type="checkbox" name="floor_work_ids" value="{{ fw.pk }}" checked class="fw-check"></td>
+                <td>Этаж {{ fw.floor_number }}</td>
+                <td>{{ fw.category.name }}</td>
+                <td class="text-muted">{{ fw.contractor|default:"—" }}</td>
+                <td class="text-end">{{ fw.fact_quantity }} {{ fw.category.unit }}</td>
+                <td class="text-end fw-semibold text-money">{{ fw.fact_amount|currency }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Нет работ с заполненным фактом.</p>
+        {% endif %}
+      </div>
+
+      {% if land_works %}
+      <div class="card-section p-4">
+        <h6 class="section-title mb-3">Благоустройство (с фактом)</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover" style="font-size:.84rem">
+            <thead class="table-light">
+              <tr><th width="40"><input type="checkbox" id="checkAllLW"></th><th>Вид работ</th><th>Подрядчик</th><th class="text-end">Факт кол-во</th><th class="text-end">Факт сумма</th></tr>
+            </thead>
+            <tbody>
+              {% for lw in land_works %}
+              <tr>
+                <td><input type="checkbox" name="land_work_ids" value="{{ lw.pk }}" checked class="lw-check"></td>
+                <td>{{ lw.category.name }}</td>
+                <td class="text-muted">{{ lw.contractor|default:"—" }}</td>
+                <td class="text-end">{{ lw.fact_quantity }} {{ lw.category.unit }}</td>
+                <td class="text-end fw-semibold text-money">{{ lw.fact_amount|currency }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('checkAllFW').addEventListener('change', function() {
+  document.querySelectorAll('.fw-check').forEach(c => c.checked = this.checked);
+});
+document.getElementById('checkAllLW') && document.getElementById('checkAllLW').addEventListener('change', function() {
+  document.querySelectorAll('.lw-check').forEach(c => c.checked = this.checked);
+});
+</script>
+{% endblock %}

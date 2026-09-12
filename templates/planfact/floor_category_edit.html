@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Виды работ по этажам — Блок {{ blk.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.fce-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.fce-table th {
+  background: #1e293b; color: #f1f5f9;
+  font-size: .7rem; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; padding: 9px 10px;
+  text-align: center; white-space: nowrap;
+  position: sticky; top: 0; z-index: 10;
+}
+.fce-table th:first-child { text-align: left; min-width: 110px; position: sticky; left: 0; z-index: 11; }
+.fce-floor-label {
+  font-size: .82rem; font-weight: 700; color: #1e293b;
+  padding: 0 14px; background: #f8fafc;
+  border-right: 2px solid #e2e8f0;
+  position: sticky; left: 0; z-index: 5;
+  vertical-align: middle; white-space: nowrap;
+}
+.fce-floor-label.underground { color: #64748b; background: #f1f5f9; }
+.fce-cell {
+  padding: 8px 6px; text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+}
+.fce-cb { width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a; }
+.fce-row:hover .fce-floor-label { background: #eff6ff; }
+.fce-row:hover .fce-floor-label.underground { background: #e2e8f0; }
+.row-toggle { cursor: pointer; font-size: .7rem; color: #94a3b8; font-weight: 600; margin-top: 3px; }
+.row-toggle:hover { color: #3b82f6; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header flex-wrap gap-2">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Виды работ по этажам</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-list-check me-2 text-primary"></i>Виды работ по этажам — Блок {{ blk.name }}</h1>
+    <div style="font-size:.8rem;color:#64748b;margin-top:3px">
+      ✓ — работа выполняется на этом этаже и учитывается в прогрессе.
+      Снятая галочка — работа не применима к этажу.
+    </div>
+  </div>
+  <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К дому
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="fceForm">
+  {% csrf_token %}
+
+  <div class="mb-3 d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(true)">
+      <i class="bi bi-check-all me-1"></i>Выбрать все
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(false)">
+      <i class="bi bi-x-lg me-1"></i>Снять все
+    </button>
+  </div>
+
+  <div style="overflow-x:auto;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+  <table class="fce-table">
+    <thead>
+      <tr>
+        <th>Этаж</th>
+        {% for cat in cats %}
+        <th>
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ cat.color }};margin-right:4px"></span>
+          {{ cat.name }}
+        </th>
+        {% endfor %}
+        <th style="background:#0f172a;min-width:80px">Все</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="fce-row" data-floor="{{ row.number }}">
+        <td class="fce-floor-label {% if row.is_underground %}underground{% endif %}">
+          {% if row.is_underground %}
+            <i class="bi bi-layers me-1" style="font-size:.7rem;color:#94a3b8"></i>
+          {% else %}
+            <i class="bi bi-building me-1" style="font-size:.7rem;color:#3b82f6"></i>
+          {% endif %}
+          {{ row.label }}
+        </td>
+        {% for c in row.cats %}
+        <td class="fce-cell">
+          <input type="checkbox" class="fce-cb row-cb-{{ row.number }}"
+                 name="assign_{{ row.number }}_{{ c.category.id }}"
+                 value="1"
+                 {% if c.is_active %}checked{% endif %}>
+        </td>
+        {% endfor %}
+        <td class="fce-cell" style="background:#f8fafc">
+          <button type="button" class="btn btn-xs p-0"
+                  style="font-size:.68rem;color:#3b82f6;font-weight:700;background:none;border:none"
+                  onclick="toggleRow({{ row.number }}, true)">Все</button>
+          <span style="color:#cbd5e1"> / </span>
+          <button type="button" class="btn btn-xs p-0"
+                  style="font-size:.68rem;color:#ef4444;font-weight:700;background:none;border:none"
+                  onclick="toggleRow({{ row.number }}, false)">Нет</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div class="d-flex justify-content-between mt-4">
+    <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Отмена
+    </a>
+    <button type="submit" class="btn btn-primary btn-lg px-5 fw-bold">
+      <i class="bi bi-check-lg me-2"></i>Сохранить
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRow(fn, val) {
+  document.querySelectorAll('.row-cb-' + fn).forEach(cb => cb.checked = val);
+}
+function toggleAll(val) {
+  document.querySelectorAll('.fce-cb').forEach(cb => cb.checked = val);
+}
+</script>
+{% endblock %}

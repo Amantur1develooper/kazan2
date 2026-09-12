@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Строители — управление аккаунтами{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item active">Строители</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-people me-2 text-primary"></i>Аккаунты строителей</h1>
+  </div>
+  <a href="{% url 'manage_user_create' %}" class="btn btn-primary">
+    <i class="bi bi-person-plus me-1"></i>Добавить строителя
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if builders %}
+<div class="card-section">
+  <table class="table table-hover mb-0" style="font-size:.9rem">
+    <thead class="table-light">
+      <tr>
+        <th>Логин</th>
+        <th>Имя</th>
+        <th>Блоки (доступ)</th>
+        <th style="width:100px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in builders %}
+      <tr>
+        <td class="fw-semibold">{{ u.username }}</td>
+        <td>{{ u.get_full_name|default:"—" }}</td>
+        <td>
+          {% for ba in u.block_accesses.all %}
+          <span class="badge bg-primary me-1">{{ ba.block.residential_complex.name }} / Блок {{ ba.block.name }}</span>
+          {% empty %}
+          <span class="text-muted">нет блоков</span>
+          {% endfor %}
+        </td>
+        <td>
+          <a href="{% url 'manage_user_edit' u.pk %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card-section p-4 text-center text-muted">
+  <i class="bi bi-people" style="font-size:2rem"></i>
+  <p class="mt-2 mb-3">Строителей пока нет.</p>
+  <a href="{% url 'manage_user_create' %}" class="btn btn-primary">
+    <i class="bi bi-person-plus me-1"></i>Добавить первого строителя
+  </a>
+</div>
+{% endif %}
+{% endblock %}

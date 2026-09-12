@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Благоустройство — Блок {{ blk.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Благоустройство</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-tree me-2 text-success"></i>Благоустройство — Блок {{ blk.name }}</h1>
+  </div>
+  <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К дому
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="card-section mb-4">
+    <div style="padding:.9rem 1.25rem .5rem;border-bottom:1px solid #f1f5f9">
+      <span class="section-title">Ввод план-факт — благоустройство</span>
+    </div>
+    <div style="padding:1rem 1.25rem">
+
+      {% for cat in categories %}
+      {% with lw=works|get_item:cat.id %}
+      <div class="card-section p-3 mb-3" style="border-left:4px solid {{ cat.color }}">
+        <h6 class="fw-bold mb-3" style="color:{{ cat.color }}">{{ cat.name }} <span class="text-muted fw-normal">({{ cat.unit }})</span></h6>
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label" style="font-size:.8rem;font-weight:600">План кол-во</label>
+            <input type="number" step="0.01" name="plan_qty_{{ cat.id }}" class="form-control form-control-sm" value="{{ lw.planned_quantity|default:'0' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" style="font-size:.8rem;font-weight:600">План сумма</label>
+            <input type="number" step="0.01" name="plan_amt_{{ cat.id }}" class="form-control form-control-sm" value="{{ lw.planned_amount|default:'0' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" style="font-size:.8rem;font-weight:600;color:#16a34a">Факт кол-во</label>
+            <input type="number" step="0.01" name="fact_qty_{{ cat.id }}" class="form-control form-control-sm border-success" value="{{ lw.fact_quantity|default:'0' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" style="font-size:.8rem;font-weight:600;color:#16a34a">Факт сумма</label>
+            <input type="number" step="0.01" name="fact_amt_{{ cat.id }}" class="form-control form-control-sm border-success" value="{{ lw.fact_amount|default:'0' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" style="font-size:.8rem;font-weight:600">Дата факта</label>
+            <input type="date" name="fact_date_{{ cat.id }}" class="form-control form-control-sm" value="{{ lw.fact_date|date:'Y-m-d'|default:'' }}">
+          </div>
+          <div class="col-6 col-md-5">
+            <label class="form-label" style="font-size:.8rem;font-weight:600">Подрядчик</label>
+            <input type="text" name="contractor_{{ cat.id }}" class="form-control form-control-sm" value="{{ lw.contractor|default:'' }}">
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label" style="font-size:.8rem;font-weight:600">Примечание</label>
+            <input type="text" name="notes_{{ cat.id }}" class="form-control form-control-sm" value="{{ lw.notes|default:'' }}">
+          </div>
+        </div>
+        {% if lw.progress_pct > 0 %}
+        <div class="progress mt-3" style="height:6px">
+          <div class="progress-bar bg-success" style="width:{{ lw.progress_pct }}%"></div>
+        </div>
+        <small class="text-muted">{{ lw.progress_pct }}% выполнено</small>
+        {% endif %}
+      </div>
+      {% endwith %}
+      {% endfor %}
+
+      {% if not categories %}
+      <div class="alert alert-warning">Виды работ для благоустройства не созданы.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Назад</a>
+    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
+  </div>
+</form>
+{% endblock %}

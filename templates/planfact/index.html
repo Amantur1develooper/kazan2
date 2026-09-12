@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}План-факт строительства{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-building-check me-2 text-primary"></i>План-факт строительства</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Выберите блок для просмотра прогресса</p>
+  </div>
+  {% if is_admin %}
+  <a href="{% url 'manage_users' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i>Строители
+  </a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if unprice_docs %}
+<div class="card-section mb-4" style="border-left:3px solid #f59e0b">
+  <div style="padding:.9rem 1.25rem .5rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fef3c7">
+    <span style="font-weight:700;color:#b45309;font-size:.95rem">
+      <i class="bi bi-exclamation-circle me-2"></i>АСМ без цен — нужно заполнить суммы
+    </span>
+    <span class="badge bg-warning text-dark">{{ unprice_docs|length }}</span>
+  </div>
+  <div style="padding:.75rem 1.25rem">
+    {% for doc in unprice_docs %}
+    <a href="{% url 'asm_edit' doc.pk %}"
+       class="d-flex align-items-center justify-content-between text-decoration-none mb-2"
+       style="padding:9px 14px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a">
+      <div>
+        <span class="fw-semibold" style="color:#0f172a">АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %}</span>
+        <span class="text-muted ms-2" style="font-size:.82rem">{{ doc.doc_date|date:"d.m.Y" }}</span>
+        <span class="ms-2" style="font-size:.82rem;color:#64748b">
+          {{ doc.block.residential_complex.name }} / Блок {{ doc.block.name }} /
+          {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %} /
+          {{ doc.category.name }}
+        </span>
+      </div>
+      <span style="color:#b45309;font-size:.82rem;font-weight:600;white-space:nowrap">
+        Заполнить цены <i class="bi bi-chevron-right ms-1"></i>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for blk in all_blocks %}
+  <div class="col-md-4 col-lg-3">
+    <a href="{% url 'planfact_block' blk.pk %}" class="text-decoration-none">
+      <div class="card-section p-4 h-100" style="transition:.15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.10)'" onmouseout="this.style.boxShadow=''">
+        <div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px">{{ blk.residential_complex.name }}</div>
+        <div style="font-size:1.2rem;font-weight:700;color:#0f172a;margin:.2rem 0">Блок {{ blk.name }}</div>
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <i class="bi bi-buildings text-primary" style="font-size:1.5rem"></i>
+          <span style="font-size:.82rem;color:#64748b">Нажмите чтобы открыть</span>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="alert alert-info">Блоки не найдены. Создайте блок в разделе «Жилые комплексы».</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

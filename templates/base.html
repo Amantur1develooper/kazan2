@@ -117,11 +117,18 @@
   </div>
 
   <nav class="sidebar-nav">
+    {% if is_builder %}
+    {# Строитель — только план-факт #}
+    <div class="sidebar-section-title">Производство</div>
+    <a href="{% url 'planfact_index' %}" class="sidebar-link {% if 'planfact' in request.resolver_match.url_name or 'asm' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-building-check"></i> План-факт стройки
+    </a>
+    {% else %}
+    {# Полный доступ #}
     <div class="sidebar-section-title">Главное</div>
     <a href="{% url 'dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
       <i class="bi bi-speedometer2"></i> Дашборд
     </a>
-
     <a href="{% url 'analytics_index' %}" class="sidebar-link {% if 'analytics' in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-graph-up-arrow"></i> Аналитика
     </a>
@@ -149,12 +156,16 @@
     <a href="{% url 'dds_unlinked' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dds_unlinked' %}active{% endif %}" style="padding-left:2rem;font-size:.85rem">
       <i class="bi bi-link-45deg"></i> Нераспределённые
     </a>
-
     <a href="{% url 'vehicle_list' %}" class="sidebar-link {% if 'vehicle' in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-car-front"></i> Склад авто
     </a>
     <a href="{% url 'apartment_list' %}" class="sidebar-link {% if 'apartment' in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-house-door"></i> Квартиры
+    </a>
+
+    <div class="sidebar-section-title">Производство</div>
+    <a href="{% url 'planfact_index' %}" class="sidebar-link {% if 'planfact' in request.resolver_match.url_name or 'asm' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-building-check"></i> План-факт стройки
     </a>
 
     <div class="sidebar-section-title">Данные</div>
@@ -166,6 +177,7 @@
       <i class="bi bi-gear"></i> Администрирование
     </a>
     {% endif %}
+    {% endif %}
   </nav>
 
   <div class="sidebar-footer">
@@ -175,7 +187,7 @@
           <i class="bi bi-person-circle me-1"></i>{{ request.user.username }}
         </div>
         <div style="color:rgba(255,255,255,.35);font-size:.7rem">
-          {% if request.user.is_staff %}Редактор{% else %}Просмотр{% endif %}
+          {% if is_builder %}Строитель{% elif request.user.is_staff %}Редактор{% else %}Просмотр{% endif %}
         </div>
       </div>
       <a href="{% url 'logout' %}" class="btn btn-sm" style="color:rgba(255,255,255,.4);padding:.25rem .5rem" title="Выйти">

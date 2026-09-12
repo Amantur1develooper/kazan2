@@ -3,10 +3,11 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.core.views import SmartLoginView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('login/', SmartLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('', include('apps.core.urls')),
     path('complexes/', include('apps.projects.urls')),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('vehicles/', include('apps.vehicles.urls')),
     path('apartments/', include('apps.apartments.urls')),
     path('analytics/', include('apps.projects.analytics_urls')),
+    path('planfact/', include('apps.planfact.urls')),
 ]
 
 if settings.DEBUG:

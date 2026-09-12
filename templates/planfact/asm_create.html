@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Новый АСМ — {{ floor_label }} / {{ category.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'asm_list' blk.pk floor_number category.pk %}">АСМ — {{ floor_label }}</a></li>
+        <li class="breadcrumb-item active">Новый АСМ</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-clipboard-plus me-2 text-primary"></i>Новый АСМ</h1>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" style="max-width:680px">
+  {% csrf_token %}
+  <div class="card-section p-4 mb-4">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <label class="form-label fw-bold" style="font-size:.85rem">Номер акта</label>
+        <input type="text" name="doc_number" class="form-control form-control-sm" placeholder="01">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label fw-bold" style="font-size:.85rem">Дата акта</label>
+        <input type="date" name="doc_date" class="form-control form-control-sm"
+               value="{{ today|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-bold" style="font-size:.85rem">Описание зоны работ</label>
+        <input type="text" name="description" class="form-control form-control-sm"
+               placeholder="Например: Блок В на отметке 16420 до 19470, колонны и диафрагмы"
+               value="Блок {{ blk.name }}, {{ floor_label }}, {{ category.name }}">
+      </div>
+      <div class="col-12"><hr style="margin:.5rem 0"></div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Зав. склад</label>
+        <input type="text" name="head_warehouse" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Нач. участка</label>
+        <input type="text" name="head_section" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Главный бухгалтер</label>
+        <input type="text" name="head_accounting" class="form-control form-control-sm">
+      </div>
+      <div class="col-6">
+        <label class="form-label" style="font-size:.8rem;color:#64748b">Нач. производство</label>
+        <input type="text" name="head_production" class="form-control form-control-sm">
+      </div>
+    </div>
+  </div>
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'asm_list' blk.pk floor_number category.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+    <button type="submit" class="btn btn-primary btn-lg">
+      <i class="bi bi-arrow-right me-1"></i>Далее — добавить материалы
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>АВР {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %} от {{ doc.doc_date|date:"d.m.Y" }}</title>
+{% load finance_filters %}
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Times New Roman',serif; font-size:11pt; color:#000; padding:15mm 20mm; }
+.no-print { margin-bottom:14px; }
+@media print { .no-print { display:none; } body { padding:12mm 18mm; } }
+h2 { text-align:center; font-size:13pt; font-weight:bold; margin-bottom:14px; }
+table.items { width:100%; border-collapse:collapse; font-size:10pt; margin-bottom:16px; }
+table.items th, table.items td { border:1px solid #333; padding:3px 6px; }
+table.items th { background:#f0f0f0; text-align:center; font-weight:bold; }
+.sig-row { display:flex; gap:16px; margin-bottom:12px; font-size:10.5pt; align-items:baseline; }
+.sig-role { width:180px; flex-shrink:0; }
+.sig-line { flex:1; border-bottom:1px solid #000; min-width:60px; }
+.sig-name { white-space:nowrap; padding-left:6px; }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button onclick="window.print()" style="padding:7px 18px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Распечатать</button>
+  <a href="{% url 'avr_edit' doc.pk %}" style="margin-left:12px;color:#2563eb;text-decoration:none;font-size:13px">&#8592; Редактировать</a>
+</div>
+
+<div style="text-align:center;margin-bottom:4px;font-size:11pt">
+  <span>Наименование объекта:</span>
+  <u style="display:inline-block;min-width:300px;text-align:left;padding:0 8px">
+    {{ doc.block.residential_complex.name }} — Блок {{ doc.block.name }}{% if floor_label %}, {{ floor_label }}{% endif %}
+  </u>
+</div>
+<div style="font-size:9.5pt;text-align:center;color:#555;margin-bottom:20px">(город, улица, дом, ЖК, блок и секция)</div>
+
+<div style="margin-bottom:6px;font-size:10.5pt">Заказчик: ОсОО «Эл-Насип»</div>
+<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;font-size:10.5pt">
+  <span style="white-space:nowrap">Подрядчик ИП:</span>
+  <span style="flex:1;border-bottom:1px solid #000">&nbsp;</span>
+  <span>{{ doc.contractor }}</span>
+</div>
+<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;font-size:10.5pt">
+  <span style="white-space:nowrap">Исполнитель:</span>
+  <span style="flex:1;border-bottom:1px solid #000">&nbsp;</span>
+  <span>{{ doc.executor }}</span>
+</div>
+<div style="margin-bottom:20px;font-size:10.5pt">
+  Дата: &laquo;{{ doc.doc_date|date:"d" }}&raquo; {{ doc.doc_date|date:"m" }} {{ doc.doc_date.year }}г.
+</div>
+
+<h2>АКТ приемки выполненных работ{% if doc.completion_pct < 100 %}<br><span style="font-size:10pt;font-weight:normal">(выполнено {{ doc.completion_pct }}%)</span>{% endif %}</h2>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width:5%">№</th>
+      <th>Наименование выполненных работ</th>
+      <th style="width:10%">Ед. изм.</th>
+      <th style="width:14%">Количество объема выполненных работ</th>
+      <th style="width:12%">Цена</th>
+      <th style="width:12%">Сумма</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in doc.items.all %}
+    <tr>
+      <td style="text-align:center">{{ forloop.counter }}</td>
+      <td>{{ item.name }}</td>
+      <td style="text-align:center">{{ item.unit }}</td>
+      <td style="text-align:center">{{ item.quantity|clean_num }}</td>
+      <td style="text-align:right">{{ item.unit_price|floatformat:0 }}</td>
+      <td style="text-align:right">{{ item.total_amount|floatformat:0 }}</td>
+    </tr>
+    {% endfor %}
+    {% for _ in empty_rows %}
+    <tr><td style="height:24px">&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    {% endfor %}
+    <tr style="font-weight:bold;background:#f5f5f5">
+      <td colspan="5" style="text-align:right;padding-right:8px">Итого:</td>
+      <td style="text-align:right">{{ doc.total_amount|floatformat:0 }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="margin-bottom:10px;font-size:10.5pt">Качество выполненных работ проверено Заказчиком в присутствии Подрядчика.</p>
+
+<div style="font-size:10.5pt;margin-bottom:4px">
+  Выявленные недостатки выполненных работ:
+  <u>{% if doc.defects %}{{ doc.defects }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endif %}</u>
+</div>
+<div style="font-size:10.5pt;margin-bottom:4px">
+  Сроки устранения выявленных недостатков:
+  <u>{% if doc.defect_deadline %}{{ doc.defect_deadline }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endif %}</u>
+</div>
+<div style="font-size:10.5pt;margin-bottom:4px">
+  Соблюдение техники безопасности на производстве:
+  <u>{% if doc.safety_compliance %}{{ doc.safety_compliance }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endif %}</u>
+</div>
+<div style="font-size:10.5pt;margin-bottom:20px">
+  Выполнение работы в указанные сроки:
+  <u>{% if doc.deadline_compliance %}{{ doc.deadline_compliance }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endif %}</u>
+</div>
+
+<div style="margin-top:24px">
+  <div class="sig-row">
+    <span class="sig-role">Начальник производства</span>
+    <span class="sig-line">&nbsp;</span>
+    <span class="sig-name">{{ doc.head_production }}</span>
+  </div>
+  <div class="sig-row">
+    <span class="sig-role">Начальник участка</span>
+    <span class="sig-line">&nbsp;</span>
+    <span class="sig-name">{{ doc.head_section }}</span>
+  </div>
+  <div class="sig-row">
+    <span class="sig-role">Прораб</span>
+    <span class="sig-line">&nbsp;</span>
+    <span class="sig-name">{{ doc.foreman }}</span>
+  </div>
+  <div class="sig-row">
+    <span class="sig-role">Мастер</span>
+    <span class="sig-line">&nbsp;</span>
+    <span class="sig-name">{{ doc.master }}</span>
+  </div>
+  <div class="sig-row">
+    <span class="sig-role">Исполнитель</span>
+    <span class="sig-line">&nbsp;</span>
+    <span class="sig-name">{{ doc.executor_sign }}</span>
+  </div>
+</div>
+
+</body>
+</html>

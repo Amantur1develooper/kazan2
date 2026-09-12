@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>{{ act.get_act_type_display }} №{{ act.act_number }}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; padding: 20mm; }
+  h1 { font-size: 14pt; text-align: center; margin-bottom: 4px; }
+  .subtitle { text-align: center; font-size: 11pt; margin-bottom: 16px; color: #333; }
+  .meta { margin-bottom: 16px; }
+  .meta table { width: 100%; }
+  .meta td { padding: 2px 6px; font-size: 10.5pt; }
+  .meta td:first-child { color: #555; width: 180px; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  table.items th, table.items td { border: 1px solid #333; padding: 4px 8px; font-size: 10pt; }
+  table.items th { background: #f0f0f0; text-align: center; font-weight: bold; }
+  table.items td.num { text-align: center; }
+  table.items td.right { text-align: right; }
+  .total-row td { font-weight: bold; background: #f8f8f8; }
+  .signatures { margin-top: 32px; display: flex; justify-content: space-between; }
+  .sig-block { width: 45%; }
+  .sig-block .title { font-weight: bold; margin-bottom: 20px; }
+  .sig-block .line { border-bottom: 1px solid #000; margin-top: 32px; }
+  .sig-block .name { font-size: 9pt; color: #555; margin-top: 4px; }
+  .no-print { margin-bottom: 16px; }
+  @media print {
+    .no-print { display: none; }
+    body { padding: 15mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button onclick="window.print()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">
+    🖨️ Распечатать
+  </button>
+  <a href="{% url 'planfact_block' act.block_id %}" style="margin-left:12px;color:#2563eb">← Назад к блоку</a>
+</div>
+
+<h1>{{ act.get_act_type_display }}</h1>
+<div class="subtitle">№ {{ act.act_number }} от {{ act.act_date|date:"d.m.Y" }}</div>
+
+<div class="meta">
+  <table>
+    <tr><td>Объект:</td><td>{{ act.block.residential_complex.name }} / Блок {{ act.block.name }}</td></tr>
+    <tr><td>Подрядчик:</td><td>{{ act.contractor|default:"________________" }}</td></tr>
+    <tr><td>Создал:</td><td>{{ act.created_by.get_full_name|default:act.created_by.username }}</td></tr>
+    {% if act.notes %}<tr><td>Примечание:</td><td>{{ act.notes }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th width="4%">№</th>
+      <th>Наименование работы / материала</th>
+      <th width="10%">Этаж</th>
+      <th width="12%">Ед.изм.</th>
+      <th width="12%">Кол-во</th>
+      <th width="14%">Сумма (сом)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% with counter=0 %}
+    {% for fw in act.floor_works.all %}
+    <tr>
+      <td class="num">{{ forloop.counter }}</td>
+      <td>{{ fw.category.name }}</td>
+      <td class="num">{{ fw.floor_number }}</td>
+      <td class="num">{{ fw.category.unit }}</td>
+      <td class="right">{{ fw.fact_quantity }}</td>
+      <td class="right">{{ fw.fact_amount }}</td>
+    </tr>
+    {% endfor %}
+    {% for lw in act.landscaping_works.all %}
+    <tr>
+      <td class="num">{{ forloop.counter }}</td>
+      <td>{{ lw.category.name }} (благоустройство)</td>
+      <td class="num">—</td>
+      <td class="num">{{ lw.category.unit }}</td>
+      <td class="right">{{ lw.fact_quantity }}</td>
+      <td class="right">{{ lw.fact_amount }}</td>
+    </tr>
+    {% endfor %}
+    {% endwith %}
+    <tr class="total-row">
+      <td colspan="5" style="text-align:right;padding-right:8px">Итого:</td>
+      <td class="right">{{ act.total_amount }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="signatures">
+  <div class="sig-block">
+    <div class="title">Сдал (Подрядчик):</div>
+    <div class="line"></div>
+    <div class="name">{{ act.contractor|default:"________________" }}</div>
+  </div>
+  <div class="sig-block">
+    <div class="title">Принял (Заказчик):</div>
+    <div class="line"></div>
+    <div class="name">________________</div>
+  </div>
+</div>
+
+</body>
+</html>

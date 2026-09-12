@@ -1,0 +1,935 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}План-факт — Блок {{ blk.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Building visualization ── */
+.bld-wrap { max-width:780px; margin:0 auto; user-select:none; }
+.bld-roof {
+  margin-left:62px;
+  background:#334155;
+  border-radius:4px 4px 0 0;
+  height:28px;
+  display:flex; align-items:center; padding:0 16px;
+  position:relative;
+}
+.bld-roof::before {
+  content:'';
+  position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+  width:0; height:0;
+  border-left:70px solid transparent;
+  border-right:70px solid transparent;
+  border-bottom:20px solid #334155;
+}
+.bld-row {
+  display:flex; align-items:stretch; height:54px;
+  border:1px solid #cbd5e1; border-top:none;
+  cursor:pointer; transition:.12s; overflow:hidden;
+}
+.bld-row:hover { box-shadow:inset 0 0 0 2px #3b82f6; z-index:1; position:relative; }
+.bld-row.underground { border-style:dashed; opacity:.82; }
+.bld-num {
+  width:62px; min-width:62px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.88rem; font-weight:800; color:#475569;
+  background:#f8fafc; border-right:1px solid #cbd5e1; flex-shrink:0;
+  flex-direction:column; gap:1px;
+}
+.bld-num .floor-label { font-size:.6rem; font-weight:500; color:#94a3b8; }
+.bld-body { flex:1; position:relative; overflow:hidden; background:#f1f5f9; }
+.bld-fill { position:absolute; top:0; left:0; bottom:0; transition:width .6s ease; }
+.bld-overlay {
+  position:absolute; inset:0; z-index:1;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 14px;
+}
+.bld-amounts {
+  display:flex; align-items:center; gap:10px;
+}
+.bld-plan-box, .bld-fact-box {
+  display:flex; flex-direction:column; align-items:flex-start; gap:0px;
+}
+.bld-amt-label { font-size:.62rem; font-weight:600; letter-spacing:.3px; text-transform:uppercase; opacity:.75; }
+.bld-amt-val { font-size:.92rem; font-weight:800; white-space:nowrap; }
+.bld-sep { font-size:1.1rem; color:#94a3b8; font-weight:300; margin:0 2px; }
+.bld-pct {
+  font-size:1.05rem; font-weight:900;
+  padding:3px 9px; border-radius:6px;
+  background:rgba(255,255,255,.55); backdrop-filter:blur(2px);
+  white-space:nowrap;
+}
+.bld-ground {
+  margin-left:62px; height:5px;
+  background:linear-gradient(90deg,#475569,#94a3b8);
+  position:relative;
+}
+.bld-ground::after {
+  content:'± 0.000 (земля)';
+  position:absolute; right:0; top:-16px;
+  font-size:.62rem; color:#94a3b8; font-weight:600;
+}
+.bld-foundation {
+  margin-left:62px; height:7px;
+  background:#1e293b; border-radius:0 0 3px 3px;
+}
+
+/* Legend */
+.legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: .6rem 1rem;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: .78rem;
+}
+.legend-item { display: flex; align-items: center; gap: .35rem; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Landscaping section */
+.land-bar-wrap { margin-bottom: .6rem; }
+.land-bar-label { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .25rem; }
+.land-bar { height: 22px; border-radius: 6px; background: #e2e8f0; overflow: hidden; }
+.land-bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: .72rem; font-weight: 700; color: #fff; transition: width .3s; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header flex-wrap gap-2">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item active">Блок {{ blk.name }}</li>
+      </ol>
+    </nav>
+    <h1>{{ blk.residential_complex.name }} / Блок {{ blk.name }}</h1>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if is_admin %}
+    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#budgetModal">
+      <i class="bi bi-currency-dollar me-1"></i>Бюджет этажей
+    </button>
+    {% endif %}
+    <a href="{% url 'act_create' blk.pk %}" class="btn btn-success btn-sm">
+      <i class="bi bi-file-earmark-plus me-1"></i>Создать акт
+    </a>
+    <a href="{% url 'act_list' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-journal-text me-1"></i>Акты
+    </a>
+    <a href="{% url 'progress_board' blk.pk %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-bar-chart-steps me-1"></i>Ход работ
+    </a>
+    <a href="{% url 'calendar_plan_list' blk.pk %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-calendar3 me-1"></i>Кал. план
+    </a>
+    {% if request.user.is_staff %}
+    <a href="{% url 'floor_category_edit' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-list-check me-1"></i>Виды работ
+    </a>
+    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">
+      <i class="bi bi-gear me-1"></i>Настройка
+    </button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+
+{# ── Summary KPIs ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="stat-card text-center">
+      <div class="label">Этажей в доме</div>
+      <div class="value text-primary">{{ config.total_floors }}</div>
+    </div>
+  </div>
+  {% if is_admin %}
+  <div class="col-6 col-md-2">
+    <a href="{% url 'floor_budget_edit' blk.pk %}" class="text-decoration-none">
+    <div class="stat-card text-center" style="border-left:3px solid #f59e0b;cursor:pointer">
+      <div class="label">План по этажам</div>
+      <div class="value text-warning text-money" style="font-size:1rem">{{ floor_budget_total|currency }}</div>
+      {% if not floor_budget_total %}
+      <div style="font-size:.7rem;color:#f59e0b;margin-top:2px">Задать →</div>
+      {% endif %}
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card text-center" style="border-left:3px solid #2563eb">
+      <div class="label">Итого потрачено (АСМ)</div>
+      <div class="value text-money" style="font-size:1rem;color:#2563eb">{{ asm_grand_total|currency }}</div>
+      {% if floor_budget_total and floor_budget_total > 0 %}
+      <div class="progress mt-1" style="height:4px">
+        <div class="progress-bar" style="width:{% widthratio asm_grand_total floor_budget_total 100 %}%;background:#2563eb"></div>
+      </div>
+      <div style="font-size:.68rem;color:#64748b;margin-top:2px">
+        {% widthratio asm_grand_total floor_budget_total 100 %}% от плана
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card text-center" style="border-left:3px solid #6366f1">
+      <div class="label">Остаток (план − АСМ − АВР)</div>
+      {% if floor_budget_total %}
+      {% with remainder=floor_budget_total|subtract:total_expenses %}
+      <div class="value text-money" style="font-size:1rem;color:{% if remainder < 0 %}#dc2626{% else %}#6366f1{% endif %}">
+        {{ remainder|currency }}
+      </div>
+      {% if remainder < 0 %}
+      <div style="font-size:.7rem;color:#dc2626;margin-top:2px">⚠ Перерасход!</div>
+      {% endif %}
+      {% endwith %}
+      {% else %}
+      <div style="font-size:.8rem;color:#94a3b8;padding:.5rem 0">—</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="stat-card text-center">
+      <div class="label">Благ. факт</div>
+      <div class="value text-info text-money" style="font-size:1rem">{{ land_fact|currency }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Сводка расходов и прогресса строительства ── #}
+{% if is_admin %}
+<div class="card-section mb-4">
+  <div style="padding:.9rem 1.25rem .5rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+    <span class="section-title"><i class="bi bi-graph-up me-2 text-success"></i>Сводка по блоку</span>
+  </div>
+  <div style="padding:1rem 1.25rem">
+
+    {# Прогресс строительства #}
+    <div style="margin-bottom:1.2rem">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem">
+        <span style="font-size:.82rem;font-weight:700;color:#1e293b">Готовность объекта</span>
+        <span style="font-size:1.6rem;font-weight:900;color:{% if building_pct >= 100 %}#15803d{% elif building_pct >= 67 %}#16a34a{% elif building_pct >= 34 %}#65a30d{% elif building_pct > 0 %}#ca8a04{% else %}#94a3b8{% endif %}">
+          {{ building_pct|floatformat:1 }}%
+        </span>
+      </div>
+      <div style="height:14px;background:#e2e8f0;border-radius:7px;overflow:hidden">
+        <div style="height:100%;width:{{ building_pct|clean_num }}%;border-radius:7px;transition:width .6s;
+          background:{% if building_pct >= 100 %}#22c55e{% elif building_pct >= 67 %}#4ade80{% elif building_pct >= 34 %}#86efac{% elif building_pct > 0 %}#fbbf24{% else %}#e2e8f0{% endif %}">
+        </div>
+      </div>
+      <div style="font-size:.7rem;color:#94a3b8;margin-top:.3rem">
+        На основе АВР (% выполненных работ по каждому этажу и виду работ)
+      </div>
+    </div>
+
+    {# Расходы: три колонки #}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+
+      {# АСМ #}
+      <div style="padding:12px 14px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1d4ed8;margin-bottom:6px">
+          <i class="bi bi-box-seam me-1"></i>АСМ — Материалы
+        </div>
+        <div style="font-size:1.15rem;font-weight:900;color:#1d4ed8">{{ asm_grand_total|currency }}</div>
+        {% if floor_budget_total and floor_budget_total > 0 %}
+        <div style="height:4px;background:#bfdbfe;border-radius:2px;margin-top:6px;overflow:hidden">
+          <div style="height:100%;width:{% widthratio asm_grand_total floor_budget_total 100 %}%;background:#2563eb;border-radius:2px"></div>
+        </div>
+        <div style="font-size:.65rem;color:#3b82f6;margin-top:3px">
+          {% widthratio asm_grand_total floor_budget_total 100 %}% от бюджета
+        </div>
+        {% endif %}
+      </div>
+
+      {# АВР #}
+      <div style="padding:12px 14px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#15803d;margin-bottom:6px">
+          <i class="bi bi-file-earmark-check me-1"></i>АВР — Работы
+        </div>
+        <div style="font-size:1.15rem;font-weight:900;color:#15803d">{{ avr_grand_total|currency }}</div>
+        {% if avr_rework_total and avr_rework_total > 0 %}
+        <div style="margin-top:5px;padding:4px 8px;border-radius:6px;background:#fff7ed;border:1px solid #fed7aa;display:flex;align-items:center;gap:5px">
+          <i class="bi bi-wrench" style="font-size:.65rem;color:#c2410c"></i>
+          <span style="font-size:.72rem;color:#c2410c;font-weight:700">Вне сметы: {{ avr_rework_total|currency }}</span>
+        </div>
+        {% endif %}
+        {% if floor_budget_total and floor_budget_total > 0 %}
+        <div style="height:4px;background:#bbf7d0;border-radius:2px;margin-top:6px;overflow:hidden">
+          <div style="height:100%;width:{% widthratio avr_grand_total floor_budget_total 100 %}%;background:#22c55e;border-radius:2px"></div>
+        </div>
+        <div style="font-size:.65rem;color:#16a34a;margin-top:3px">
+          {% widthratio avr_grand_total floor_budget_total 100 %}% от бюджета
+        </div>
+        {% endif %}
+      </div>
+
+      {# Итого #}
+      {% with remainder=floor_budget_total|subtract:total_expenses %}
+      <div style="padding:12px 14px;border-radius:10px;background:{% if remainder < 0 %}#fef2f2{% else %}#fafafa{% endif %};border:1px solid {% if remainder < 0 %}#fecaca{% else %}#e2e8f0{% endif %}">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:{% if remainder < 0 %}#b91c1c{% else %}#374151{% endif %};margin-bottom:6px">
+          <i class="bi bi-calculator me-1"></i>Всего расходов
+        </div>
+        <div style="font-size:1.15rem;font-weight:900;color:{% if remainder < 0 %}#dc2626{% else %}#0f172a{% endif %}">{{ total_expenses|currency }}</div>
+        {% if floor_budget_total and floor_budget_total > 0 %}
+        <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:6px;overflow:hidden">
+          <div style="height:100%;width:{% widthratio total_expenses floor_budget_total 100 %}%;background:{% if remainder < 0 %}#dc2626{% else %}#64748b{% endif %};border-radius:2px"></div>
+        </div>
+        <div style="font-size:.65rem;margin-top:3px;color:{% if remainder < 0 %}#dc2626;font-weight:700{% else %}#64748b{% endif %}">
+          {% if remainder < 0 %}⚠ Перерасход {{ remainder|abs_value|currency }}{% else %}Остаток {{ remainder|currency }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endwith %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── АСМ без цен (только для admin) ── #}
+{% if unprice_docs %}
+<div class="card-section mb-4" style="border-left:3px solid #f59e0b">
+  <div style="padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fef3c7">
+    <span style="font-weight:700;color:#b45309;font-size:.9rem">
+      <i class="bi bi-exclamation-circle me-2"></i>Нужно заполнить цены (строитель ввёл без сумм)
+    </span>
+    <span class="badge bg-warning text-dark">{{ unprice_docs|length }}</span>
+  </div>
+  <div style="padding:.6rem 1.25rem">
+    {% for doc in unprice_docs %}
+    <a href="{% url 'asm_edit' doc.pk %}"
+       class="d-flex align-items-center justify-content-between text-decoration-none py-2"
+       style="border-bottom:1px solid #fef9c3{% if forloop.last %};border-bottom:none{% endif %}">
+      <div style="font-size:.88rem">
+        <span class="fw-semibold text-dark">АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %}</span>
+        <span class="text-muted ms-2">{{ doc.doc_date|date:"d.m.Y" }}</span>
+        <span class="ms-2" style="color:#64748b">
+          — {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %}
+          / {{ doc.category.name }}
+        </span>
+        {% if doc.description %}
+        <span class="text-muted ms-1" style="font-size:.8rem">· {{ doc.description }}</span>
+        {% endif %}
+      </div>
+      <span class="btn btn-warning btn-sm text-white ms-3" style="white-space:nowrap;font-size:.78rem">
+        Заполнить цены
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Текущие работы (только для админа) ── #}
+{% if is_admin and ongoing_works %}
+<div class="card-section mb-4" style="border-left:3px solid #3b82f6">
+  <div style="padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dbeafe">
+    <span style="font-weight:700;color:#1d4ed8;font-size:.9rem">
+      <i class="bi bi-activity me-2"></i>Сейчас ведётся ({{ ongoing_works|length }})
+    </span>
+  </div>
+  <div style="padding:.4rem 1.25rem .8rem;display:flex;flex-wrap:wrap;gap:8px;margin-top:.4rem">
+    {% for w in ongoing_works %}
+    <a href="{% url 'planfact_floor_edit' blk.pk w.floor_number %}"
+       class="text-decoration-none"
+       style="display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;transition:.1s"
+       onmouseover="this.style.background='#dbeafe';this.style.borderColor='#93c5fd'"
+       onmouseout="this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'">
+      <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;
+                   animation:pulse-dot 1.4s infinite"></span>
+      <span style="font-size:.85rem;font-weight:600;color:#1e40af">{{ w.floor_label }}</span>
+      <span style="font-size:.8rem;color:#3b82f6">{{ w.category.name }}</span>
+      <span style="font-size:.78rem;background:#2563eb;color:#fff;border-radius:4px;padding:1px 6px;font-weight:700">
+        {{ w.progress_pct }}%
+      </span>
+      {% if w.contractor %}
+      <span style="font-size:.72rem;color:#64748b">— {{ w.contractor }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+<style>
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.5; transform:scale(1.4); }
+}
+</style>
+{% endif %}
+
+{# ── Building visualization ── #}
+<div class="card-section mb-4">
+  <div style="padding:.9rem 1.25rem .5rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+    <span class="section-title"><i class="bi bi-buildings me-2 text-primary"></i>Прогресс по этажам</span>
+    <span style="font-size:.75rem;color:#94a3b8">Нажмите на этаж</span>
+  </div>
+  <div style="padding:1.2rem 1.25rem">
+    <div class="bld-wrap">
+
+      {# Roof #}
+      <div class="bld-roof">
+        <span style="font-size:.72rem;color:#94a3b8;font-weight:600;letter-spacing:.5px">
+          {{ blk.residential_complex.name }} · Блок {{ blk.name }}
+        </span>
+      </div>
+
+      {% for floor in floors %}
+      {% if floor.number == 1 and config.underground_floors > 0 %}
+      <div class="bld-ground"></div>
+      {% endif %}
+      {% with p=floor.display_pct %}
+      <div class="bld-row {% if floor.is_underground %}underground{% endif %}"
+           onclick="openFloorModal({{ floor.number }})">
+        <div class="bld-num">
+          {% if floor.number < 0 %}
+            <span>Б{{ floor.number|slice:"1:" }}</span>
+            <span class="floor-label">подвал</span>
+          {% else %}
+            <span>{{ floor.number }}</span>
+            <span class="floor-label">этаж</span>
+          {% endif %}
+        </div>
+        <div class="bld-body" style="display:flex;flex-direction:column;background:transparent">
+
+          {# ── АВР: top section — per-category completion ── #}
+          <div style="flex:1;position:relative;display:flex;overflow:hidden;background:#f1f5f9">
+            {% for c in floor.active_cats %}
+            <div style="flex:1;{% if not forloop.last %}border-right:1px solid rgba(255,255,255,.4);{% endif %}background:{% if c.display_pct >= 100 %}#16a34a{% elif c.display_pct >= 67 %}#4ade80{% elif c.display_pct >= 34 %}#86efac{% elif c.display_pct > 0 %}#d1fae5{% else %}transparent{% endif %}">
+              <div style="height:3px;background:{{ c.category.color }};opacity:.9"></div>
+            </div>
+            {% endfor %}
+            {# overlay: amounts (admin) + AVR badge #}
+            <div style="position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:0 10px">
+              {% if is_admin %}
+              <div class="bld-amounts">
+                <div class="bld-plan-box">
+                  <span class="bld-amt-label" style="color:#92400e">Бюджет</span>
+                  <span class="bld-amt-val" style="color:#b45309">
+                    {% if floor.planned_amount %}{{ floor.planned_amount|shortnum }}{% else %}<span style="color:#d1d5db;font-size:.75rem">—</span>{% endif %}
+                  </span>
+                </div>
+              </div>
+              {% else %}
+              <span style="font-size:.78rem;color:#64748b;font-weight:600">
+                {% if floor.number < 0 %}Подвал {{ floor.number|slice:"1:" }}{% else %}Этаж {{ floor.number }}{% endif %}
+              </span>
+              {% endif %}
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+                <span style="font-size:.5rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#64748b;opacity:.8">АВР</span>
+                <span class="bld-pct" style="padding:2px 7px;font-size:.88rem;color:{% if p >= 100 %}#15803d{% elif p >= 67 %}#16a34a{% elif p >= 34 %}#65a30d{% elif p > 0 %}#ca8a04{% else %}#94a3b8{% endif %}">
+                  {{ p|floatformat:0 }}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {# ── АСМ: bottom strip — budget consumption ── #}
+          <div style="flex:0 0 16px;position:relative;overflow:hidden;background:#f0f4f8;border-top:1px solid #e2e8f0">
+            {% if floor.asm_total > 0 %}
+              {% if floor.planned_amount %}
+              <div style="position:absolute;top:0;left:0;bottom:0;width:{{ floor.asm_vs_plan_pct|clean_num }}%;background:{% if floor.asm_overspend %}#fca5a5{% elif floor.asm_vs_plan_pct >= 80 %}#fdba74{% else %}#93c5fd{% endif %};transition:width .4s"></div>
+              {% else %}
+              <div style="position:absolute;top:0;left:0;bottom:0;right:0;background:#bfdbfe;opacity:.35"></div>
+              {% endif %}
+            {% endif %}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 7px;justify-content:space-between;z-index:1">
+              <span style="font-size:.56rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#64748b">АСМ</span>
+              {% if floor.asm_total > 0 %}
+                {% if floor.planned_amount %}
+                  <span style="font-size:.62rem;font-weight:800;color:{% if floor.asm_overspend %}#dc2626{% elif floor.asm_vs_plan_raw >= 80 %}#c2410c{% else %}#1d4ed8{% endif %}">
+                    {% if floor.asm_overspend %}⚠ {% endif %}{{ floor.asm_vs_plan_raw|floatformat:0 }}%
+                  </span>
+                {% else %}
+                  {% if is_admin %}<span style="font-size:.6rem;font-weight:700;color:#2563eb">{{ floor.asm_total|shortnum }}</span>{% endif %}
+                {% endif %}
+              {% else %}
+                <span style="font-size:.58rem;color:#cbd5e1">—</span>
+              {% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {% endwith %}
+      {% empty %}
+      <div class="text-muted text-center py-4">Настройте количество этажей (кнопка «Настройка»)</div>
+      {% endfor %}
+
+      {% if floors %}<div class="bld-foundation"></div>{% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Floor modal (content pre-rendered by Django) ── #}
+<div class="modal fade" id="floorModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="floorModalLabel">Этаж</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        {% for floor in floors %}
+        <div class="floor-panel d-none" id="fp{{ floor.number }}">
+
+          {# Plan vs Fact block — admin only #}
+          {% with fill=floor.asm_vs_plan_pct|default:0 %}
+          {% if is_admin %}
+          <div style="padding:14px 16px 12px;border-bottom:1px solid #f1f5f9;background:#fafafa">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;text-align:center">
+                <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#b45309;letter-spacing:.4px;margin-bottom:3px">Бюджет (план)</div>
+                <div style="font-size:1.05rem;font-weight:800;color:#b45309">
+                  {% if floor.planned_amount %}{{ floor.planned_amount|currency }}{% else %}<span style="color:#d1d5db;font-size:.9rem">не задан</span>{% endif %}
+                </div>
+              </div>
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:9px 12px;text-align:center">
+                <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#1d4ed8;letter-spacing:.4px;margin-bottom:3px">Израсходовано (факт)</div>
+                <div style="font-size:1.05rem;font-weight:800;color:#1d4ed8">
+                  {% if floor.asm_total > 0 %}{{ floor.asm_total|currency }}{% else %}<span style="color:#d1d5db;font-size:.9rem">0 сом</span>{% endif %}
+                </div>
+              </div>
+            </div>
+
+            {% if floor.planned_amount %}
+            {% with rem=floor.planned_amount|subtract:floor.asm_total %}
+            <div style="background:{% if rem < 0 %}#fef2f2{% else %}#f0fdf4{% endif %};border:1px solid {% if rem < 0 %}#fecaca{% else %}#bbf7d0{% endif %};border-radius:8px;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-size:.78rem;font-weight:600;color:{% if rem < 0 %}#b91c1c{% else %}#15803d{% endif %}">
+                {% if rem < 0 %}⚠ Перерасход{% else %}Остаток{% endif %}
+              </span>
+              <span style="font-size:.92rem;font-weight:800;color:{% if rem < 0 %}#dc2626{% else %}#16a34a{% endif %}">
+                {% if rem < 0 %}−{% endif %}{{ rem|abs_value|currency }}
+              </span>
+            </div>
+            {% endwith %}
+            {% endif %}
+
+            <div style="height:10px;background:#e2e8f0;border-radius:5px;overflow:hidden;margin-bottom:4px">
+              <div style="height:100%;width:{{ fill }}%;min-width:{% if fill > 0 %}4px{% else %}0{% endif %};background:{% if fill >= 100 %}#dc2626{% elif fill >= 80 %}#f97316{% elif fill >= 50 %}#facc15{% elif fill > 0 %}#4ade80{% else %}#e2e8f0{% endif %};border-radius:5px;transition:width .4s"></div>
+            </div>
+            <div style="font-size:.72rem;color:#64748b;text-align:right">{{ fill }}% освоено</div>
+
+          </div>
+          {% endif %}
+          {% endwith %}
+
+          {# ASM by category #}
+          <div style="padding:10px 16px 4px">
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px">
+              АСМ — Акт списания материалов
+            </div>
+            {% for c in floor.categories %}
+            <a href="{% url 'asm_list' blk.pk floor.number c.category.pk %}"
+               class="d-flex align-items-center justify-content-between text-decoration-none mb-2"
+               style="padding:9px 12px;border-radius:8px;background:{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %};border:1px solid {% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %};opacity:{% if c.assigned %}1{% else %}.45{% endif %};transition:.1s"
+               onmouseover="this.style.opacity='1';this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'"
+               onmouseout="this.style.opacity='{% if c.assigned %}1{% else %}.45{% endif %}';this.style.background='{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %}';this.style.borderColor='{% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %}'">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="width:9px;height:9px;border-radius:2px;background:{% if c.assigned %}{{ c.category.color }}{% else %}#cbd5e1{% endif %};flex-shrink:0"></span>
+                <span style="font-weight:600;font-size:.88rem;color:{% if c.assigned %}#0f172a{% else %}#94a3b8{% endif %}">{{ c.category.name }}</span>
+                {% if not c.assigned %}<span style="font-size:.65rem;color:#94a3b8">(не назначено)</span>{% endif %}
+                {% if c.asm_count > 0 %}
+                <span style="font-size:.7rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-weight:700">
+                  ×{{ c.asm_count }}
+                </span>
+                {% endif %}
+              </div>
+              <span style="font-size:.75rem;color:#2563eb;font-weight:600">
+                {% if is_admin and c.asm_total > 0 %}{{ c.asm_total|floatformat:0 }} сом · {% endif %}
+                <i class="bi bi-chevron-right"></i>
+              </span>
+            </a>
+            {% empty %}
+            <p class="text-muted" style="font-size:.85rem">Виды работ не созданы.</p>
+            {% endfor %}
+          </div>
+
+          {# AVR by category — with progress bars #}
+          <div style="padding:4px 16px 12px;border-top:1px solid #f1f5f9;margin-top:2px">
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:10px;margin-top:8px">
+              АВР — Выполнение работ
+            </div>
+            {% for c in floor.categories %}
+            <a href="{% url 'avr_list' blk.pk floor.number c.category.pk %}"
+               class="text-decoration-none d-block mb-3"
+               onmouseover="this.querySelector('.avr-card').style.borderColor='#86efac'"
+               onmouseout="this.querySelector('.avr-card').style.borderColor='{% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %}'"
+               style="opacity:{% if c.assigned %}1{% else %}.45{% endif %}">
+              <div class="avr-card" style="padding:9px 12px;border-radius:8px;background:{% if c.avr_pct >= 100 %}#f0fdf4{% elif c.avr_pct > 0 %}#f8fff8{% else %}#fafafa{% endif %};border:1px solid {% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %};transition:border-color .1s">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <span style="width:8px;height:8px;border-radius:2px;background:{{ c.category.color }};flex-shrink:0"></span>
+                    <span style="font-weight:600;font-size:.85rem;color:#0f172a">{{ c.category.name }}</span>
+                  </div>
+                  <span style="font-size:.82rem;font-weight:800;color:{% if c.avr_pct >= 100 %}#15803d{% elif c.avr_pct > 0 %}#16a34a{% else %}#94a3b8{% endif %}">
+                    {{ c.avr_pct|floatformat:0 }}%
+                    <i class="bi bi-chevron-right ms-1" style="font-size:.7rem"></i>
+                  </span>
+                </div>
+                <div style="height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+                  <div style="height:100%;width:{{ c.avr_pct|clean_num }}%;border-radius:4px;background:{% if c.avr_pct >= 100 %}#22c55e{% elif c.avr_pct >= 70 %}#4ade80{% elif c.avr_pct >= 40 %}#86efac{% else %}#bbf7d0{% endif %};transition:width .4s"></div>
+                </div>
+                {% if c.avr_pct >= 100 %}
+                <div style="font-size:.68rem;color:#15803d;font-weight:700;margin-top:4px">✓ Выполнено полностью</div>
+                {% elif c.avr_pct > 0 %}
+                <div style="font-size:.68rem;color:#64748b;margin-top:4px">В процессе — нажмите чтобы добавить АВР</div>
+                {% else %}
+                <div style="font-size:.68rem;color:#94a3b8;margin-top:4px">Нажмите чтобы создать АВР</div>
+                {% endif %}
+              </div>
+            </a>
+            {% empty %}
+            {% endfor %}
+          </div>
+
+          {# Plan/Fact link #}
+          <div style="padding:8px 16px 14px;border-top:1px solid #f1f5f9;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+            <a href="{% url 'planfact_floor_edit' blk.pk floor.number %}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-pencil me-1"></i>План / факт
+            </a>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{# ── Landscaping ── #}
+{% if config.has_landscaping %}
+<div class="card-section mb-4">
+  <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+    <span class="section-title"><i class="bi bi-tree me-2 text-success"></i>Благоустройство</span>
+    {% if is_admin %}
+    <a href="{% url 'planfact_landscaping_edit' blk.pk %}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-pencil me-1"></i>Редактировать
+    </a>
+    {% endif %}
+  </div>
+  <div style="padding:1rem 1.25rem">
+    {% if land_works %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.85rem">
+      {% for lw in land_works %}
+      {% with p=lw.progress_pct %}
+      <div style="border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;background:#fff">
+        {# Header #}
+        <div style="padding:10px 14px 8px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid {{ lw.category.color }}40">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="width:10px;height:10px;border-radius:3px;background:{{ lw.category.color }};flex-shrink:0"></span>
+            <span style="font-weight:700;font-size:.88rem;color:#1e293b">{{ lw.category.name }}</span>
+          </div>
+          <span style="font-size:1.3rem;font-weight:900;color:{% if p >= 100 %}#15803d{% elif p >= 67 %}#16a34a{% elif p > 0 %}#ca8a04{% else %}#94a3b8{% endif %}">
+            {{ p|floatformat:0 }}%
+          </span>
+        </div>
+        {# Progress bar #}
+        <div style="height:6px;background:#e2e8f0">
+          <div style="height:100%;width:{{ p|clean_num }}%;background:{% if p >= 100 %}#22c55e{% elif p >= 67 %}#4ade80{% elif p >= 34 %}#86efac{% elif p > 0 %}#fbbf24{% else %}transparent{% endif %};transition:width .5s"></div>
+        </div>
+        {# Details #}
+        <div style="padding:10px 14px 12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:.72rem;color:#94a3b8;font-weight:600">Объём</span>
+            <span style="font-size:.82rem;font-weight:700;color:#334155">
+              {{ lw.fact_quantity|floatformat:0 }} / {{ lw.planned_quantity|floatformat:0 }}
+              <span style="font-size:.68rem;color:#94a3b8;font-weight:500">{{ lw.category.unit }}</span>
+            </span>
+          </div>
+          {% if is_admin and lw.planned_amount > 0 %}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:.72rem;color:#94a3b8;font-weight:600">Бюджет</span>
+            <span style="font-size:.8rem;font-weight:700;color:#334155">
+              {{ lw.fact_amount|currency }} <span style="color:#cbd5e1;font-weight:400">/ {{ lw.planned_amount|currency }}</span>
+            </span>
+          </div>
+          {% endif %}
+          {% if lw.contractor %}
+          <div style="font-size:.73rem;color:#64748b;margin-top:4px;display:flex;align-items:center;gap:5px">
+            <i class="bi bi-person-fill" style="color:#94a3b8"></i>{{ lw.contractor }}
+          </div>
+          {% endif %}
+          {% if lw.fact_date %}
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:5px">
+            <i class="bi bi-calendar3" style="font-size:.65rem"></i>{{ lw.fact_date|date:"d.m.Y" }}
+          </div>
+          {% endif %}
+          {% if p == 0 %}
+          <div style="margin-top:6px;font-size:.7rem;color:#94a3b8;font-style:italic">Не начато</div>
+          {% elif p >= 100 %}
+          <div style="margin-top:6px;font-size:.72rem;color:#15803d;font-weight:700">✓ Завершено</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% if is_admin and land_fact > 0 %}
+    <div style="margin-top:.9rem;padding:10px 14px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.78rem;font-weight:700;color:#15803d"><i class="bi bi-sigma me-1"></i>Итого благоустройство</span>
+      <span style="font-size:.92rem;font-weight:800;color:#15803d">{{ land_fact|currency }}
+        {% if land_plan > 0 %}<span style="font-size:.72rem;color:#86efac;font-weight:500"> / {{ land_plan|currency }}</span>{% endif %}
+      </span>
+    </div>
+    {% endif %}
+    {% else %}
+    <div style="padding:1.5rem;text-align:center;color:#94a3b8;font-size:.88rem">
+      <i class="bi bi-tree" style="font-size:2rem;display:block;margin-bottom:.5rem;color:#d1fae5"></i>
+      Виды работ для благоустройства не созданы
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Recent documents (ASM + AVR) ── #}
+{% if recent_docs %}
+<div class="card-section mb-4">
+  <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+    <span class="section-title"><i class="bi bi-journal-check me-2 text-primary"></i>Последние документы</span>
+    <div class="d-flex gap-2">
+      <a href="{% url 'act_list' blk.pk %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-list-ul me-1"></i>Все акты
+      </a>
+    </div>
+  </div>
+  <div style="padding:.8rem 1.25rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+    {% for item in recent_docs %}
+    {% with doc=item.doc dtype=item.type %}
+    <a href="{% if dtype == 'asm' %}{% url 'asm_edit' doc.pk %}{% else %}{% url 'avr_edit' doc.pk %}{% endif %}"
+       style="display:flex;border-radius:10px;border:1px solid {% if dtype == 'avr' %}#bfdbfe{% else %}#fde68a{% endif %};overflow:hidden;background:#fff;transition:.12s;text-decoration:none"
+       onmouseover="this.style.background='{% if dtype == 'avr' %}#eff6ff{% else %}#fffbeb{% endif %}'"
+       onmouseout="this.style.background='#fff'">
+      {# Color strip #}
+      <div style="width:5px;min-width:5px;background:{% if dtype == 'avr' %}#3b82f6{% else %}#f59e0b{% endif %}"></div>
+      {# Content #}
+      <div style="padding:10px 14px;flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0">
+        {# Number + date #}
+        <div style="min-width:75px">
+          <div style="font-size:.95rem;font-weight:900;color:#0f172a">
+            {% if doc.doc_number %}№{{ doc.doc_number }}{% else %}<span style="color:#cbd5e1">б/н</span>{% endif %}
+          </div>
+          <div style="font-size:.68rem;color:#94a3b8;margin-top:1px">{{ doc.doc_date|date:"d.m.Y" }}</div>
+        </div>
+        {# Type badge #}
+        <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:800;letter-spacing:.3px;white-space:nowrap;flex-shrink:0;
+                     background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
+                     color:{% if dtype == 'avr' %}#1d4ed8{% else %}#92400e{% endif %}">
+          {% if dtype == 'avr' %}АВР{% else %}АСМ{% endif %}
+        </span>
+        {% if dtype == 'avr' and doc.is_rework %}
+        <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:800;white-space:nowrap;flex-shrink:0;
+                     background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">
+          <i class="bi bi-wrench me-1" style="font-size:.6rem"></i>Вне сметы
+        </span>
+        {% endif %}
+        {# Category + floor #}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ doc.category.name }}
+          </div>
+          <div style="font-size:.68rem;color:#94a3b8">
+            {% if doc.floor_number is not None %}
+              {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %}
+            {% endif %}
+            {% if doc.contractor %} · {{ doc.contractor }}{% endif %}
+          </div>
+        </div>
+        {# AVR: completion pct / ASM: amount (admin only) #}
+        {% if dtype == 'avr' %}
+        <span style="font-size:.92rem;font-weight:900;color:{% if doc.completion_pct >= 100 %}#15803d{% elif doc.completion_pct > 0 %}#16a34a{% else %}#94a3b8{% endif %};white-space:nowrap;flex-shrink:0">
+          {{ doc.completion_pct|floatformat:0 }}%
+        </span>
+        {% elif is_admin %}
+        <span style="font-size:.88rem;font-weight:800;color:#1d4ed8;white-space:nowrap;flex-shrink:0">
+          {{ doc.doc_total|currency }}
+        </span>
+        {% endif %}
+        {# Print #}
+        {% if dtype == 'asm' %}
+        <a href="{% url 'asm_print' doc.pk %}"
+           onclick="event.stopPropagation()"
+           style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1px solid #e2e8f0;color:#64748b;text-decoration:none;flex-shrink:0"
+           onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+          <i class="bi bi-printer" style="font-size:.8rem"></i>
+        </a>
+        {% else %}
+        <a href="{% url 'avr_print' doc.pk %}"
+           onclick="event.stopPropagation()"
+           style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1px solid #e2e8f0;color:#64748b;text-decoration:none;flex-shrink:0"
+           onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+          <i class="bi bi-printer" style="font-size:.8rem"></i>
+        </a>
+        {% endif %}
+      </div>
+    </a>
+    {% endwith %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Budget modal ── #}
+{% if is_admin %}
+<div class="modal fade" id="budgetModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="{% url 'floor_budget_edit' blk.pk %}">
+        {% csrf_token %}
+        <div class="modal-header" style="background:#fffbeb;border-bottom:2px solid #fde68a;padding:1rem 1.25rem">
+          <div>
+            <h5 class="modal-title mb-0">
+              <i class="bi bi-currency-dollar me-2 text-warning"></i>Плановый бюджет по этажам
+            </h5>
+            <div style="font-size:.75rem;color:#92400e;margin-top:3px">Блок {{ blk.name }} — введите план для каждого этажа</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body" style="padding:1rem 1.25rem;background:#fafafa">
+          <div class="row g-2">
+            {% for floor in floors %}
+            <div class="col-6 col-sm-4 col-md-3">
+              <div style="padding:9px 11px;border-radius:9px;background:{% if floor.is_underground %}#f1f5f9{% else %}#fff{% endif %};border:1px solid {% if floor.planned_amount and floor.planned_amount > 0 %}#fde68a{% else %}#e2e8f0{% endif %}">
+                <div style="font-size:.73rem;font-weight:700;color:{% if floor.is_underground %}#64748b{% else %}#0f172a{% endif %};margin-bottom:5px;display:flex;align-items:center;gap:5px">
+                  {% if floor.is_underground %}
+                    <i class="bi bi-layers" style="font-size:.65rem"></i>{{ floor.label }}
+                  {% else %}
+                    <i class="bi bi-building" style="font-size:.65rem;color:#3b82f6"></i>Этаж {{ floor.label }}
+                  {% endif %}
+                </div>
+                <input type="text" inputmode="numeric"
+                       name="plan_{{ floor.number }}"
+                       class="form-control form-control-sm budget-input"
+                       data-raw="{{ floor.planned_amount|default:0|clean_num }}"
+                       placeholder="0"
+                       style="font-size:.9rem;font-weight:700;border-color:#e2e8f0;text-align:right">
+                {% if floor.asm_total > 0 %}
+                <div style="font-size:.65rem;color:#64748b;margin-top:4px;text-align:right">
+                  АСМ: {{ floor.asm_total|currency }}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="modal-footer" style="background:#fffbeb;border-top:2px solid #fde68a;justify-content:space-between;padding:.75rem 1.25rem">
+          <div>
+            <div style="font-size:.7rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Итого план</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#b45309" id="budgetTotal">0 сом</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-warning fw-bold px-4">
+              <i class="bi bi-check-lg me-1"></i>Сохранить
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Config modal (staff only) ── #}
+{% if request.user.is_staff %}
+<div class="modal fade" id="configModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="save_config" value="1">
+        <div class="modal-header">
+          <h5 class="modal-title">Настройка здания</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Всего этажей (включая подземные)</label>
+            <input type="number" name="total_floors" class="form-control" value="{{ config.total_floors }}" min="1" max="100">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Подземных этажей (подвал)</label>
+            <input type="number" name="underground_floors" class="form-control" value="{{ config.underground_floors }}" min="0" max="10">
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="has_landscaping" id="chkLand" {% if config.has_landscaping %}checked{% endif %}>
+            <label class="form-check-label" for="chkLand">Показывать раздел «Благоустройство»</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Budget input: format with spaces (1000000 → "1 000 000") ──
+function fmtMoney(str) {
+  const digits = str.toString().replace(/[\s\D]/g, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+function rawMoney(el) {
+  return parseFloat(el.value.replace(/\s/g, '')) || 0;
+}
+
+function updateBudgetTotal() {
+  let total = 0;
+  document.querySelectorAll('.budget-input').forEach(el => { total += rawMoney(el); });
+  const el = document.getElementById('budgetTotal');
+  if (el) el.textContent = fmtMoney(total) + ' сом';
+}
+
+document.querySelectorAll('.budget-input').forEach(el => {
+  el.addEventListener('input', function() {
+    const start = this.selectionStart;
+    const oldLen = this.value.length;
+    this.value = fmtMoney(this.value);
+    const diff = this.value.length - oldLen;
+    this.setSelectionRange(start + diff, start + diff);
+    updateBudgetTotal();
+  });
+});
+
+// Format initial values and strip spaces on submit
+document.getElementById('budgetModal')?.addEventListener('show.bs.modal', function() {
+  document.querySelectorAll('.budget-input').forEach(el => {
+    el.value = fmtMoney(el.dataset.raw || '0');
+  });
+  updateBudgetTotal();
+});
+
+document.querySelector('#budgetModal form')?.addEventListener('submit', function() {
+  document.querySelectorAll('.budget-input').forEach(el => {
+    el.value = el.value.replace(/\s/g, '');
+  });
+});
+
+const _modal = new bootstrap.Modal(document.getElementById('floorModal'));
+function openFloorModal(fn) {
+  document.querySelectorAll('.floor-panel').forEach(el => el.classList.add('d-none'));
+  const panel = document.getElementById('fp' + fn);
+  if (panel) panel.classList.remove('d-none');
+  document.getElementById('floorModalLabel').textContent =
+    (fn < 0 ? 'Подвал ' + Math.abs(fn) : 'Этаж ' + fn);
+  _modal.show();
+}
+</script>
+{% endblock %}

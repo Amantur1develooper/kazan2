@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load finance_filters l10n %}
+
+{% block title %}АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %} — {{ floor_label }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.asm-table th { background:#f8fafc; font-size:.78rem; font-weight:600; padding:5px 8px; }
+.asm-table td { padding:4px 6px; vertical-align:middle; }
+.asm-table input { font-size:.82rem; }
+.del-check { width:20px; }
+.new-row td { background:#f0fdf4; }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'asm_list' blk.pk doc.floor_number doc.category.pk %}">АСМ — {{ floor_label }}</a>
+        </li>
+        <li class="breadcrumb-item active">
+          АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %}
+        </li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-clipboard-check me-2 text-primary"></i>
+      АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %} / {{ floor_label }} / {{ doc.category.name }}
+    </h1>
+  </div>
+  <a href="{% url 'asm_print' doc.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">
+    <i class="bi bi-printer me-1"></i>Печать
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="asm-form">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="save" id="form-action">
+
+  {# Header fields #}
+  <div class="card-section p-3 mb-3">
+    <div class="row g-2">
+      <div class="col-6 col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600">Номер</label>
+        <input type="text" name="doc_number" class="form-control form-control-sm" value="{{ doc.doc_number }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label" style="font-size:.78rem;font-weight:600">Дата</label>
+        <input type="date" name="doc_date" class="form-control form-control-sm"
+               value="{{ doc.doc_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-12 col-md-8">
+        <label class="form-label" style="font-size:.78rem;font-weight:600">Описание зоны работ</label>
+        <input type="text" name="description" class="form-control form-control-sm" value="{{ doc.description }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:#64748b">Зав. склад</label>
+        <input type="text" name="head_warehouse" class="form-control form-control-sm" value="{{ doc.head_warehouse }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:#64748b">Нач. участка</label>
+        <input type="text" name="head_section" class="form-control form-control-sm" value="{{ doc.head_section }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:#64748b">Главный бухгалтер</label>
+        <input type="text" name="head_accounting" class="form-control form-control-sm" value="{{ doc.head_accounting }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:#64748b">Нач. производство</label>
+        <input type="text" name="head_production" class="form-control form-control-sm" value="{{ doc.head_production }}">
+      </div>
+    </div>
+  </div>
+
+  {# Items table #}
+  <div class="card-section mb-3">
+    <div style="padding:.7rem 1rem .4rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+      <span class="section-title">Материалы</span>
+      {% if doc.total_amount %}
+      <span class="fw-bold" style="color:#0f172a">Итого: {{ doc.total_amount|currency }}</span>
+      {% endif %}
+    </div>
+    <div style="overflow-x:auto">
+    <table class="table table-sm mb-0 asm-table" style="min-width:{% if is_admin %}700px{% else %}500px{% endif %}">
+      <thead>
+        <tr>
+          <th class="del-check" title="Удалить"></th>
+          <th style="width:36px">№</th>
+          <th>Наименование материала</th>
+          <th style="width:80px">Ед.изм.</th>
+          <th style="width:100px">Количество</th>
+          {% if is_admin %}
+          <th style="width:110px">Цена за ед.</th>
+          <th style="width:120px">Сумма</th>
+          {% endif %}
+          <th style="width:130px">Примечание</th>
+        </tr>
+      </thead>
+      <tbody id="items-body">
+        {# Existing items #}
+        {% for item in items %}
+        <tr>
+          <td><input type="checkbox" name="delete_item" value="{{ item.pk }}" title="Удалить строку"></td>
+          <td class="text-muted">{{ forloop.counter }}</td>
+          <td><input type="text" name="name_{{ item.pk }}" class="form-control form-control-sm"
+                     value="{{ item.name }}" required></td>
+          <td><input type="text" name="unit_{{ item.pk }}" class="form-control form-control-sm"
+                     value="{{ item.unit }}"></td>
+          <td><input type="number" step="0.001" name="qty_{{ item.pk }}" class="form-control form-control-sm"
+                     value="{{ item.quantity|clean_num }}"></td>
+          {% if is_admin %}
+          <td><input type="number" step="0.01" name="price_{{ item.pk }}" class="form-control form-control-sm"
+                     value="{{ item.unit_price|clean_num }}"></td>
+          <td style="text-align:right;font-weight:600;font-size:.85rem;padding-right:8px">
+            {{ item.total_amount|floatformat:0 }}
+          </td>
+          {% endif %}
+          <td><input type="text" name="notes_{{ item.pk }}" class="form-control form-control-sm"
+                     value="{{ item.notes }}"></td>
+        </tr>
+        {% endfor %}
+
+        {# New empty rows #}
+        {% for _ in empty_rows %}
+        <tr class="new-row">
+          <td></td>
+          <td class="text-muted">{{ items|length|add:forloop.counter }}</td>
+          <td><input type="text" name="new_name" class="form-control form-control-sm" placeholder="Наименование"></td>
+          <td><input type="text" name="new_unit" class="form-control form-control-sm" placeholder="кг"></td>
+          <td><input type="number" step="0.001" name="new_qty" class="form-control form-control-sm" placeholder="0"></td>
+          {% if is_admin %}
+          <td><input type="number" step="0.01" name="new_price" class="form-control form-control-sm" placeholder="0"></td>
+          <td></td>
+          {% endif %}
+          <td><input type="text" name="new_notes" class="form-control form-control-sm"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="p-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addRows()">
+        <i class="bi bi-plus me-1"></i>Добавить строки
+      </button>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'asm_list' blk.pk doc.floor_number doc.category.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-outline-primary">
+        <i class="bi bi-check me-1"></i>Сохранить
+      </button>
+      <button type="button" class="btn btn-success" onclick="saveAndPrint()">
+        <i class="bi bi-printer me-1"></i>Сохранить и распечатать
+      </button>
+    </div>
+  </div>
+</form>
+
+<script>
+function calcRow(el){
+  // Not recalculating server totals inline — just visual hint
+}
+function addRows(){
+  const tbody = document.getElementById('items-body');
+  const baseCount = tbody.querySelectorAll('tr').length;
+  for(let i=0;i<5;i++){
+    const n = baseCount + i + 1;
+    tbody.insertAdjacentHTML('beforeend',`
+    <tr class="new-row">
+      <td></td><td class="text-muted">${n}</td>
+      <td><input type="text" name="new_name" class="form-control form-control-sm" placeholder="Наименование"></td>
+      <td><input type="text" name="new_unit" class="form-control form-control-sm" placeholder="кг"></td>
+      <td><input type="number" step="0.001" name="new_qty"   class="form-control form-control-sm" placeholder="0"></td>
+      <td><input type="number" step="0.01"  name="new_price" class="form-control form-control-sm" placeholder="0"></td>
+      <td></td>
+      <td><input type="text" name="new_notes" class="form-control form-control-sm"></td>
+    </tr>`);
+  }
+}
+function saveAndPrint(){
+  document.getElementById('form-action').value='save_print';
+  document.getElementById('asm-form').submit();
+}
+</script>
+{% endblock %}

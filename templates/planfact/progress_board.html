@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Ход строительства — Блок {{ blk.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.pb-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.pb-table th {
+  background: #1e293b; color: #f1f5f9;
+  font-size: .7rem; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; padding: 9px 12px;
+  text-align: center; white-space: nowrap;
+  position: sticky; top: 0; z-index: 10;
+}
+.pb-table th:first-child { text-align: left; min-width: 100px; position: sticky; left: 0; z-index: 11; }
+.pb-floor-label {
+  font-size: .82rem; font-weight: 800; color: #1e293b;
+  padding: 0 14px; min-width: 100px;
+  background: #f8fafc; border-right: 2px solid #e2e8f0;
+  position: sticky; left: 0; z-index: 5;
+  vertical-align: middle;
+}
+.pb-floor-label.underground { color: #64748b; background: #f1f5f9; }
+.pb-cell {
+  padding: 6px 8px; text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  min-width: 110px;
+  vertical-align: middle;
+}
+.pb-pct-block {
+  position: relative; border-radius: 8px; overflow: hidden;
+  height: 54px; display: flex; align-items: center; justify-content: center;
+}
+.pb-bar {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  transition: width .4s ease;
+  border-radius: 8px;
+}
+.pb-pct-num {
+  position: relative; z-index: 1;
+  font-size: 1.35rem; font-weight: 900;
+  line-height: 1;
+}
+.pb-input {
+  width: 64px; font-size: 1.1rem; font-weight: 800;
+  text-align: center; border: 2px solid #cbd5e1; border-radius: 6px;
+  padding: 6px 4px; background: rgba(255,255,255,.85);
+  -moz-appearance: textfield;
+}
+.pb-input::-webkit-inner-spin-button,
+.pb-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.pb-input:focus { outline: none; border-color: #3b82f6; background: #fff; }
+.avg-cell {
+  padding: 6px 10px; text-align: center;
+  font-size: 1rem; font-weight: 800;
+  border-left: 2px solid #e2e8f0;
+  min-width: 70px; vertical-align: middle;
+}
+.pb-row:hover .pb-floor-label { background: #eff6ff; }
+.pb-row:hover .pb-floor-label.underground { background: #e2e8f0; }
+
+/* Legend */
+.pct-color-0   { background: #f1f5f9; color: #94a3b8; }
+.pct-color-low { background: #fef9c3; color: #a16207; }
+.pct-color-mid { background: #dcfce7; color: #15803d; }
+.pct-color-hi  { background: #bbf7d0; color: #166534; }
+.pct-color-100 { background: #22c55e; color: #fff; }
+
+@media (max-width: 600px) {
+  .pb-pct-num { font-size: 1.05rem; }
+  .pb-input { width: 54px; font-size: 1rem; }
+  .pb-pct-block { height: 46px; }
+}
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header flex-wrap gap-2">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Ход работ</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-bar-chart-steps me-2 text-primary"></i>Ход строительства — Блок {{ blk.name }}</h1>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>К дому
+    </a>
+    <a href="{% url 'progress_board_excel' blk.pk %}" class="btn btn-success btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Скачать Excel
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="progressForm">
+  {% csrf_token %}
+
+  {# Legend #}
+  <div class="d-flex gap-3 flex-wrap mb-3 align-items-center" style="font-size:.75rem;font-weight:600">
+    <span style="padding:3px 10px;border-radius:20px" class="pct-color-0">0% — не начато</span>
+    <span style="padding:3px 10px;border-radius:20px" class="pct-color-low">1–33% — начало</span>
+    <span style="padding:3px 10px;border-radius:20px" class="pct-color-mid">34–66% — в процессе</span>
+    <span style="padding:3px 10px;border-radius:20px" class="pct-color-hi">67–99% — финиш</span>
+    <span style="padding:3px 10px;border-radius:20px" class="pct-color-100">100% — готово</span>
+    <span style="padding:3px 10px;border-radius:20px;background:#f0fdf4;border:1px solid #86efac;color:#166534">
+      <i class="bi bi-lock-fill me-1" style="font-size:.65rem"></i>АВР — из документа, только чтение
+    </span>
+    <span style="padding:3px 10px;border-radius:20px;background:#f8fafc;border:1px solid #e2e8f0;color:#94a3b8">
+      — не назначено на этаж
+    </span>
+  </div>
+
+  <div style="overflow-x:auto;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.07)">
+  <table class="pb-table">
+    <thead>
+      <tr>
+        <th>Этаж</th>
+        {% for cat in cats %}
+        <th>
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ cat.color }};margin-right:5px"></span>
+          {{ cat.name }}
+        </th>
+        {% endfor %}
+        <th style="background:#0f172a">Итого</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="pb-row" style="{% if row.is_underground %}opacity:.85{% endif %}">
+
+        {# Floor label #}
+        <td class="pb-floor-label {% if row.is_underground %}underground{% endif %}">
+          {% if row.is_underground %}
+            <i class="bi bi-layers me-1" style="font-size:.7rem;color:#94a3b8"></i>
+          {% else %}
+            <i class="bi bi-building me-1" style="font-size:.7rem;color:#3b82f6"></i>
+          {% endif %}
+          {{ row.label }}
+        </td>
+
+        {# Category cells #}
+        {% for c in row.cats %}
+        {% with p=c.pct %}
+        <td class="pb-cell" style="{% if not c.assigned %}opacity:.3;{% endif %}">
+          {% if not c.assigned %}
+            {# Not assigned to this floor #}
+            <div style="height:54px;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:1.2rem">—</div>
+          {% elif c.source == 'avr' %}
+            {# AVR-sourced: read-only, locked display #}
+            <div class="pb-pct-block {% if p >= 100 %}pct-color-100{% elif p >= 67 %}pct-color-hi{% elif p >= 34 %}pct-color-mid{% elif p > 0 %}pct-color-low{% else %}pct-color-0{% endif %}"
+                 style="cursor:default;position:relative">
+              <div class="pb-bar"
+                   style="width:{{ p|floatformat:0 }}%;background:{% if p >= 100 %}#22c55e{% elif p >= 67 %}#4ade80{% elif p >= 34 %}#86efac{% elif p > 0 %}#fef08a{% else %}transparent{% endif %}">
+              </div>
+              <span class="pb-pct-num">{{ p|floatformat:0 }}%</span>
+              <span style="position:absolute;bottom:3px;right:5px;font-size:.55rem;font-weight:800;letter-spacing:.4px;
+                           color:{% if p >= 100 %}#fff{% else %}#16a34a{% endif %};text-transform:uppercase;opacity:.9">
+                АВР
+              </span>
+              <span style="position:absolute;top:3px;right:4px;font-size:.65rem;color:{% if p >= 100 %}rgba(255,255,255,.7){% else %}#94a3b8{% endif %}">
+                <i class="bi bi-lock-fill"></i>
+              </span>
+            </div>
+          {% else %}
+            {# Manual: editable input #}
+            <div class="pb-pct-block {% if p == 0 %}pct-color-0{% elif p < 34 %}pct-color-low{% elif p < 67 %}pct-color-mid{% elif p < 100 %}pct-color-hi{% else %}pct-color-100{% endif %}">
+              <div class="pb-bar"
+                   style="width:{{ p|floatformat:0 }}%;background:{% if p == 0 %}transparent{% elif p < 34 %}#fef08a{% elif p < 67 %}#86efac{% elif p < 100 %}#4ade80{% else %}#22c55e{% endif %}">
+              </div>
+              <input type="number" min="0" max="100"
+                     name="pct_{{ row.number }}_{{ c.category.id }}"
+                     class="pb-input pct-input"
+                     value="{{ p|floatformat:0 }}"
+                     data-orig="{{ p|floatformat:0 }}"
+                     onchange="markChanged(this)"
+                     oninput="updateCell(this)">
+            </div>
+          {% endif %}
+        </td>
+        {% endwith %}
+        {% endfor %}
+
+        {# Average #}
+        <td class="avg-cell">
+          <div style="font-size:.72rem;color:#94a3b8;font-weight:600;margin-bottom:2px">avg</div>
+          <div class="avg-val" style="color:{% if row.avg_pct >= 100 %}#15803d{% elif row.avg_pct >= 67 %}#16a34a{% elif row.avg_pct >= 34 %}#ca8a04{% elif row.avg_pct > 0 %}#f97316{% else %}#94a3b8{% endif %}">
+            {{ row.avg_pct }}%
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
+    <div id="changeNotice" style="display:none;font-size:.85rem;color:#b45309;font-weight:600">
+      <i class="bi bi-exclamation-circle me-1"></i>Есть несохранённые изменения
+    </div>
+    <div style="flex:1"></div>
+    <button type="submit" class="btn btn-primary btn-lg px-5 fw-bold">
+      <i class="bi bi-check-lg me-2"></i>Сохранить прогресс
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function pctColor(p) {
+  if (p == 0)   return { bar: 'transparent', bg: '#f1f5f9', text: '#94a3b8' };
+  if (p < 34)   return { bar: '#fef08a',    bg: '#fef9c3', text: '#a16207' };
+  if (p < 67)   return { bar: '#86efac',    bg: '#dcfce7', text: '#15803d' };
+  if (p < 100)  return { bar: '#4ade80',    bg: '#bbf7d0', text: '#166534' };
+  return              { bar: '#22c55e',    bg: '#22c55e', text: '#fff'    };
+}
+
+function updateCell(input) {
+  const p    = Math.max(0, Math.min(100, parseInt(input.value) || 0));
+  const c    = pctColor(p);
+  const wrap = input.closest('.pb-pct-block');
+  wrap.style.background = c.bg;
+  input.style.color     = c.text;
+  const bar  = wrap.querySelector('.pb-bar');
+  if (bar) { bar.style.width = p + '%'; bar.style.background = c.bar; }
+  // update avg in same row
+  const row  = input.closest('tr');
+  const vals = [...row.querySelectorAll('.pb-input')].map(i => parseInt(i.value) || 0);
+  const avg  = Math.round(vals.reduce((a,b) => a+b, 0) / vals.length);
+  const avgEl = row.querySelector('.avg-val');
+  if (avgEl) {
+    avgEl.textContent = avg + '%';
+    avgEl.style.color = avg >= 100 ? '#15803d' : avg >= 67 ? '#16a34a' : avg >= 34 ? '#ca8a04' : avg > 0 ? '#f97316' : '#94a3b8';
+  }
+}
+
+function markChanged(input) {
+  if (input.value !== input.dataset.orig) {
+    document.getElementById('changeNotice').style.display = 'block';
+  }
+}
+
+// Init colors on load
+document.querySelectorAll('.pb-input').forEach(el => {
+  const p = parseInt(el.value) || 0;
+  const c = pctColor(p);
+  el.style.color = c.text;
+});
+
+// Warn before leaving with unsaved changes
+let formDirty = false;
+document.querySelectorAll('.pb-input').forEach(el => {
+  el.addEventListener('change', () => { formDirty = true; });
+});
+document.getElementById('progressForm').addEventListener('submit', () => { formDirty = false; });
+window.addEventListener('beforeunload', e => {
+  if (formDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

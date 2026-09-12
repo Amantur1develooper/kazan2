@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}{{ plan.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'calendar_plan_list' blk.pk %}">Календарный план</a></li>
+        <li class="breadcrumb-item active">{{ plan.name }}</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-calendar3 me-2 text-primary"></i>{{ plan.name }}</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'calendar_fact_enter' plan.pk %}" class="btn btn-success btn-sm">
+      <i class="bi bi-pencil me-1"></i>Ввод факта
+    </a>
+    <a href="{% url 'calendar_task_edit' plan.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-list-ul me-1"></i>Задачи
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Legend -->
+<div class="d-flex gap-3 mb-3 flex-wrap" style="font-size:.78rem">
+  <span><span style="display:inline-block;width:12px;height:12px;background:#fecaca;border-radius:2px"></span> Просрочка</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#bfdbfe;border-radius:2px"></span> Текущий месяц</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#bbf7d0;border-radius:2px"></span> Выполнено</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#f1f5f9;border-radius:2px"></span> Будущий</span>
+</div>
+
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+<table style="border-collapse:collapse;min-width:max-content;font-size:.8rem;width:100%">
+
+  <!-- Year row -->
+  <thead>
+  <tr style="background:#1e3a5f;color:#fff">
+    <th rowspan="3" style="min-width:220px;max-width:280px;padding:6px 10px;text-align:left;position:sticky;left:0;background:#1e3a5f;z-index:2;border-right:2px solid #fff3">
+      Наименование
+    </th>
+    {% with prev_year="" %}
+    {% for y, m, ms in month_headers %}
+      {% if y != prev_year %}
+        {% with col_count=month_headers|length %}
+        <th colspan="1" data-year="{{ y }}"
+            style="text-align:center;padding:4px 6px;border-left:2px solid #ffffff40;white-space:nowrap">
+          {{ y }}
+        </th>
+        {% endwith %}
+      {% endif %}
+    {% endfor %}
+    {% endwith %}
+    <th rowspan="3" style="min-width:90px;padding:6px 8px;text-align:right;background:#1e3a5f;border-left:2px solid #fff3">
+      Итого план
+    </th>
+    <th rowspan="3" style="min-width:90px;padding:6px 8px;text-align:right;background:#1e3a5f;border-left:1px solid #fff3">
+      Итого факт
+    </th>
+  </tr>
+  <!-- Month name row -->
+  <tr style="background:#2563eb;color:#fff">
+    {% for y, m, ms in month_headers %}
+    <th style="text-align:center;padding:3px 4px;min-width:80px;border-left:{% if m == 1 %}2px solid #ffffff40{% else %}1px solid #ffffff20{% endif %};white-space:nowrap">
+      {{ ms }}
+    </th>
+    {% endfor %}
+  </tr>
+  <!-- Plan/Fact sub-header -->
+  <tr style="background:#3b82f6;color:#fff">
+    {% for y, m, ms in month_headers %}
+    <th style="text-align:center;padding:2px 4px;border-left:{% if m == 1 %}2px solid #ffffff40{% else %}1px solid #ffffff20{% endif %}">
+      <div style="font-size:.65rem;opacity:.85">план</div>
+      <div style="font-size:.65rem;opacity:.7">факт</div>
+    </th>
+    {% endfor %}
+  </tr>
+  </thead>
+
+  <tbody>
+  {% for row in rows %}
+  <tr style="border-bottom:1px solid #e2e8f0">
+    <td style="padding:5px 10px;position:sticky;left:0;background:#fff;z-index:1;border-right:2px solid #e2e8f0;font-weight:500;max-width:280px">
+      {{ row.task.name }}
+      {% if row.task.unit %}<span style="font-size:.72rem;color:#94a3b8;margin-left:4px">{{ row.task.unit }}</span>{% endif %}
+    </td>
+    {% for cell in row.cells %}
+    <td style="text-align:right;padding:3px 6px;vertical-align:top;min-width:80px;
+        border-left:{% if cell.month == 1 %}2px solid #cbd5e1{% else %}1px solid #f1f5f9{% endif %};
+        background:{% if cell.is_overdue %}#fef2f2{% elif cell.is_current %}#eff6ff{% elif cell.is_done %}#f0fdf4{% else %}#fafafa{% endif %}">
+      {% if cell.plan_amt > 0 or cell.fact_amt > 0 %}
+        <div style="font-size:.72rem;color:#334155">{{ cell.plan_amt|floatformat:0 }}</div>
+        <div style="font-size:.75rem;font-weight:{% if cell.fact_amt > 0 %}600{% else %}400{% endif %};
+            color:{% if cell.is_overdue %}#dc2626{% elif cell.is_done %}#16a34a{% elif cell.fact_amt > 0 %}#2563eb{% else %}#94a3b8{% endif %}">
+          {{ cell.fact_amt|floatformat:0 }}
+        </div>
+      {% else %}
+        <span style="color:#e2e8f0">—</span>
+      {% endif %}
+    </td>
+    {% endfor %}
+    <td style="text-align:right;padding:5px 8px;font-weight:600;border-left:2px solid #e2e8f0;background:#f8fafc">
+      {{ row.plan_total|floatformat:0 }}
+    </td>
+    <td style="text-align:right;padding:5px 8px;font-weight:600;border-left:1px solid #e2e8f0;background:#f8fafc;
+        color:{% if row.fact_total >= row.plan_total and row.plan_total > 0 %}#16a34a{% elif row.fact_total > 0 %}#2563eb{% else %}#94a3b8{% endif %}">
+      {{ row.fact_total|floatformat:0 }}
+    </td>
+  </tr>
+  {% empty %}
+  <tr>
+    <td colspan="100" style="text-align:center;padding:24px;color:#94a3b8">
+      Задачи не добавлены.
+      <a href="{% url 'calendar_task_edit' plan.pk %}">Добавить задачи →</a>
+    </td>
+  </tr>
+  {% endfor %}
+
+  <!-- Totals row -->
+  {% if rows %}
+  <tr style="background:#f0f9ff;font-weight:700;border-top:2px solid #bfdbfe">
+    <td style="padding:6px 10px;position:sticky;left:0;background:#f0f9ff;z-index:1;border-right:2px solid #e2e8f0">
+      Итого
+    </td>
+    {% for ct in col_totals %}
+    <td style="text-align:right;padding:4px 6px;min-width:80px;
+        border-left:{% if ct.month == 1 %}2px solid #bfdbfe{% else %}1px solid #dbeafe{% endif %};
+        background:{% if ct.month == today.month and ct.year == today.year %}#eff6ff{% else %}#f0f9ff{% endif %}">
+      <div style="font-size:.72rem;color:#475569">{{ ct.plan|floatformat:0 }}</div>
+      <div style="font-size:.75rem;color:{% if ct.fact > 0 %}#2563eb{% else %}#94a3b8{% endif %}">
+        {{ ct.fact|floatformat:0 }}
+      </div>
+    </td>
+    {% endfor %}
+    <td style="text-align:right;padding:6px 8px;border-left:2px solid #bfdbfe;background:#dbeafe">
+      {{ rows|length }}{{ '' }}{% for r in rows %}{% if forloop.first %}{{ '' }}{% endif %}{% endfor %}
+      {% comment %}sum plan total{% endcomment %}
+      —
+    </td>
+    <td style="text-align:right;padding:6px 8px;border-left:1px solid #bfdbfe;background:#dbeafe">—</td>
+  </tr>
+  {% endif %}
+  </tbody>
+</table>
+</div>
+
+<script>
+// Fix year colspan: group consecutive same-year month_headers
+(function(){
+  var ths = document.querySelectorAll('thead tr:first-child th[data-year]');
+  var groups = {};
+  ths.forEach(function(th){
+    var y = th.getAttribute('data-year');
+    groups[y] = (groups[y]||0) + 1;
+  });
+  var seen = {};
+  ths.forEach(function(th){
+    var y = th.getAttribute('data-year');
+    if(seen[y]){ th.remove(); return; }
+    th.setAttribute('colspan', groups[y]);
+    seen[y] = true;
+  });
+})();
+</script>
+
+<div class="mt-3 d-flex gap-2">
+  <a href="{% url 'calendar_fact_enter' plan.pk %}" class="btn btn-success">
+    <i class="bi bi-pencil me-1"></i>Ввод план/факта за месяц
+  </a>
+  <a href="{% url 'calendar_plan_list' blk.pk %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Все планы
+  </a>
+</div>
+{% endblock %}

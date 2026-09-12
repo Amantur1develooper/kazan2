@@ -4,8 +4,22 @@ from django.shortcuts import render
 from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 from django.db.models import Value
+from django.contrib.auth.views import LoginView
 
 from apps.projects.models import Organization, ResidentialComplex, Stage, FloorExpense, Block
+
+
+class SmartLoginView(LoginView):
+    template_name = 'registration/login.html'
+
+    def get_success_url(self):
+        user = self.request.user
+        is_admin = user.is_staff or user.groups.filter(name='Производство').exists()
+        if not is_admin:
+            from apps.planfact.models import BlockAccess
+            if BlockAccess.objects.filter(user=user).exists():
+                return '/planfact/'
+        return super().get_success_url()
 
 
 def dashboard(request):

@@ -121,3 +121,30 @@ def percent(value, total):
         return round(v / t * 100, 1)
     except (TypeError, ValueError, ZeroDivisionError):
         return 0
+
+
+@register.filter
+def clean_num(value):
+    """Decimal без лишних нулей, всегда с точкой: 1000.000 → 1000, 5.500 → 5.5"""
+    try:
+        from decimal import Decimal, ROUND_DOWN
+        d = Decimal(str(value)).normalize()
+        return format(d, 'f')
+    except Exception:
+        return str(value)
+
+
+@register.filter
+def shortnum(value):
+    """Format large numbers as 1.2М, 850К, etc."""
+    try:
+        v = float(value)
+        if v == 0:
+            return '0'
+        if abs(v) >= 1_000_000:
+            return f'{v/1_000_000:.1f}М'.replace('.0М', 'М')
+        if abs(v) >= 1_000:
+            return f'{v/1_000:.0f}К'
+        return f'{v:.0f}'
+    except (TypeError, ValueError):
+        return str(value)

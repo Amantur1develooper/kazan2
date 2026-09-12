@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load finance_filters %}
+
+{% block title %}Плановый бюджет по этажам — Блок {{ blk.name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <nav aria-label="breadcrumb" style="margin-bottom:.2rem">
+      <ol class="breadcrumb mb-0" style="font-size:.78rem">
+        <li class="breadcrumb-item"><a href="{% url 'planfact_index' %}">План-факт</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'planfact_block' blk.pk %}">Блок {{ blk.name }}</a></li>
+        <li class="breadcrumb-item active">Бюджет по этажам</li>
+      </ol>
+    </nav>
+    <h1><i class="bi bi-currency-dollar me-2 text-warning"></i>Плановый бюджет по этажам — Блок {{ blk.name }}</h1>
+  </div>
+  <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К дому
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="card-section mb-4">
+    <div style="padding:.9rem 1.25rem .5rem;border-bottom:1px solid #f1f5f9">
+      <span class="section-title">Введите плановую сумму для каждого этажа</span>
+    </div>
+    <div style="padding:1rem 1.25rem">
+      <div style="overflow-x:auto">
+      <table class="table table-sm table-hover mb-0" style="min-width:440px">
+        <thead style="background:#f8fafc">
+          <tr>
+            <th style="width:160px">Этаж</th>
+            <th>Плановая сумма (сом)</th>
+            <th>Примечание</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr {% if row.number < 0 %}style="background:#f8fafc;color:#64748b"{% endif %}>
+            <td style="vertical-align:middle;font-weight:600">
+              {% if row.number < 0 %}
+                <i class="bi bi-layers text-secondary me-1" style="font-size:.8rem"></i>
+              {% else %}
+                <i class="bi bi-building text-primary me-1" style="font-size:.8rem"></i>
+              {% endif %}
+              {{ row.label }}
+            </td>
+            <td>
+              <input type="number" step="0.01" min="0"
+                     name="plan_{{ row.number }}"
+                     class="form-control form-control-sm"
+                     value="{{ row.planned_amount }}"
+                     placeholder="0">
+            </td>
+            <td>
+              <input type="text"
+                     name="notes_{{ row.number }}"
+                     class="form-control form-control-sm"
+                     value="{{ row.notes }}"
+                     placeholder="необязательно">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'planfact_block' blk.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+    <button type="submit" class="btn btn-primary btn-lg">
+      <i class="bi bi-check-lg me-1"></i>Сохранить
+    </button>
+  </div>
+</form>
+{% endblock %}
