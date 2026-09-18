@@ -347,6 +347,23 @@ def planfact_block(request, block_pk):
             })
     ongoing_works.sort(key=lambda x: x['floor_number'])
 
+    # Documents awaiting admin signature
+    pending_avr = list(
+        AvrDocument.objects.filter(block=block, is_accepted=False, completion_pct__gte=100)
+        .select_related('category').order_by('-doc_date')
+    )
+    pending_asm = list(
+        AsmDocument.objects.filter(block=block, is_accepted=False)
+        .prefetch_related('items').select_related('category').order_by('-doc_date')
+    )
+    # Only show ASMs that have at least one item filled in
+    pending_asm = [d for d in pending_asm if d.items.exists()]
+    pending_docs = sorted(
+        [{'doc': d, 'dtype': 'avr'} for d in pending_avr] +
+        [{'doc': d, 'dtype': 'asm'} for d in pending_asm],
+        key=lambda x: x['doc'].doc_date, reverse=True
+    )
+
     return render(request, 'planfact/block.html', {
         'blk': block,
         'config': config,
@@ -365,6 +382,7 @@ def planfact_block(request, block_pk):
         'building_pct': building_pct,
         'recent_docs': recent_docs,
         'recent_acts': recent_acts,
+        'pending_docs': pending_docs,
         'is_admin': _is_admin_user(request.user),
         'unprice_docs': unprice_docs,
         'ongoing_works': ongoing_works,

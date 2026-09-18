@@ -709,6 +709,66 @@
 {% endif %}
 
 {# ── Recent documents (ASM + AVR) ── #}
+{% if is_admin and pending_docs %}
+<div class="card-section mb-4" style="border-left:3px solid #f59e0b">
+  <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #fef3c7;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-pen-fill" style="color:#d97706;font-size:1.1rem"></i>
+    <span class="section-title" style="color:#92400e">Ожидают подписания</span>
+    <span style="background:#f59e0b;color:#fff;border-radius:20px;font-size:.72rem;font-weight:800;padding:2px 9px">
+      {{ pending_docs|length }}
+    </span>
+  </div>
+  <div style="padding:.8rem 1.25rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+    {% for item in pending_docs %}
+    {% with doc=item.doc dtype=item.dtype %}
+    <a href="{% if dtype == 'asm' %}{% url 'asm_edit' doc.pk %}{% else %}{% url 'avr_edit' doc.pk %}{% endif %}"
+       style="display:flex;border-radius:10px;border:1px solid #fde68a;overflow:hidden;background:#fffbeb;transition:.12s;text-decoration:none"
+       onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='#fffbeb'">
+      <div style="width:5px;min-width:5px;background:#f59e0b"></div>
+      <div style="padding:10px 14px;flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0">
+        <div style="min-width:75px">
+          <div style="font-size:.95rem;font-weight:900;color:#0f172a">
+            {% if doc.doc_number %}№{{ doc.doc_number }}{% else %}<span style="color:#cbd5e1">б/н</span>{% endif %}
+          </div>
+          <div style="font-size:.68rem;color:#94a3b8;margin-top:1px">{{ doc.doc_date|date:"d.m.Y" }}</div>
+        </div>
+        <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:800;white-space:nowrap;flex-shrink:0;
+                     background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
+                     color:{% if dtype == 'avr' %}#1d4ed8{% else %}#92400e{% endif %}">
+          {% if dtype == 'avr' %}АВР{% else %}АСМ{% endif %}
+        </span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ doc.category.name }}
+          </div>
+          <div style="font-size:.68rem;color:#94a3b8">
+            {% if doc.floor_number is not None %}
+              {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %}
+            {% endif %}
+            {% if dtype == 'avr' and doc.contractor %} · {{ doc.contractor }}{% endif %}
+          </div>
+        </div>
+        {% if dtype == 'avr' %}
+        <span style="font-size:.92rem;font-weight:900;color:#15803d;white-space:nowrap;flex-shrink:0">
+          {{ doc.completion_pct|floatformat:0 }}%
+        </span>
+        {% else %}
+        <span style="font-size:.88rem;font-weight:800;color:#1d4ed8;white-space:nowrap;flex-shrink:0">
+          {{ doc.total_amount|currency }}
+        </span>
+        {% endif %}
+        <span style="padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap;flex-shrink:0;
+                     background:#fef9c3;color:#a16207;border:1px solid #fde68a">
+          <i class="bi bi-pen me-1" style="font-size:.6rem"></i>Подписать
+        </span>
+      </div>
+    </a>
+    {% endwith %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if recent_docs %}
 <div class="card-section mb-4">
   <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
@@ -761,7 +821,19 @@
             {% if doc.contractor %} · {{ doc.contractor }}{% endif %}
           </div>
         </div>
-        {# AVR: completion pct / ASM: amount (admin only) #}
+        {# Acceptance badge #}
+        {% if doc.is_accepted %}
+        <span style="padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:700;white-space:nowrap;flex-shrink:0;
+                     background:#f0fdf4;color:#15803d;border:1px solid #86efac">
+          <i class="bi bi-lock-fill me-1" style="font-size:.55rem"></i>Принято
+        </span>
+        {% elif is_admin %}
+        <span style="padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:600;white-space:nowrap;flex-shrink:0;
+                     background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">
+          Не принято
+        </span>
+        {% endif %}
+        {# AVR: completion pct / ASM: amount #}
         {% if dtype == 'avr' %}
         <span style="font-size:.92rem;font-weight:900;color:{% if doc.completion_pct >= 100 %}#15803d{% elif doc.completion_pct > 0 %}#16a34a{% else %}#94a3b8{% endif %};white-space:nowrap;flex-shrink:0">
           {{ doc.completion_pct|floatformat:0 }}%
