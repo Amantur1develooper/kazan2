@@ -10,6 +10,11 @@
 .avr-table input { font-size:.82rem; }
 .del-check { width:20px; }
 .new-row td { background:#f0fdf4; }
+@media (max-width: 600px) {
+  .avr-table { font-size: .78rem; }
+  .avr-table th, .avr-table td { padding: 3px 4px; }
+  .avr-table input { font-size: .78rem; }
+}
 </style>
 {% endblock %}
 
@@ -188,12 +193,12 @@
   <div class="card-section mb-3">
     <div style="padding:.7rem 1rem .4rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
       <span class="section-title">Работы</span>
-      {% if is_admin and doc.total_amount %}
+      {% if doc.total_amount %}
       <span class="fw-bold" style="color:#0f172a">Итого: {{ doc.total_amount|currency }}</span>
       {% endif %}
     </div>
     <div style="overflow-x:auto">
-    <table class="table table-sm mb-0 avr-table" style="min-width:{% if is_admin %}700px{% else %}500px{% endif %}">
+    <table class="table table-sm mb-0 avr-table" style="min-width:700px">
       <thead>
         <tr>
           <th class="del-check" title="Удалить"></th>
@@ -201,10 +206,8 @@
           <th>Наименование работ</th>
           <th style="width:80px">Ед.изм.</th>
           <th style="width:100px">Количество</th>
-          {% if is_admin %}
           <th style="width:110px">Цена</th>
           <th style="width:120px">Сумма</th>
-          {% endif %}
           <th style="width:130px">Примечание</th>
         </tr>
       </thead>
@@ -219,13 +222,11 @@
                      value="{{ item.unit }}"></td>
           <td><input type="number" step="0.001" name="qty_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.quantity|clean_num }}"></td>
-          {% if is_admin %}
           <td><input type="number" step="0.01" name="price_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.unit_price|clean_num }}"></td>
           <td style="text-align:right;font-weight:600;font-size:.85rem;padding-right:8px">
             {{ item.total_amount|floatformat:0 }}
           </td>
-          {% endif %}
           <td><input type="text" name="notes_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.notes }}"></td>
         </tr>
@@ -238,10 +239,8 @@
           <td><input type="text" name="new_name" class="form-control form-control-sm" placeholder="Наименование работ"></td>
           <td><input type="text" name="new_unit" class="form-control form-control-sm" placeholder="м²"></td>
           <td><input type="number" step="0.001" name="new_qty" class="form-control form-control-sm" placeholder="0"></td>
-          {% if is_admin %}
           <td><input type="number" step="0.01" name="new_price" class="form-control form-control-sm" placeholder="0"></td>
           <td></td>
-          {% endif %}
           <td><input type="text" name="new_notes" class="form-control form-control-sm"></td>
         </tr>
         {% endfor %}
@@ -391,11 +390,6 @@ function updatePhotoCount(input) {
 function addRows(){
   const tbody = document.getElementById('items-body');
   const baseCount = tbody.querySelectorAll('tr').length;
-  {% if is_admin %}
-  const adminCols = `<td><input type="number" step="0.01" name="new_price" class="form-control form-control-sm" placeholder="0"></td><td></td>`;
-  {% else %}
-  const adminCols = '';
-  {% endif %}
   for(let i=0;i<5;i++){
     const n = baseCount + i + 1;
     tbody.insertAdjacentHTML('beforeend',`
@@ -404,7 +398,8 @@ function addRows(){
       <td><input type="text" name="new_name" class="form-control form-control-sm" placeholder="Наименование работ"></td>
       <td><input type="text" name="new_unit" class="form-control form-control-sm" placeholder="м²"></td>
       <td><input type="number" step="0.001" name="new_qty" class="form-control form-control-sm" placeholder="0"></td>
-      ${adminCols}
+      <td><input type="number" step="0.01" name="new_price" class="form-control form-control-sm" placeholder="0"></td>
+      <td></td>
       <td><input type="text" name="new_notes" class="form-control form-control-sm"></td>
     </tr>`);
   }

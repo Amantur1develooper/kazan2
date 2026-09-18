@@ -75,6 +75,25 @@
   background:#1e293b; border-radius:0 0 3px 3px;
 }
 
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .expense-grid { grid-template-columns: 1fr !important; gap: .5rem !important; }
+
+  .bld-wrap { max-width: 100%; }
+  .bld-row { height: 44px; }
+  .bld-num { width: 46px; min-width: 46px; font-size: .75rem; }
+  .bld-num .floor-label { display: none; }
+  .bld-roof { margin-left: 46px; height: 22px; }
+  .bld-ground { margin-left: 46px; }
+  .bld-foundation { margin-left: 46px; }
+  .bld-ground::after { font-size: .55rem; }
+  .bld-pct { font-size: .85rem; padding: 2px 6px; }
+  .bld-amt-val { font-size: .72rem; }
+  .bld-amt-label { font-size: .52rem; }
+  .bld-sep { display: none; }
+  .bld-plan-box { display: none; }
+}
+
 /* Legend */
 .legend-bar {
   display: flex;
@@ -109,32 +128,31 @@
     </nav>
     <h1>{{ blk.residential_complex.name }} / Блок {{ blk.name }}</h1>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
-    {% if is_admin %}
-    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#budgetModal">
-      <i class="bi bi-currency-dollar me-1"></i>Бюджет этажей
-    </button>
-    {% endif %}
+  <div class="d-flex gap-2 flex-wrap align-items-center">
     <a href="{% url 'act_create' blk.pk %}" class="btn btn-success btn-sm">
-      <i class="bi bi-file-earmark-plus me-1"></i>Создать акт
-    </a>
-    <a href="{% url 'act_list' blk.pk %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-journal-text me-1"></i>Акты
+      <i class="bi bi-file-earmark-plus me-1"></i><span class="d-none d-sm-inline">Создать акт</span><span class="d-sm-none">Акт</span>
     </a>
     <a href="{% url 'progress_board' blk.pk %}" class="btn btn-primary btn-sm">
-      <i class="bi bi-bar-chart-steps me-1"></i>Ход работ
+      <i class="bi bi-bar-chart-steps me-1"></i><span class="d-none d-sm-inline">Ход работ</span><span class="d-sm-none">Ход</span>
     </a>
-    <a href="{% url 'calendar_plan_list' blk.pk %}" class="btn btn-outline-primary btn-sm">
-      <i class="bi bi-calendar3 me-1"></i>Кал. план
-    </a>
-    {% if request.user.is_staff %}
-    <a href="{% url 'floor_category_edit' blk.pk %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-list-check me-1"></i>Виды работ
-    </a>
-    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">
-      <i class="bi bi-gear me-1"></i>Настройка
-    </button>
-    {% endif %}
+    {# Дополнительные — в dropdown на мобильном #}
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'act_list' blk.pk %}"><i class="bi bi-journal-text me-2"></i>Акты</a></li>
+        <li><a class="dropdown-item" href="{% url 'calendar_plan_list' blk.pk %}"><i class="bi bi-calendar3 me-2"></i>Кал. план</a></li>
+        {% if is_admin %}
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#budgetModal"><i class="bi bi-currency-dollar me-2"></i>Бюджет этажей</a></li>
+        {% endif %}
+        {% if request.user.is_staff %}
+        <li><a class="dropdown-item" href="{% url 'floor_category_edit' blk.pk %}"><i class="bi bi-list-check me-2"></i>Виды работ</a></li>
+        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#configModal"><i class="bi bi-gear me-2"></i>Настройка</a></li>
+        {% endif %}
+      </ul>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -229,7 +247,7 @@
     </div>
 
     {# Расходы: три колонки #}
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem" class="expense-grid">
 
       {# АСМ #}
       <div style="padding:12px 14px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe">

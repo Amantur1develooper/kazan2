@@ -99,9 +99,51 @@
     .section-title { font-size: .95rem; font-weight: 700; color: #0f172a; }
     .text-money { font-variant-numeric: tabular-nums; }
 
+    /* ─── Mobile topbar ─── */
+    .mobile-topbar {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1050;
+      height: 52px; background: #0f172a;
+      align-items: center; justify-content: space-between;
+      padding: 0 1rem; gap: .75rem;
+    }
+    .mobile-topbar .brand { color: #fff; font-weight: 700; font-size: .95rem; flex: 1; }
+    .mobile-topbar .topbar-btn {
+      background: none; border: none; color: rgba(255,255,255,.8);
+      font-size: 1.3rem; padding: .25rem .5rem; line-height: 1; cursor: pointer;
+    }
+
+    /* ─── Sidebar overlay ─── */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 1035; backdrop-filter: blur(2px);
+    }
+    .sidebar-overlay.active { display: block; }
+
     @media (max-width: 768px) {
-      .sidebar { transform: translateX(-100%); }
-      .main { margin-left: 0; }
+      .mobile-topbar { display: flex; }
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        top: 0;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; padding-top: 52px; }
+      .page-header { padding: .75rem 1rem; flex-wrap: wrap; gap: .5rem; }
+      .page-header h1 { font-size: 1.05rem; }
+      .page-body { padding: .9rem .75rem; }
+      .stat-card { padding: .9rem; }
+      .stat-card .value { font-size: 1.2rem; }
+      .toast-container { top: 60px; right: .5rem; left: .5rem; }
+      .toast-container .toast { width: 100%; }
+      .breadcrumb { font-size: .72rem !important; }
+      .card-section { border-radius: 10px; }
+    }
+
+    @media (max-width: 480px) {
+      .page-body { padding: .65rem .5rem; }
+      .page-header { padding: .6rem .75rem; }
+      .stat-card .value { font-size: 1.05rem; }
     }
   </style>
   <link href="/static/css/custom.css" rel="stylesheet">
@@ -109,8 +151,22 @@
 </head>
 <body>
 
+<!-- Mobile topbar -->
+<div class="mobile-topbar">
+  <button class="topbar-btn" onclick="toggleSidebar()" aria-label="Меню">
+    <i class="bi bi-list"></i>
+  </button>
+  <span class="brand"><i class="bi bi-buildings-fill me-1 text-primary"></i>Строй Финанс</span>
+  <a href="{% url 'logout' %}" class="topbar-btn" title="Выйти">
+    <i class="bi bi-box-arrow-right"></i>
+  </a>
+</div>
+
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <!-- Sidebar -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="brand-title"><i class="bi bi-buildings-fill me-2 text-primary"></i>Строй Финанс</div>
     <div class="brand-sub">Финансы строительства</div>
@@ -225,6 +281,21 @@
 <script>
   // Auto-init toasts
   document.querySelectorAll('.toast').forEach(el => new bootstrap.Toast(el).show());
+
+  // Mobile sidebar toggle
+  function toggleSidebar() {
+    const s = document.getElementById('sidebar');
+    const o = document.getElementById('sidebarOverlay');
+    s.classList.toggle('open');
+    o.classList.toggle('active');
+    document.body.style.overflow = s.classList.contains('open') ? 'hidden' : '';
+  }
+  // Close sidebar on nav link click (mobile)
+  document.querySelectorAll('.sidebar-link').forEach(el => {
+    el.addEventListener('click', () => {
+      if (window.innerWidth <= 768) toggleSidebar();
+    });
+  });
 </script>
 {% block scripts %}{% endblock %}
 </body>

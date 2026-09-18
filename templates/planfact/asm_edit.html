@@ -38,9 +38,27 @@
 {% endblock %}
 
 {% block content %}
+
+{% if doc.is_accepted %}
+<div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+  <i class="bi bi-lock-fill" style="font-size:2.2rem;color:#16a34a;flex-shrink:0"></i>
+  <div>
+    <div style="font-size:1.05rem;font-weight:800;color:#15803d">АСМ принят и заблокирован — редактирование запрещено</div>
+    <div style="font-size:.85rem;color:#166534;margin-top:4px">
+      Принял: <strong>{{ doc.accepted_by }}</strong>
+      &nbsp;&bull;&nbsp; Дата: <strong>{{ doc.accepted_at|date:"d.m.Y" }}</strong>
+      {% if doc.accepted_amount %}
+      &nbsp;&bull;&nbsp; Сумма: <strong>{{ doc.accepted_amount|currency }}</strong>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <form method="post" id="asm-form">
   {% csrf_token %}
   <input type="hidden" name="action" value="save" id="form-action">
+  <fieldset {% if doc.is_accepted %}disabled style="opacity:.7"{% endif %}>
 
   {# Header fields #}
   <div class="card-section p-3 mb-3">
@@ -86,7 +104,7 @@
       {% endif %}
     </div>
     <div style="overflow-x:auto">
-    <table class="table table-sm mb-0 asm-table" style="min-width:{% if is_admin %}700px{% else %}500px{% endif %}">
+    <table class="table table-sm mb-0 asm-table" style="min-width:700px">
       <thead>
         <tr>
           <th class="del-check" title="Удалить"></th>
@@ -94,15 +112,12 @@
           <th>Наименование материала</th>
           <th style="width:80px">Ед.изм.</th>
           <th style="width:100px">Количество</th>
-          {% if is_admin %}
           <th style="width:110px">Цена за ед.</th>
           <th style="width:120px">Сумма</th>
-          {% endif %}
           <th style="width:130px">Примечание</th>
         </tr>
       </thead>
       <tbody id="items-body">
-        {# Existing items #}
         {% for item in items %}
         <tr>
           <td><input type="checkbox" name="delete_item" value="{{ item.pk }}" title="Удалить строку"></td>
@@ -113,19 +128,16 @@
                      value="{{ item.unit }}"></td>
           <td><input type="number" step="0.001" name="qty_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.quantity|clean_num }}"></td>
-          {% if is_admin %}
           <td><input type="number" step="0.01" name="price_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.unit_price|clean_num }}"></td>
           <td style="text-align:right;font-weight:600;font-size:.85rem;padding-right:8px">
             {{ item.total_amount|floatformat:0 }}
           </td>
-          {% endif %}
           <td><input type="text" name="notes_{{ item.pk }}" class="form-control form-control-sm"
                      value="{{ item.notes }}"></td>
         </tr>
         {% endfor %}
 
-        {# New empty rows #}
         {% for _ in empty_rows %}
         <tr class="new-row">
           <td></td>
@@ -133,27 +145,28 @@
           <td><input type="text" name="new_name" class="form-control form-control-sm" placeholder="Наименование"></td>
           <td><input type="text" name="new_unit" class="form-control form-control-sm" placeholder="кг"></td>
           <td><input type="number" step="0.001" name="new_qty" class="form-control form-control-sm" placeholder="0"></td>
-          {% if is_admin %}
           <td><input type="number" step="0.01" name="new_price" class="form-control form-control-sm" placeholder="0"></td>
           <td></td>
-          {% endif %}
           <td><input type="text" name="new_notes" class="form-control form-control-sm"></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     </div>
+    {% if not doc.is_accepted %}
     <div class="p-2">
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addRows()">
         <i class="bi bi-plus me-1"></i>Добавить строки
       </button>
     </div>
+    {% endif %}
   </div>
 
   <div class="d-flex justify-content-between">
     <a href="{% url 'asm_list' blk.pk doc.floor_number doc.category.pk %}" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Назад
     </a>
+    {% if not doc.is_accepted %}
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-outline-primary">
         <i class="bi bi-check me-1"></i>Сохранить
@@ -162,8 +175,48 @@
         <i class="bi bi-printer me-1"></i>Сохранить и распечатать
       </button>
     </div>
+    {% endif %}
   </div>
+
+  </fieldset>
 </form>
+
+{% if is_admin and not doc.is_accepted %}
+<div style="margin-top:24px;border:2px dashed #93c5fd;border-radius:12px;padding:20px;background:#eff6ff">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <i class="bi bi-patch-check-fill" style="font-size:1.5rem;color:#2563eb"></i>
+    <span style="font-size:1rem;font-weight:800;color:#1d4ed8">Приёмка АСМ (только для администратора)</span>
+  </div>
+  <p style="font-size:.83rem;color:#1e40af;margin-bottom:14px">
+    После нажатия «Принять» АСМ будет заблокирован. Сумма уйдёт в расходы и её нельзя будет изменить.
+  </p>
+  <form method="post" id="accept-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="accept">
+    <div class="row g-2 mb-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label" style="font-size:.8rem;font-weight:600;color:#1d4ed8">Принял (ФИО)</label>
+        <input type="text" name="accepted_by" class="form-control form-control-sm" placeholder="Имя принимающего" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-size:.8rem;font-weight:600;color:#1d4ed8">Дата приёмки</label>
+        <input type="date" name="accepted_at" class="form-control form-control-sm" value="{% now 'Y-m-d' %}">
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-label" style="font-size:.8rem;font-weight:600;color:#1d4ed8">
+          Сумма (пусто — возьмётся из акта)
+        </label>
+        <input type="text" name="accepted_amount" class="form-control form-control-sm"
+               placeholder="{{ doc.total_amount|currency }}">
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary fw-bold px-5 py-2"
+            onclick="if(confirm('Подтвердить приёмку АСМ? После этого документ будет заблокирован.')) document.getElementById('accept-form').submit();">
+      <i class="bi bi-patch-check me-2"></i>Принять АСМ
+    </button>
+  </form>
+</div>
+{% endif %}
 
 <script>
 function calcRow(el){

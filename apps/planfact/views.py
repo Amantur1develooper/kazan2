@@ -217,7 +217,13 @@ def planfact_block(request, block_pk):
         (r['floor_number'], r['category_id']): {'count': r['doc_count'], 'total': r['asm_total']}
         for r in asm_rows
     }
-    asm_grand_total = sum(v['total'] for v in asm_map.values())
+    # Only accepted ASMs count as expenses
+    asm_accepted_qs = AsmDocument.objects.filter(block=block, is_accepted=True)
+    asm_accepted_manual = asm_accepted_qs.filter(
+        accepted_amount__isnull=False).aggregate(s=Coalesce(Sum('accepted_amount'), D0))['s']
+    asm_accepted_items  = asm_accepted_qs.filter(
+        accepted_amount__isnull=True).aggregate(s=Coalesce(Sum(_item_expr), D0))['s']
+    asm_grand_total = asm_accepted_manual + asm_accepted_items
 
     # AVR completion % per (floor_number, category_id) — sum of all AVR completion_pct
     avr_pct_rows = (
@@ -892,6 +898,20 @@ def asm_edit(request, asm_pk):
     if request.method == 'POST':
         action = request.POST.get('action', 'save')
 
+        if action == 'accept' and is_admin and not doc.is_accepted:
+            doc.is_accepted     = True
+            doc.accepted_by     = request.POST.get('accepted_by', '').strip()
+            doc.accepted_at     = request.POST.get('accepted_at') or date.today()
+            raw_amt = request.POST.get('accepted_amount', '').strip().replace(' ', '')
+            doc.accepted_amount = Decimal(raw_amt) if raw_amt else doc.total_amount
+            doc.save()
+            messages.success(request, 'АСМ принят и заблокирован.')
+            return redirect('asm_edit', asm_pk=doc.pk)
+
+        if doc.is_accepted:
+            messages.error(request, 'АСМ принят и заблокирован — изменения запрещены.')
+            return redirect('asm_edit', asm_pk=doc.pk)
+
         doc.doc_number      = request.POST.get('doc_number', doc.doc_number).strip()
         doc.doc_date        = request.POST.get('doc_date', str(doc.doc_date))
         doc.description     = request.POST.get('description', doc.description).strip()
@@ -913,8 +933,7 @@ def asm_edit(request, asm_pk):
                 item.name     = name
                 item.unit     = request.POST.get(f'unit_{item.pk}', item.unit).strip()
                 item.quantity = request.POST.get(f'qty_{item.pk}', '0') or 0
-                if is_admin:
-                    item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
+                item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
                 item.notes    = request.POST.get(f'notes_{item.pk}', '').strip()
                 item.save()
 
@@ -934,7 +953,7 @@ def asm_edit(request, asm_pk):
                 name=name,
                 unit=(new_units[i] if i < len(new_units) else '').strip(),
                 quantity=new_qtys[i] if i < len(new_qtys) and new_qtys[i] else 0,
-                unit_price=(new_prices[i] if is_admin and i < len(new_prices) and new_prices[i] else 0),
+                unit_price=(new_prices[i] if i < len(new_prices) and new_prices[i] else 0),
                 notes=(new_notes[i] if i < len(new_notes) else '').strip(),
             )
 
@@ -950,6 +969,7 @@ def asm_edit(request, asm_pk):
         'blk': doc.block, 'floor_label': floor_label,
         'empty_rows': range(EMPTY_ROWS),
         'is_admin': is_admin,
+        'photos': doc.photos.all() if hasattr(doc, 'photos') else [],
     })
 
 
@@ -971,8 +991,11 @@ def asm_delete(request, asm_pk):
     floor_number = doc.floor_number
     cat_id      = doc.category_id
     if request.method == 'POST':
-        doc.delete()
-        messages.success(request, 'АСМ удалён.')
+        if doc.is_accepted:
+            messages.error(request, 'Принятый АСМ нельзя удалить.')
+        else:
+            doc.delete()
+            messages.success(request, 'АСМ удалён.')
         return redirect('asm_list', block_pk=blk_pk, floor_number=floor_number, category_id=cat_id)
     return redirect('asm_list', block_pk=blk_pk, floor_number=floor_number, category_id=cat_id)
 
@@ -1322,8 +1345,7 @@ def avr_edit(request, avr_pk):
                 item.name     = name
                 item.unit     = request.POST.get(f'unit_{item.pk}', item.unit).strip()
                 item.quantity = request.POST.get(f'qty_{item.pk}', '0') or 0
-                if is_admin:
-                    item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
+                item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
                 item.notes    = request.POST.get(f'notes_{item.pk}', '').strip()
                 item.save()
 
@@ -1342,7 +1364,7 @@ def avr_edit(request, avr_pk):
                 document=doc, order=max_order, name=name,
                 unit=(new_units[i] if i < len(new_units) else '').strip(),
                 quantity=new_qtys[i] if i < len(new_qtys) and new_qtys[i] else 0,
-                unit_price=(new_prices[i] if is_admin and i < len(new_prices) and new_prices[i] else 0),
+                unit_price=(new_prices[i] if i < len(new_prices) and new_prices[i] else 0),
                 notes=(new_notes[i] if i < len(new_notes) else '').strip(),
             )
 

@@ -5,6 +5,28 @@ from django.db.models.functions import Coalesce
 from django.db.models import Value
 
 
+class CompanyDirector(models.Model):
+    name        = models.CharField('Имя и фамилия', max_length=200, default='Аман Тюреркинов')
+    position    = models.CharField('Должность', max_length=100, default='Генеральный директор / CEO')
+    photo       = models.ImageField('Фото', upload_to='director/', blank=True, null=True)
+    phone       = models.CharField('Телефон', max_length=50, blank=True, default='0558212040')
+    email       = models.EmailField('Email', blank=True, default='amanturagency@gmail.com')
+    bio         = models.TextField('О себе', blank=True)
+    company     = models.CharField('Компания', max_length=200, blank=True, default='Строй Финанс')
+
+    class Meta:
+        verbose_name = 'Директор / CEO'
+        verbose_name_plural = 'Директор / CEO'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class MainCash(models.Model):
     name = models.CharField('Название', max_length=100, default='Главная касса')
     description = models.TextField('Описание', blank=True)

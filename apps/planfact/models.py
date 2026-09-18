@@ -147,6 +147,13 @@ class AsmDocument(models.Model):
     )
     created_at   = models.DateTimeField(auto_now_add=True)
 
+    # Acceptance fields — set by admin, locks the document
+    is_accepted     = models.BooleanField('Принято', default=False)
+    accepted_by     = models.CharField('Принял', max_length=200, blank=True)
+    accepted_at     = models.DateField('Дата приёмки', null=True, blank=True)
+    accepted_amount = models.DecimalField('Сумма к оплате', max_digits=15, decimal_places=2,
+                                          null=True, blank=True)
+
     class Meta:
         verbose_name = 'АСМ'
         verbose_name_plural = 'АСМ — Акты списания материалов'

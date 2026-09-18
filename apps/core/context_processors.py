@@ -1,4 +1,5 @@
 from apps.planfact.models import BlockAccess
+from .models import CompanyDirector
 
 
 def user_role(request):
@@ -7,3 +8,7 @@ def user_role(request):
     is_admin = request.user.is_staff or request.user.groups.filter(name='Производство').exists()
     is_builder = not is_admin and BlockAccess.objects.filter(user=request.user).exists()
     return {'is_admin_user': is_admin, 'is_builder': is_builder}
+
+
+def company_director(request):
+    return {'director': CompanyDirector.get()}
