@@ -133,4 +133,13 @@
   </a>
 </div>
 {% endif %}
+
+{# Mobile sticky create button #}
+<div class="d-md-none" style="position:fixed;bottom:70px;right:16px;z-index:500">
+  <a href="{% url 'asm_create' blk.pk floor_number category.pk %}"
+     class="btn btn-primary shadow-lg"
+     style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem">
+    <i class="bi bi-plus-lg"></i>
+  </a>
+</div>
 {% endblock %}

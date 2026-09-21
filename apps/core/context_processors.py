@@ -12,3 +12,16 @@ def user_role(request):
 
 def company_director(request):
     return {'director': CompanyDirector.get()}
+
+
+def mobile_nav_context(request):
+    """Extract block/floor/category from URL kwargs for mobile bottom nav."""
+    resolver = request.resolver_match
+    if not resolver:
+        return {}
+    kwargs = resolver.kwargs
+    return {
+        'current_block_pk': kwargs.get('block_pk'),
+        'current_floor_number': kwargs.get('floor_number'),
+        'current_category_pk': kwargs.get('category_id'),
+    }

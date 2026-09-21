@@ -78,20 +78,51 @@
 /* ── Mobile ── */
 @media (max-width: 600px) {
   .expense-grid { grid-template-columns: 1fr !important; gap: .5rem !important; }
+  /* Bigger touch targets in floor modal */
+  .floor-cat-link { min-height: 52px !important; padding: 12px 14px !important; }
+  .floor-cat-link span { font-size: .95rem !important; }
+  /* Bigger floor rows */
 
   .bld-wrap { max-width: 100%; }
-  .bld-row { height: 44px; }
-  .bld-num { width: 46px; min-width: 46px; font-size: .75rem; }
-  .bld-num .floor-label { display: none; }
-  .bld-roof { margin-left: 46px; height: 22px; }
-  .bld-ground { margin-left: 46px; }
-  .bld-foundation { margin-left: 46px; }
-  .bld-ground::after { font-size: .55rem; }
-  .bld-pct { font-size: .85rem; padding: 2px 6px; }
-  .bld-amt-val { font-size: .72rem; }
-  .bld-amt-label { font-size: .52rem; }
-  .bld-sep { display: none; }
+
+  /* Tall, easy-to-tap floors */
+  .bld-row { height: 64px; }
+
+  /* Floor number: wider, bigger font, show label */
+  .bld-num {
+    width: 54px; min-width: 54px;
+    font-size: .95rem; font-weight: 900;
+    flex-direction: column; gap: 2px;
+  }
+  .bld-num .floor-label { display: block; font-size: .58rem; color: #94a3b8; font-weight: 500; }
+
+  /* Roof */
+  .bld-roof { margin-left: 54px; height: 26px; }
+  .bld-ground { margin-left: 54px; }
+  .bld-foundation { margin-left: 54px; }
+  .bld-ground::after { font-size: .55rem; top: -14px; }
+
+  /* Big % badge */
+  .bld-pct {
+    font-size: 1.1rem !important;
+    font-weight: 900 !important;
+    padding: 4px 10px !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,.75) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+
+  /* Hide admin amounts on mobile to save space */
+  .bld-amounts { display: none; }
   .bld-plan-box { display: none; }
+  .bld-sep { display: none; }
+  .bld-amt-val { display: none; }
+
+  /* ASM strip taller */
+  .bld-row .bld-body > div:last-child { flex-basis: 20px !important; }
+
+  /* Category color tops thicker */
+  .bld-row .bld-body div[style*="height:3px"] { height: 5px !important; }
 }
 
 /* Legend */
@@ -434,7 +465,7 @@
                 </div>
               </div>
               {% else %}
-              <span style="font-size:.78rem;color:#64748b;font-weight:600">
+              <span class="d-none d-sm-inline" style="font-size:.78rem;color:#64748b;font-weight:600">
                 {% if floor.number < 0 %}Подвал {{ floor.number|slice:"1:" }}{% else %}Этаж {{ floor.number }}{% endif %}
               </span>
               {% endif %}
@@ -545,7 +576,7 @@
             </div>
             {% for c in floor.categories %}
             <a href="{% url 'asm_list' blk.pk floor.number c.category.pk %}"
-               class="d-flex align-items-center justify-content-between text-decoration-none mb-2"
+               class="d-flex align-items-center justify-content-between text-decoration-none mb-2 floor-cat-link"
                style="padding:9px 12px;border-radius:8px;background:{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %};border:1px solid {% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %};opacity:{% if c.assigned %}1{% else %}.45{% endif %};transition:.1s"
                onmouseover="this.style.opacity='1';this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'"
                onmouseout="this.style.opacity='{% if c.assigned %}1{% else %}.45{% endif %}';this.style.background='{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %}';this.style.borderColor='{% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %}'">

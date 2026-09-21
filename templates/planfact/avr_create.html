@@ -99,11 +99,11 @@
     </div>
   </div>
 
-  <div class="d-flex justify-content-between">
-    <a href="{% url 'avr_list' blk.pk floor_number category.pk %}" class="btn btn-outline-secondary">
+  <div class="d-flex justify-content-between gap-2">
+    <a href="{% url 'avr_list' blk.pk floor_number category.pk %}" class="btn btn-outline-secondary btn-touch">
       <i class="bi bi-arrow-left me-1"></i>Назад
     </a>
-    <button type="submit" class="btn btn-success btn-lg">
+    <button type="submit" class="btn btn-success btn-lg btn-touch flex-fill" style="max-width:320px">
       <i class="bi bi-arrow-right me-1"></i>Далее — добавить работы
     </button>
   </div>

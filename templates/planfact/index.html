@@ -50,21 +50,30 @@
 
 <div class="row g-3">
   {% for blk in all_blocks %}
-  <div class="col-md-4 col-lg-3">
+  <div class="col-6 col-md-4 col-lg-3">
     <a href="{% url 'planfact_block' blk.pk %}" class="text-decoration-none">
-      <div class="card-section p-4 h-100" style="transition:.15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.10)'" onmouseout="this.style.boxShadow=''">
-        <div style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px">{{ blk.residential_complex.name }}</div>
-        <div style="font-size:1.2rem;font-weight:700;color:#0f172a;margin:.2rem 0">Блок {{ blk.name }}</div>
-        <div class="d-flex align-items-center gap-2 mt-2">
-          <i class="bi bi-buildings text-primary" style="font-size:1.5rem"></i>
-          <span style="font-size:.82rem;color:#64748b">Нажмите чтобы открыть</span>
+      <div class="card-section h-100" style="transition:.15s;cursor:pointer;overflow:hidden"
+           onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.10)'" onmouseout="this.style.boxShadow=''">
+        <div style="background:linear-gradient(135deg,#1e40af,#2563eb);padding:18px 16px 14px">
+          <i class="bi bi-buildings" style="font-size:2rem;color:rgba(255,255,255,.5)"></i>
+        </div>
+        <div style="padding:12px 14px 16px">
+          <div style="font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">
+            {{ blk.residential_complex.name }}
+          </div>
+          <div style="font-size:1.15rem;font-weight:800;color:#0f172a;line-height:1.2">
+            Блок {{ blk.name }}
+          </div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:.75rem;color:#3b82f6;font-weight:600">Открыть →</span>
+          </div>
         </div>
       </div>
     </a>
   </div>
   {% empty %}
   <div class="col-12">
-    <div class="alert alert-info">Блоки не найдены. Создайте блок в разделе «Жилые комплексы».</div>
+    <div class="alert alert-info">Блоки не найдены.</div>
   </div>
   {% endfor %}
 </div>
