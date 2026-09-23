@@ -37,7 +37,7 @@
   background:#f8fafc; border-right:1px solid #cbd5e1; flex-shrink:0;
   flex-direction:column; gap:1px;
 }
-.bld-num .floor-label { font-size:.6rem; font-weight:500; color:#94a3b8; }
+.bld-num .floor-label { font-size:.6rem; font-weight:500; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:56px; text-align:center; }
 .bld-body { flex:1; position:relative; overflow:hidden; background:#f1f5f9; }
 .bld-fill { position:absolute; top:0; left:0; bottom:0; transition:width .6s ease; }
 .bld-overlay {
@@ -180,6 +180,7 @@
         {% endif %}
         {% if request.user.is_staff %}
         <li><a class="dropdown-item" href="{% url 'floor_category_edit' blk.pk %}"><i class="bi bi-list-check me-2"></i>Виды работ</a></li>
+        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#floorLabelsModal"><i class="bi bi-pencil-square me-2"></i>Названия этажей</a></li>
         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#configModal"><i class="bi bi-gear me-2"></i>Настройка</a></li>
         {% endif %}
       </ul>
@@ -436,13 +437,20 @@
       <div class="bld-row {% if floor.is_underground %}underground{% endif %}"
            onclick="openFloorModal({{ floor.number }})">
         <div class="bld-num">
-          {% if floor.number < 0 %}
-            <span>Б{{ floor.number|slice:"1:" }}</span>
-            <span class="floor-label">подвал</span>
+          {% with custom=label_map|get_item:floor.number %}
+          {% if custom %}
+            <span style="font-size:.62rem;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:54px;text-align:center;line-height:1.1">{{ custom }}</span>
+            <span class="floor-label">{% if floor.number < 0 %}Б{{ floor.number|slice:"1:" }}{% else %}{{ floor.number }}{% endif %}</span>
           {% else %}
-            <span>{{ floor.number }}</span>
-            <span class="floor-label">этаж</span>
+            {% if floor.number < 0 %}
+              <span>Б{{ floor.number|slice:"1:" }}</span>
+              <span class="floor-label">подвал</span>
+            {% else %}
+              <span>{{ floor.number }}</span>
+              <span class="floor-label">этаж</span>
+            {% endif %}
           {% endif %}
+          {% endwith %}
         </div>
         <div class="bld-body" style="display:flex;flex-direction:column;background:transparent">
 
@@ -464,9 +472,13 @@
                   </span>
                 </div>
               </div>
+              {# Mobile only: show floor label for admins (amounts are hidden on mobile) #}
+              <span class="d-sm-none" style="font-size:.75rem;color:#475569;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px">
+                {{ floor.floor_label }}
+              </span>
               {% else %}
-              <span class="d-none d-sm-inline" style="font-size:.78rem;color:#64748b;font-weight:600">
-                {% if floor.number < 0 %}Подвал {{ floor.number|slice:"1:" }}{% else %}Этаж {{ floor.number }}{% endif %}
+              <span style="font-size:.78rem;color:#64748b;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px">
+                {{ floor.floor_label }}
               </span>
               {% endif %}
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
@@ -773,9 +785,7 @@
             {{ doc.category.name }}
           </div>
           <div style="font-size:.68rem;color:#94a3b8">
-            {% if doc.floor_number is not None %}
-              {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %}
-            {% endif %}
+            {% if doc.floor_number is not None %}{{ label_map|floor_label:doc.floor_number }}{% endif %}
             {% if dtype == 'avr' and doc.contractor %} · {{ doc.contractor }}{% endif %}
           </div>
         </div>
@@ -846,9 +856,7 @@
             {{ doc.category.name }}
           </div>
           <div style="font-size:.68rem;color:#94a3b8">
-            {% if doc.floor_number is not None %}
-              {% if doc.floor_number < 0 %}Подвал {{ doc.floor_number|slice:"1:" }}{% else %}Этаж {{ doc.floor_number }}{% endif %}
-            {% endif %}
+            {% if doc.floor_number is not None %}{{ label_map|floor_label:doc.floor_number }}{% endif %}
             {% if doc.contractor %} · {{ doc.contractor }}{% endif %}
           </div>
         </div>
@@ -996,6 +1004,78 @@
     </div>
   </div>
 </div>
+
+{# ── Floor Labels Modal ── #}
+<div class="modal fade" id="floorLabelsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-height:90vh">
+    <div class="modal-content" style="max-height:85vh;display:flex;flex-direction:column">
+      <form method="post" style="display:flex;flex-direction:column;min-height:0;flex:1">
+        {% csrf_token %}
+        <input type="hidden" name="save_floor_labels" value="1">
+        <div class="modal-header flex-shrink-0" style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+          <div>
+            <h5 class="modal-title mb-0">
+              <i class="bi bi-pencil-square me-2 text-primary"></i>Названия этажей
+            </h5>
+            <div style="font-size:.75rem;color:#64748b;margin-top:2px">Блок {{ blk.name }} — задайте произвольное название</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body flex-grow-1" style="overflow-y:auto;padding:1rem;-webkit-overflow-scrolling:touch">
+          <div style="font-size:.78rem;color:#64748b;margin-bottom:.75rem;padding:8px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">
+            <i class="bi bi-info-circle me-1"></i>
+            Оставьте пустым — будет показываться стандартное название
+          </div>
+          <div class="row g-2">
+            {# Show from floor 1 upward, then underground floors — so floor 1 is always at the top #}
+            {% for floor in floors reversed %}
+            {% if not floor.is_underground %}
+            <div class="col-12">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e2e8f0">
+                <div style="width:48px;flex-shrink:0;text-align:center;background:#f1f5f9;border-radius:6px;padding:4px 0">
+                  <span style="font-size:.72rem;font-weight:800;color:#475569">{{ floor.number }}</span>
+                  <div style="font-size:.55rem;color:#94a3b8;font-weight:500">этаж</div>
+                </div>
+                <input type="text" name="label_{{ floor.number }}"
+                       class="form-control form-control-sm"
+                       placeholder="Этаж {{ floor.number }}"
+                       value="{{ label_map|get_item:floor.number|default:'' }}"
+                       maxlength="100"
+                       style="font-size:15px">
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% for floor in floors %}
+            {% if floor.is_underground %}
+            <div class="col-12">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px dashed #cbd5e1">
+                <div style="width:48px;flex-shrink:0;text-align:center;background:#e2e8f0;border-radius:6px;padding:4px 0">
+                  <span style="font-size:.72rem;font-weight:800;color:#64748b">Б{{ floor.number|slice:"1:" }}</span>
+                  <div style="font-size:.55rem;color:#94a3b8;font-weight:500">подвал</div>
+                </div>
+                <input type="text" name="label_{{ floor.number }}"
+                       class="form-control form-control-sm"
+                       placeholder="Подвал {{ floor.number|slice:'1:' }}"
+                       value="{{ label_map|get_item:floor.number|default:'' }}"
+                       maxlength="100"
+                       style="font-size:15px">
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer flex-shrink-0" style="background:#f8fafc;border-top:1px solid #e2e8f0;justify-content:space-between">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endif %}
 
 {% endblock %}
@@ -1044,12 +1124,16 @@ document.querySelector('#budgetModal form')?.addEventListener('submit', function
 });
 
 const _modal = new bootstrap.Modal(document.getElementById('floorModal'));
+const _floorLabels = {
+  {% for floor in floors %}"{{ floor.number }}": "{{ floor.floor_label }}"{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
 function openFloorModal(fn) {
   document.querySelectorAll('.floor-panel').forEach(el => el.classList.add('d-none'));
   const panel = document.getElementById('fp' + fn);
   if (panel) panel.classList.remove('d-none');
   document.getElementById('floorModalLabel').textContent =
-    (fn < 0 ? 'Подвал ' + Math.abs(fn) : 'Этаж ' + fn);
+    _floorLabels[String(fn)] || (fn < 0 ? 'Подвал ' + Math.abs(fn) : 'Этаж ' + fn);
   _modal.show();
 }
 </script>

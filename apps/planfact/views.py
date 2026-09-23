@@ -12,7 +12,19 @@ from .models import (WorkCategory, FloorWork, LandscapingWork, WorkAct, BlockFlo
                      FloorBudget, AsmDocument, AsmItem, BlockAccess,
                      CalendarPlan, CalendarTask, CalendarMonthPlan,
                      AvrDocument, AvrItem, AvrPhoto, FloorCategoryAssignment,
-                     MONTHS_RU, MONTHS_SHORT)
+                     FloorLabel, MONTHS_RU, MONTHS_SHORT)
+
+
+def _default_floor_label(floor_number):
+    if floor_number < 0:
+        return f'Подвал {abs(floor_number)}'
+    return f'Этаж {floor_number}'
+
+
+def _get_floor_label(label_map, floor_number):
+    """Return custom label if set, otherwise the default 'Этаж N' / 'Подвал N'."""
+    custom = label_map.get(floor_number, '').strip()
+    return custom if custom else _default_floor_label(floor_number)
 
 
 def _is_admin_user(user):
@@ -56,7 +68,7 @@ def staff_required(view_func):
 
 
 def _build_floor_matrix(block, categories, config, budget_map=None, asm_map=None,
-                        avr_pct_map=None, floor_assigned=None):
+                        avr_pct_map=None, floor_assigned=None, label_map=None):
     underground = config.underground_floors
     above = config.total_floors - underground
     floor_numbers = list(range(-underground, 0)) + list(range(1, above + 1))
@@ -65,6 +77,8 @@ def _build_floor_matrix(block, categories, config, budget_map=None, asm_map=None
     work_map = {(w.floor_number, w.category_id): w for w in works}
     if budget_map is None:
         budget_map = {}
+    if label_map is None:
+        label_map = {}
     if asm_map is None:
         asm_map = {}
     if avr_pct_map is None:
@@ -122,6 +136,7 @@ def _build_floor_matrix(block, categories, config, budget_map=None, asm_map=None
         floors.append({
             'number': fn,
             'label': f'Подвал {abs(fn)}' if fn < 0 else str(fn),
+            'floor_label': _get_floor_label(label_map, fn),
             'is_underground': fn < 0,
             'has_data': has_data,
             'categories': all_cats_modal,   # modal shows all + assigned flag
@@ -194,8 +209,29 @@ def planfact_block(request, block_pk):
             messages.success(request, 'Конфигурация сохранена.')
         return redirect('planfact_block', block_pk=block_pk)
 
+    if request.method == 'POST' and 'save_floor_labels' in request.POST:
+        if not request.user.is_staff:
+            messages.error(request, 'Только администратор может менять названия этажей.')
+        else:
+            underground = config.underground_floors
+            above = config.total_floors - underground
+            all_fn = list(range(-underground, 0)) + list(range(1, above + 1))
+            for fn in all_fn:
+                lbl = request.POST.get(f'label_{fn}', '').strip()
+                if lbl:
+                    FloorLabel.objects.update_or_create(
+                        block=block, floor_number=fn,
+                        defaults={'label': lbl}
+                    )
+                else:
+                    FloorLabel.objects.filter(block=block, floor_number=fn).delete()
+            messages.success(request, 'Названия этажей сохранены.')
+        return redirect('planfact_block', block_pk=block_pk)
+
     floor_cats = list(WorkCategory.objects.filter(scope__in=['floor', 'general']))
     land_cats  = list(WorkCategory.objects.filter(scope__in=['landscaping', 'general']))
+
+    label_map = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=block)}
 
     budget_map = {fb.floor_number: fb for fb in FloorBudget.objects.filter(block=block)}
 
@@ -243,7 +279,7 @@ def planfact_block(request, block_pk):
     for a in _assignments:
         floor_assigned[a['floor_number']].add(a['category_id'])
 
-    floors = _build_floor_matrix(block, floor_cats, config, budget_map, asm_map, avr_pct_map, floor_assigned)
+    floors = _build_floor_matrix(block, floor_cats, config, budget_map, asm_map, avr_pct_map, floor_assigned, label_map)
 
     land_works = []
     for cat in land_cats:
@@ -338,9 +374,8 @@ def planfact_block(request, block_pk):
         if (fn, cat_id) in accepted_pairs:
             continue
         if 0 < pct < 100 and cat_id in cat_map:
-            lbl = f'Подвал {abs(fn)}' if fn < 0 else f'Этаж {fn}'
             ongoing_works.append({
-                'floor_label': lbl,
+                'floor_label': _get_floor_label(label_map, fn),
                 'floor_number': fn,
                 'category': cat_map[cat_id],
                 'progress_pct': round(pct, 1),
@@ -386,6 +421,7 @@ def planfact_block(request, block_pk):
         'is_admin': _is_admin_user(request.user),
         'unprice_docs': unprice_docs,
         'ongoing_works': ongoing_works,
+        'label_map': label_map,
     })
 
 
@@ -850,7 +886,8 @@ def asm_list(request, block_pk, floor_number, category_id):
     docs     = AsmDocument.objects.filter(
         block=blk, floor_number=floor_number, category=category
     ).prefetch_related('items')
-    floor_label = f'Подвал {abs(floor_number)}' if floor_number < 0 else f'Этаж {floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=blk, floor_number=floor_number)}
+    floor_label = _get_floor_label(_lm, floor_number)
     return render(request, 'planfact/asm_list.html', {
         'blk': blk, 'category': category,
         'floor_number': floor_number, 'floor_label': floor_label,
@@ -867,7 +904,8 @@ def asm_create(request, block_pk, floor_number, category_id):
     floor_number = int(floor_number)
     blk      = get_object_or_404(Block.objects.select_related('residential_complex'), pk=block_pk)
     category = get_object_or_404(WorkCategory, pk=category_id)
-    floor_label = f'Подвал {abs(floor_number)}' if floor_number < 0 else f'Этаж {floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=blk, floor_number=floor_number)}
+    floor_label = _get_floor_label(_lm, floor_number)
 
     if request.method == 'POST':
         doc_number      = request.POST.get('doc_number', '').strip()
@@ -981,7 +1019,8 @@ def asm_edit(request, asm_pk):
         return redirect('asm_edit', asm_pk=doc.pk)
 
     EMPTY_ROWS = 8
-    floor_label = f'Подвал {abs(doc.floor_number)}' if doc.floor_number < 0 else f'Этаж {doc.floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=doc.block, floor_number=doc.floor_number)}
+    floor_label = _get_floor_label(_lm, doc.floor_number)
     return render(request, 'planfact/asm_edit.html', {
         'doc': doc, 'items': items,
         'blk': doc.block, 'floor_label': floor_label,
@@ -998,7 +1037,8 @@ def asm_print(request, asm_pk):
                            .prefetch_related('items'),
         pk=asm_pk,
     )
-    floor_label = f'Подвал {abs(doc.floor_number)}' if doc.floor_number < 0 else f'Этаж {doc.floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=doc.block, floor_number=doc.floor_number)}
+    floor_label = _get_floor_label(_lm, doc.floor_number)
     return render(request, 'planfact/asm_print.html', {'doc': doc, 'floor_label': floor_label})
 
 
@@ -1225,7 +1265,8 @@ def avr_list(request, block_pk, floor_number, category_id):
     blk      = get_object_or_404(Block.objects.select_related('residential_complex'), pk=block_pk)
     category = get_object_or_404(WorkCategory, pk=category_id)
     docs     = AvrDocument.objects.filter(block=blk, floor_number=floor_number, category=category).prefetch_related('items')
-    floor_label = f'Подвал {abs(floor_number)}' if floor_number < 0 else f'Этаж {floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=blk, floor_number=floor_number)}
+    floor_label = _get_floor_label(_lm, floor_number)
     try:
         fw = FloorWork.objects.get(block=blk, floor_number=floor_number, category=category)
         current_progress = fw.progress_pct
@@ -1247,7 +1288,8 @@ def avr_create(request, block_pk, floor_number, category_id):
     floor_number = int(floor_number)
     blk      = get_object_or_404(Block.objects.select_related('residential_complex'), pk=block_pk)
     category = get_object_or_404(WorkCategory, pk=category_id)
-    floor_label = f'Подвал {abs(floor_number)}' if floor_number < 0 else f'Этаж {floor_number}'
+    _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=blk, floor_number=floor_number)}
+    floor_label = _get_floor_label(_lm, floor_number)
     try:
         fw = FloorWork.objects.get(block=blk, floor_number=floor_number, category=category)
         current_progress = fw.progress_pct
@@ -1392,8 +1434,11 @@ def avr_edit(request, avr_pk):
         return redirect('avr_edit', avr_pk=doc.pk)
 
     EMPTY_ROWS = 8
-    floor_label = (f'Подвал {abs(doc.floor_number)}' if doc.floor_number and doc.floor_number < 0
-                   else (f'Этаж {doc.floor_number}' if doc.floor_number else 'Общий'))
+    if doc.floor_number is not None:
+        _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=doc.block, floor_number=doc.floor_number)}
+        floor_label = _get_floor_label(_lm, doc.floor_number)
+    else:
+        floor_label = 'Общий'
     return render(request, 'planfact/avr_edit.html', {
         'doc': doc, 'items': items,
         'blk': doc.block, 'floor_label': floor_label,
@@ -1411,8 +1456,11 @@ def avr_print(request, avr_pk):
     )
     items_count = doc.items.count()
     empty_rows = range(max(0, 7 - items_count))
-    floor_label = (f'Подвал {abs(doc.floor_number)}' if doc.floor_number and doc.floor_number < 0
-                   else (f'Этаж {doc.floor_number}' if doc.floor_number else ''))
+    if doc.floor_number is not None:
+        _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=doc.block, floor_number=doc.floor_number)}
+        floor_label = _get_floor_label(_lm, doc.floor_number)
+    else:
+        floor_label = ''
     return render(request, 'planfact/avr_print.html', {'doc': doc, 'floor_label': floor_label, 'empty_rows': empty_rows})
 
 

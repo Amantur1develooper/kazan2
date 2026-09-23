@@ -215,6 +215,22 @@ class FloorBudget(models.Model):
         return f"Блок {self.block.name} / Эт.{self.floor_number} / план {self.planned_amount}"
 
 
+class FloorLabel(models.Model):
+    block        = models.ForeignKey('projects.Block', on_delete=models.CASCADE,
+                                     related_name='floor_labels', verbose_name='Блок')
+    floor_number = models.IntegerField('Номер этажа')
+    label        = models.CharField('Название этажа', max_length=100, blank=True)
+
+    class Meta:
+        verbose_name = 'Название этажа'
+        verbose_name_plural = 'Названия этажей'
+        unique_together = ['block', 'floor_number']
+        ordering = ['floor_number']
+
+    def __str__(self):
+        return f"Блок {self.block.name} / Эт.{self.floor_number} = {self.label}"
+
+
 class BlockAccess(models.Model):
     user  = models.ForeignKey(User, on_delete=models.CASCADE,
                                related_name='block_accesses', verbose_name='Пользователь')

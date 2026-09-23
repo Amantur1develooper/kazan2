@@ -112,6 +112,20 @@ def get_item(d, key):
 
 
 @register.filter
+def floor_label(label_map, floor_number):
+    """Return custom label from map or default 'Этаж N' / 'Подвал N'."""
+    try:
+        fn = int(floor_number)
+    except (TypeError, ValueError):
+        return str(floor_number)
+    if isinstance(label_map, dict):
+        custom = label_map.get(fn, '').strip()
+        if custom:
+            return custom
+    return f'Подвал {abs(fn)}' if fn < 0 else f'Этаж {fn}'
+
+
+@register.filter
 def percent(value, total):
     try:
         v = float(value)
