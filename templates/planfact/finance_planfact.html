@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load finance_filters %}
+
+{% block title %}Финансовый план-факт{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-bar-chart-line me-2 text-warning"></i>Финансовый план-факт по блокам</h1>
+    <p class="text-muted mb-0" style="font-size:.9rem">Бюджет vs фактические расходы по каждому блоку</p>
+  </div>
+  <a href="{% url 'dds_planfact_upload' %}" class="btn btn-warning btn-sm">
+    <i class="bi bi-upload me-1"></i>Загрузить план-факт
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Итоги ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="stat-card text-center" style="border-left:3px solid #f59e0b">
+      <div class="label">Бюджет (план)</div>
+      <div class="value text-money text-warning" style="font-size:.95rem">{{ grand_plan|currency }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="stat-card text-center" style="border-left:3px solid #7c3aed">
+      <div class="label">Загружено (план-факт)</div>
+      <div class="value text-money" style="font-size:.95rem;color:#7c3aed">
+        {% if grand_pf %}{{ grand_pf|currency }}{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="stat-card text-center" style="border-left:3px solid #d97706">
+      <div class="label">ДДС — всего расход</div>
+      <div class="value text-money" style="font-size:.95rem;color:#b45309">{{ grand_dds|currency }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card text-center" style="border-left:3px solid #2563eb">
+      <div class="label">АСМ (материалы)</div>
+      <div class="value text-money" style="font-size:.95rem;color:#2563eb">{{ grand_asm|currency }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card text-center" style="border-left:3px solid #16a34a">
+      <div class="label">АВР (работы)</div>
+      <div class="value text-money text-success" style="font-size:.95rem">{{ grand_avr|currency }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Таблица по блокам ── #}
+{% for group in rc_summary %}
+<div class="data-table mb-4">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <span class="section-title">
+      <i class="bi bi-building me-2 text-primary"></i>{{ group.rc.name }}
+    </span>
+    <div class="d-flex gap-3" style="font-size:.82rem">
+      <span class="text-muted">План: <strong class="text-warning">{{ group.plan|currency }}</strong></span>
+      {% if group.pf %}<span class="text-muted">Загружено: <strong style="color:#7c3aed">{{ group.pf|currency }}</strong></span>{% endif %}
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size:.84rem">
+      <thead class="table-light">
+        <tr>
+          <th>Блок</th>
+          <th class="text-end text-warning">Бюджет (план)</th>
+          <th class="text-end" style="color:#7c3aed">Загружено <small class="d-block fw-normal text-muted">план-факт Excel</small></th>
+          <th class="text-end" style="color:#b45309">ДДС — всего <small class="d-block fw-normal text-muted">все расходы</small></th>
+          <th class="text-end text-primary">АСМ</th>
+          <th class="text-end text-success">АВР</th>
+          <th class="text-end">Отклонение <small class="d-block fw-normal text-muted">план − загружено</small></th>
+          <th class="text-end">% факт</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in group.rows %}
+        {% with pct=row.pf|percent:row.plan %}
+        <tr>
+          <td class="fw-semibold">Блок {{ row.block.name }}</td>
+
+          <td class="text-end text-money text-warning">
+            {% if row.plan %}{{ row.plan|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end text-money fw-semibold" style="color:#7c3aed">
+            {% if row.pf %}
+              {{ row.pf|currency }}
+            {% else %}
+              <a href="{% url 'dds_planfact_upload' %}" class="text-muted" style="font-size:.75rem">Загрузить →</a>
+            {% endif %}
+          </td>
+
+          <td class="text-end text-money" style="color:#92400e">
+            {% if row.dds %}{{ row.dds|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end text-money" style="color:#2563eb">
+            {% if row.asm %}{{ row.asm|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end text-money text-success">
+            {% if row.avr %}{{ row.avr|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end text-money fw-semibold">
+            {% if row.plan and row.pf %}
+              {% with dev=row.plan|subtract:row.pf %}
+              <span class="{% if dev < 0 %}text-danger{% else %}text-success{% endif %}">
+                {% if dev < 0 %}−{{ dev|abs_value|currency }}{% else %}+{{ dev|currency }}{% endif %}
+              </span>
+              {% endwith %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end" style="min-width:110px">
+            {% if row.plan and row.pf %}
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:{% if pct > 100 %}100{% else %}{{ pct|clean_num }}{% endif %}%;background:{% if pct > 100 %}#dc2626{% elif pct >= 80 %}#f59e0b{% else %}#7c3aed{% endif %};border-radius:3px"></div>
+              </div>
+              <span style="font-size:.75rem;font-weight:700;color:{% if pct > 100 %}#dc2626{% elif pct >= 80 %}#f59e0b{% else %}#7c3aed{% endif %}">{{ pct }}%</span>
+            </div>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'planfact_block' row.block.pk %}" class="btn btn-xs btn-outline-secondary" title="Открыть план-факт блока">
+                <i class="bi bi-arrow-right"></i>
+              </a>
+              {% if row.pf and is_admin %}
+              <form method="post" class="d-inline"
+                    onsubmit="return confirm('Удалить {{ row.pf|currency }} загруженных данных для блока «{{ row.block.name }}»?')">
+                {% csrf_token %}
+                <input type="hidden" name="clear_pf_block" value="{{ row.block.pk }}">
+                <button type="submit" class="btn btn-xs btn-outline-danger" title="Очистить план-факт импорт">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-semibold">
+        <tr>
+          <td>Итого</td>
+          <td class="text-end text-money text-warning">{{ group.plan|currency }}</td>
+          <td class="text-end text-money fw-bold" style="color:#7c3aed">{% if group.pf %}{{ group.pf|currency }}{% else %}—{% endif %}</td>
+          <td class="text-end text-money" style="color:#92400e">{{ group.dds|currency }}</td>
+          <td class="text-end text-money" style="color:#2563eb">{{ group.asm|currency }}</td>
+          <td class="text-end text-money text-success">{{ group.avr|currency }}</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+{% if not rc_summary %}
+<div class="card-section p-5 text-center text-muted">
+  <i class="bi bi-bar-chart fs-2 d-block mb-3"></i>
+  Нет доступных блоков с финансовыми данными.
+  <div class="mt-3">
+    <a href="{% url 'dds_planfact_upload' %}" class="btn btn-warning btn-sm">
+      <i class="bi bi-upload me-1"></i>Загрузить план-факт Excel
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

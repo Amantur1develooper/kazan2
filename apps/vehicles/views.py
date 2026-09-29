@@ -71,10 +71,12 @@ def vehicle_list(request):
     transactions = list(qs.order_by('-date', '-created_at'))
 
     # Totals
-    total_in   = sum(t.amount_in  for t in transactions)
-    total_out  = sum(t.amount_out for t in transactions)
-    total_loss = sum(t.loss       for t in transactions)
-    in_balance  = [t for t in transactions if not t.is_sold]
+    total_in     = sum(t.amount_in  for t in transactions)
+    total_out    = sum(t.amount_out for t in transactions)
+    total_loss   = sum(t.loss       for t in transactions)
+    total_profit  = sum(-t.loss for t in transactions if t.loss < 0)  # приход − расход > 0
+    total_deficit = sum(t.loss  for t in transactions if t.loss > 0)  # расход − приход > 0
+    in_balance   = [t for t in transactions if not t.is_sold]
 
     orgs   = Organization.objects.order_by('name')
     blocks = Block.objects.select_related('residential_complex').order_by(
@@ -86,6 +88,8 @@ def vehicle_list(request):
         'total_in':       total_in,
         'total_out':      total_out,
         'total_loss':     total_loss,
+        'total_profit':   total_profit,
+        'total_deficit':  total_deficit,
         'in_balance':     in_balance,
         'orgs':           orgs,
         'blocks':         blocks,

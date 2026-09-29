@@ -942,7 +942,7 @@ def dds_planfact_upload(request):
             ))
 
         CashFlowRecord.objects.bulk_create(to_create)
-        msg = f'Импортировано {len(to_create)} расходов в блок «{block.name}» — ожидают привязки к смете.'
+        msg = f'Импортировано {len(to_create)} расходов в блок «{block.name}».'
         if skipped:
             msg += f' Пропущено {skipped} строк с нулевой суммой.'
         messages.success(request, msg)
@@ -953,7 +953,7 @@ def dds_planfact_upload(request):
     finally:
         os.unlink(tmp_path)
 
-    return redirect('dds_unlinked')
+    return redirect('planfact_block', block_pk=block.pk)
 
 
 # ── Unlinked DDS records ──────────────────────────────────────────────────────

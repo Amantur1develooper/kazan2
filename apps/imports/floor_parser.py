@@ -331,9 +331,153 @@ def parse_generic(filepath) -> dict:
     }
 
 
+def _is_planfact_custom(rows) -> bool:
+    """Detect custom plan-fact format: row[1] has №|Наименование|...|ИТОГО СТОИМОСТИ."""
+    if len(rows) < 4:
+        return False
+    hdr = [str(v or '').strip().lower() for v in rows[1][:6]]
+    return (
+        any('наименован' in v for v in hdr) and
+        any('итого' in v for v in hdr)
+    )
+
+
+def parse_planfact_custom(filepath) -> dict:
+    """
+    Parse custom plan-fact Excel format (Блок К style):
+      Row 1: headers — №|Наименование|Ед.|Кол.|Цена|ИТОГО СТОИМОСТИ
+      Row 2: column indices (skip)
+      Row 3: block header with grand total (skip)
+      Row 4+: sections (integer code) and items (float/string code like '5.1')
+    Sub-items with no name use col[6] as description.
+
+    Hierarchy detection: a coded row is a sub-section aggregate (skip it and all
+    its descendants) when the NEXT coded row has strictly greater dot-depth.
+    Example: '4.2' followed by '4.2.1' → '4.2' is an aggregate, skip everything
+    until the next row at depth ≤ 2.
+    """
+    import openpyxl
+
+    wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    wb.close()
+
+    def _is_section_code(v):
+        """True if v is a whole-number section index (1, 2, 5, 6 …)."""
+        try:
+            f = float(v)
+            return f == int(f) and f > 0
+        except (TypeError, ValueError):
+            return False
+
+    def _code_depth(v):
+        """Dot-depth of a code: 0 for integer sections, N for N-dot decimals."""
+        if _is_section_code(v):
+            return 0
+        return str(v).strip().count('.') + 1
+
+    # Extract block total from row 3 (col 5) to detect and skip grand-total rows
+    block_total = _to_decimal(rows[3][5] if len(rows) > 3 and len(rows[3]) > 5 else None)
+
+    # --- Pre-pass: identify sub-section aggregate rows ---
+    # A non-integer coded row whose NEXT coded row is deeper is an aggregate (skip).
+    coded_seq = []  # [(row_index, depth), ...]
+    for i in range(3, len(rows)):
+        c = (list(rows[i]) + [None] * 7)[0]
+        if c is None:
+            continue
+        coded_seq.append((i, _code_depth(c)))
+
+    skip_indices = set()
+    for j, (idx, depth) in enumerate(coded_seq):
+        if depth == 0:
+            skip_indices.add(idx)  # integer sections always skipped
+        elif j + 1 < len(coded_seq) and coded_seq[j + 1][1] > depth:
+            skip_indices.add(idx)  # aggregate: next coded row is deeper
+
+    # --- Main parse loop with descendant-skip propagation ---
+    skip_depth = None   # when set, skip all rows until we exit this depth level
+
+    items = []
+    for i, row in enumerate(rows):
+        if i < 3:
+            continue
+
+        row = list(row) + [None] * 7
+        code = row[0]
+
+        if code is not None:
+            d = _code_depth(code)
+            # Exit skip mode when we reach a coded row at the same or higher level
+            if skip_depth is not None and d <= skip_depth:
+                skip_depth = None
+            # This coded row is a section header → enter skip mode and skip the row
+            if i in skip_indices:
+                if d > 0:        # don't propagate for integer sections
+                    skip_depth = d
+                continue
+
+        if skip_depth is not None:
+            continue
+
+        name      = str(row[1] or '').strip()
+        unit      = str(row[2] or '').strip()
+        qty_raw   = row[3]
+        price_raw = row[4]
+        total_raw = row[5]
+        raw_note  = str(row[6] or '').strip()
+        note      = '' if raw_note.startswith('#') else raw_note
+
+        if all(v is None for v in row[:6]):
+            continue
+        if name and 'блок' in name.lower():
+            continue
+
+        total = _to_decimal(total_raw)
+        if total <= 0:
+            continue
+
+        if block_total and total >= block_total * Decimal('0.99'):
+            continue
+
+        item_name = name or note
+        if not item_name:
+            continue
+
+        items.append({
+            'item_code':    str(code or '').strip(),
+            'name':         item_name,
+            'unit':         unit,
+            'quantity':     _to_decimal(qty_raw),
+            'unit_price':   _to_decimal(price_raw),
+            'total_amount': total,
+            'expense_date': None,
+        })
+
+    return {
+        'doc_title': 'План-факт',
+        'doc_date':  None,
+        'items':     items,
+        'format':    'planfact_custom',
+    }
+
+
 def parse_floor_excel(filepath) -> dict:
     """Main entry point: auto-detect format and parse."""
     ext = filepath.rsplit('.', 1)[-1].lower()
+
+    # Try custom plan-fact format first (xlsx only)
+    if ext == 'xlsx':
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+            rows = [list(r) for r in wb.worksheets[0].iter_rows(values_only=True)]
+            wb.close()
+            if _is_planfact_custom(rows):
+                return parse_planfact_custom(filepath)
+        except Exception:
+            pass
 
     if ext == 'xls':
         try:

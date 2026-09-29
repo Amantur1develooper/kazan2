@@ -189,6 +189,153 @@ def planfact_index(request):
 
 
 @production_required
+def finance_planfact_list(request):
+    """Financial plan-fact by block: budget vs DDS actual spend."""
+    from collections import defaultdict
+    from apps.projects.models import ResidentialComplex
+    from apps.dds.models import CashFlowRecord
+    from django.db.models import Value
+
+    D0 = Decimal('0')
+
+    # Handle clear planfact import for a block (admin only)
+    if request.method == 'POST' and 'clear_pf_block' in request.POST:
+        if not _is_admin_user(request.user):
+            messages.error(request, 'Только администратор может очищать данные.')
+            return redirect('finance_planfact_list')
+        block_pk = request.POST.get('clear_pf_block', '').strip()
+        if block_pk.isdigit():
+            deleted, _ = CashFlowRecord.objects.filter(
+                block_id=int(block_pk),
+                operation_type='Расход (план-факт)',
+            ).delete()
+            blk_name = Block.objects.filter(pk=int(block_pk)).values_list('name', flat=True).first() or block_pk
+            messages.success(request, f'Удалено {deleted} записей план-факт для блока «{blk_name}».')
+        return redirect('finance_planfact_list')
+
+    all_blocks = list(
+        Block.objects.select_related('residential_complex')
+        .order_by('residential_complex__name', 'name')
+    )
+    accessible = {b.pk for b in all_blocks if _can_access_block(request.user, b.pk)}
+    all_blocks = [b for b in all_blocks if b.pk in accessible]
+
+    # Planned budgets per block
+    budget_rows = list(
+        FloorBudget.objects.filter(block__in=all_blocks)
+        .values('block_id')
+        .annotate(total=Coalesce(Sum('planned_amount'), Value(D0)))
+    )
+    budget_map = {r['block_id']: r['total'] for r in budget_rows}
+
+    # DDS actual spend per block (all out records)
+    dds_rows = list(
+        CashFlowRecord.objects.filter(block__in=all_blocks, direction='out')
+        .values('block_id')
+        .annotate(total=Coalesce(Sum('amount'), Value(D0)))
+    )
+    dds_map = {r['block_id']: r['total'] for r in dds_rows}
+
+    # Plan-fact import records specifically (operation_type='Расход (план-факт)')
+    pf_rows = list(
+        CashFlowRecord.objects.filter(
+            block__in=all_blocks,
+            direction='out',
+            operation_type='Расход (план-факт)',
+        )
+        .values('block_id')
+        .annotate(total=Coalesce(Sum('amount'), Value(D0)))
+    )
+    pf_map = {r['block_id']: r['total'] for r in pf_rows}
+
+    # ASM totals per block
+    _asm_expr = ExpressionWrapper(
+        F('items__quantity') * F('items__unit_price'),
+        output_field=DecimalField(max_digits=15, decimal_places=2),
+    )
+    asm_rows = list(
+        AsmDocument.objects.filter(block__in=all_blocks, is_accepted=True)
+        .values('block_id')
+        .annotate(total=Coalesce(Sum(_asm_expr), Value(D0)))
+    )
+    asm_map = {r['block_id']: r['total'] for r in asm_rows}
+
+    # AVR totals per block (accepted, manual + items)
+    _avr_expr = ExpressionWrapper(
+        F('items__quantity') * F('items__unit_price'),
+        output_field=DecimalField(max_digits=15, decimal_places=2),
+    )
+    avr_manual_rows = list(
+        AvrDocument.objects.filter(block__in=all_blocks, is_accepted=True, accepted_amount__isnull=False)
+        .values('block_id')
+        .annotate(total=Coalesce(Sum('accepted_amount'), Value(D0)))
+    )
+    avr_item_rows = list(
+        AvrDocument.objects.filter(block__in=all_blocks, is_accepted=True, accepted_amount__isnull=True)
+        .values('block_id')
+        .annotate(total=Coalesce(Sum(_avr_expr), Value(D0)))
+    )
+    avr_map = defaultdict(lambda: D0)
+    for r in avr_manual_rows:
+        avr_map[r['block_id']] += r['total']
+    for r in avr_item_rows:
+        avr_map[r['block_id']] += r['total']
+
+    # Build per-block rows grouped by RC
+    rc_groups = defaultdict(list)
+    for blk in all_blocks:
+        plan   = budget_map.get(blk.pk, D0)
+        dds    = dds_map.get(blk.pk, D0)
+        pf     = pf_map.get(blk.pk, D0)
+        asm    = asm_map.get(blk.pk, D0)
+        avr    = avr_map[blk.pk]
+        total_fact = asm + avr
+        rc_groups[blk.residential_complex].append({
+            'block':      blk,
+            'plan':       plan,
+            'dds':        dds,
+            'pf':         pf,
+            'asm':        asm,
+            'avr':        avr,
+            'total_fact': total_fact,
+            'deviation':  plan - dds if plan else None,
+        })
+
+    rc_summary = []
+    grand_plan = grand_dds = grand_pf = grand_asm = grand_avr = D0
+    for rc, rows in rc_groups.items():
+        s_plan = sum(r['plan'] for r in rows)
+        s_dds  = sum(r['dds']  for r in rows)
+        s_pf   = sum(r['pf']   for r in rows)
+        s_asm  = sum(r['asm']  for r in rows)
+        s_avr  = sum(r['avr']  for r in rows)
+        rc_summary.append({
+            'rc':   rc,
+            'rows': rows,
+            'plan': s_plan,
+            'dds':  s_dds,
+            'pf':   s_pf,
+            'asm':  s_asm,
+            'avr':  s_avr,
+        })
+        grand_plan += s_plan
+        grand_dds  += s_dds
+        grand_pf   += s_pf
+        grand_asm  += s_asm
+        grand_avr  += s_avr
+
+    return render(request, 'planfact/finance_planfact.html', {
+        'rc_summary':  rc_summary,
+        'grand_plan':  grand_plan,
+        'grand_dds':   grand_dds,
+        'grand_pf':    grand_pf,
+        'grand_asm':   grand_asm,
+        'grand_avr':   grand_avr,
+        'is_admin':    _is_admin_user(request.user),
+    })
+
+
+@production_required
 def planfact_block(request, block_pk):
     if not _can_access_block(request.user, block_pk):
         messages.error(request, 'Нет доступа к этому блоку.')
@@ -322,6 +469,13 @@ def planfact_block(request, block_pk):
     building_pct = round(sum(f['display_pct'] for f in floors) / len(floors), 1) if floors else 0
     total_expenses = asm_grand_total + avr_grand_total
 
+    # DDS actual spend for this block
+    from apps.dds.models import CashFlowRecord
+    from django.db.models import Value
+    dds_out = CashFlowRecord.objects.filter(
+        block=block, direction='out'
+    ).aggregate(s=Coalesce(Sum('amount'), Value(D0)))['s']
+
     # Recent documents: combine AsmDocument + AvrDocument, sorted by date
     _item_expr2 = ExpressionWrapper(
         F('items__quantity') * F('items__unit_price'),
@@ -422,6 +576,7 @@ def planfact_block(request, block_pk):
         'unprice_docs': unprice_docs,
         'ongoing_works': ongoing_works,
         'label_map': label_map,
+        'dds_out': dds_out,
     })
 
 

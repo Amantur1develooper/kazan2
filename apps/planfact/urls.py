@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.planfact_index, name='planfact_index'),
+    path('finance/', views.finance_planfact_list, name='finance_planfact_list'),
     path('<int:block_pk>/', views.planfact_block, name='planfact_block'),
     re_path(r'^(?P<block_pk>[0-9]+)/floor/(?P<floor_number>-?[0-9]+)/$', views.planfact_floor_edit, name='planfact_floor_edit'),
     path('<int:block_pk>/landscaping/', views.planfact_landscaping_edit, name='planfact_landscaping_edit'),
