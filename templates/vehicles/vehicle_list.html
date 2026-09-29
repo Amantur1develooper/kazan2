@@ -6,227 +6,543 @@
 {% block page_header %}
 <div class="page-header">
   <div>
-    <h1><i class="bi bi-car-front me-2 text-primary"></i>Склад авто</h1>
-    <p class="text-muted mb-0" style="font-size:.9rem">Учёт автомобилей как расчётного средства</p>
+    <h1 style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;font-weight:700;letter-spacing:-.5px">
+      <i class="bi bi-car-front me-2" style="color:#007AFF"></i>Склад авто
+    </h1>
+    <p class="text-muted mb-0" style="font-size:.88rem">Учёт автомобилей как расчётного средства</p>
   </div>
   <div class="d-flex gap-2">
-    <a href="{% url 'vehicle_import' %}" class="btn btn-success btn-sm">
-      <i class="bi bi-upload me-1"></i>Импорт Excel
+    <a href="{% url 'vehicle_import' %}" class="veh-btn veh-btn-secondary">
+      <i class="bi bi-arrow-up-tray me-1"></i>Импорт
     </a>
-    <a href="{% url 'vehicle_create' %}" class="btn btn-primary btn-sm">
-      <i class="bi bi-plus-lg me-1"></i>Добавить
+    <a href="{% url 'vehicle_create' %}" class="veh-btn veh-btn-primary">
+      <i class="bi bi-plus me-1"></i>Добавить
     </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+<style>
+/* ── Apple design tokens ── */
+:root {
+  --a-blue:    #007AFF;
+  --a-green:   #34C759;
+  --a-red:     #FF3B30;
+  --a-orange:  #FF9500;
+  --a-purple:  #AF52DE;
+  --a-gray:    #8E8E93;
+  --a-gray2:   #AEAEB2;
+  --a-gray3:   #C7C7CC;
+  --a-bg:      #F2F2F7;
+  --a-card:    #FFFFFF;
+  --a-text:    #1C1C1E;
+  --a-text2:   #3C3C43;
+  --a-text3:   #6E6E73;
+  --a-sep:     #E5E5EA;
+  --a-r:       16px;
+  --a-r-sm:    10px;
+  --a-shadow:  0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.07);
+  --a-shadow-s:0 1px 3px rgba(0,0,0,.08);
+}
+
+/* ── Override page background ── */
+.main-content { background: var(--a-bg) !important; }
+
+/* ── Buttons ── */
+.veh-btn {
+  display:inline-flex; align-items:center;
+  padding:.45rem 1rem; border-radius:980px;
+  font-size:.84rem; font-weight:600;
+  border:none; cursor:pointer; text-decoration:none;
+  transition:opacity .15s, transform .1s;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+}
+.veh-btn:active { transform:scale(.97); opacity:.85; }
+.veh-btn-primary { background:var(--a-blue); color:#fff; }
+.veh-btn-secondary { background:rgba(120,120,128,.15); color:var(--a-text); }
+.veh-btn-sm { padding:.3rem .75rem; font-size:.78rem; }
+.veh-btn-danger { background:rgba(255,59,48,.12); color:var(--a-red); }
+.veh-btn-success { background:rgba(52,199,89,.12); color:var(--a-green); }
+
+/* ── Stat cards ── */
+.veh-stats {
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:12px; margin-bottom:20px;
+}
+@media(max-width:900px){ .veh-stats{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:600px){ .veh-stats{ grid-template-columns:repeat(2,1fr); gap:10px; } }
+
+.veh-stat {
+  background:var(--a-card);
+  border-radius:var(--a-r);
+  padding:16px 14px 14px;
+  box-shadow:var(--a-shadow-s);
+  display:flex; flex-direction:column; gap:6px;
+}
+.veh-stat-icon {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; margin-bottom:2px;
+}
+.veh-stat-val {
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+  font-size:1.25rem; font-weight:700; color:var(--a-text); line-height:1.1;
+  letter-spacing:-.3px;
+}
+.veh-stat-val.small-num { font-size:1rem; }
+.veh-stat-lbl {
+  font-size:.72rem; font-weight:500; color:var(--a-text3);
+  text-transform:uppercase; letter-spacing:.04em;
+}
+.veh-stat-sub { font-size:.7rem; color:var(--a-gray); }
+
+/* ── Filter bar ── */
+.veh-filter {
+  background:var(--a-card);
+  border-radius:var(--a-r);
+  padding:14px 16px;
+  box-shadow:var(--a-shadow-s);
+  margin-bottom:16px;
+}
+.veh-search {
+  display:flex; align-items:center; gap:8px;
+  background:#F2F2F7; border-radius:10px;
+  padding:0 12px; height:38px;
+}
+.veh-search i { color:var(--a-gray); font-size:.9rem; }
+.veh-search input {
+  border:none; background:transparent; outline:none;
+  font-size:.88rem; flex:1; color:var(--a-text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+}
+.veh-select {
+  background:#F2F2F7; border:none; border-radius:10px;
+  padding:0 10px; height:38px; font-size:.83rem;
+  color:var(--a-text); outline:none; cursor:pointer;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+  width:100%;
+}
+.veh-filter-apply {
+  height:38px; padding:0 20px; border-radius:10px;
+  background:var(--a-blue); color:#fff; border:none;
+  font-size:.84rem; font-weight:600; cursor:pointer;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+  white-space:nowrap;
+}
+.veh-filter-clear {
+  height:38px; width:38px; border-radius:10px;
+  background:rgba(120,120,128,.15); color:var(--a-gray);
+  border:none; font-size:1rem; cursor:pointer; flex-shrink:0;
+}
+
+/* ── In-balance notice ── */
+.veh-notice {
+  background:rgba(0,122,255,.08);
+  border-radius:var(--a-r-sm);
+  padding:10px 14px;
+  font-size:.82rem; color:var(--a-blue);
+  display:flex; align-items:flex-start; gap:8px;
+  margin-bottom:14px;
+}
+
+/* ── Section header ── */
+.veh-section-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px; padding:0 2px;
+}
+.veh-section-hdr h2 {
+  font-size:.78rem; font-weight:600; color:var(--a-text3);
+  text-transform:uppercase; letter-spacing:.06em; margin:0;
+}
+.veh-section-hdr span { font-size:.78rem; color:var(--a-gray); }
+
+/* ── Desktop table ── */
+.veh-table-wrap {
+  background:var(--a-card); border-radius:var(--a-r);
+  box-shadow:var(--a-shadow-s); overflow:hidden;
+}
+.veh-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.veh-table thead th {
+  padding:11px 12px; font-size:.72rem; font-weight:600;
+  color:var(--a-text3); text-transform:uppercase; letter-spacing:.04em;
+  border-bottom:1px solid var(--a-sep); background:#FAFAFA;
+}
+.veh-table tbody tr { border-bottom:1px solid var(--a-sep); transition:background .12s; }
+.veh-table tbody tr:last-child { border-bottom:none; }
+.veh-table tbody tr:hover { background:#F9F9FB; }
+.veh-table tbody tr.available { background:rgba(0,122,255,.03); }
+.veh-table td { padding:10px 12px; color:var(--a-text); vertical-align:middle; }
+.veh-table tfoot td {
+  padding:10px 12px; font-weight:600; font-size:.82rem;
+  border-top:1px solid var(--a-sep); background:#FAFAFA;
+}
+.text-r { text-align:right; }
+.text-money-a { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+/* ── Status pill ── */
+.veh-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border-radius:980px;
+  font-size:.72rem; font-weight:600; cursor:pointer;
+  border:none; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+  transition:opacity .15s;
+}
+.veh-pill:active { opacity:.75; }
+.veh-pill-sold { background:rgba(255,59,48,.1); color:var(--a-red); }
+.veh-pill-avail { background:rgba(52,199,89,.1); color:var(--a-green); }
+
+/* ── Mobile cards ── */
+.veh-cards { display:flex; flex-direction:column; gap:10px; }
+.veh-card {
+  background:var(--a-card); border-radius:var(--a-r);
+  box-shadow:var(--a-shadow-s); overflow:hidden;
+}
+.veh-card-head {
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--a-sep);
+  display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
+}
+.veh-card-title {
+  font-size:.97rem; font-weight:700; color:var(--a-text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+  letter-spacing:-.2px; flex:1;
+}
+.veh-card-sub {
+  font-size:.72rem; color:var(--a-text3); margin-top:3px;
+}
+.veh-card-money {
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  padding:12px 16px;
+  border-bottom:1px solid var(--a-sep);
+}
+.veh-money-item { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.veh-money-lbl { font-size:.62rem; font-weight:500; color:var(--a-text3); text-transform:uppercase; letter-spacing:.04em; }
+.veh-money-val { font-size:.92rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.veh-card-foot {
+  padding:10px 16px;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.veh-card-info { font-size:.72rem; color:var(--a-text3); flex:1; }
+
+/* ── Action icon buttons ── */
+.veh-icon-btn {
+  width:32px; height:32px; border-radius:8px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:none; cursor:pointer; font-size:.82rem;
+  transition:background .12s;
+  text-decoration:none;
+}
+.veh-icon-edit  { background:rgba(0,122,255,.1); color:var(--a-blue); }
+.veh-icon-del   { background:rgba(255,59,48,.08); color:var(--a-red); }
+.veh-icon-btn:hover { filter:brightness(.9); }
+
+/* ── Responsive show/hide ── */
+.mobile-only { display:none; }
+.desk-only   { display:block; }
+@media(max-width:767px) {
+  .mobile-only { display:block; }
+  .desk-only   { display:none; }
+}
+
+/* ── Empty state ── */
+.veh-empty {
+  background:var(--a-card); border-radius:var(--a-r);
+  box-shadow:var(--a-shadow-s); padding:48px 20px;
+  text-align:center; color:var(--a-text3);
+}
+.veh-empty i { font-size:2.5rem; color:var(--a-gray3); display:block; margin-bottom:12px; }
+.veh-empty p { font-size:.9rem; margin-bottom:16px; }
+
+/* ── Modal Apple style ── */
+.veh-modal .modal-content {
+  border:none; border-radius:var(--a-r);
+  box-shadow:0 8px 40px rgba(0,0,0,.18);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+}
+.veh-modal .modal-header { border-bottom:1px solid var(--a-sep); padding:16px 20px 12px; border-radius:var(--a-r) var(--a-r) 0 0; }
+.veh-modal .modal-footer { border-top:1px solid var(--a-sep); padding:12px 20px 16px; }
+.veh-modal .modal-title { font-weight:700; font-size:1rem; }
+</style>
 
 {% if messages %}
 {% for msg in messages %}
-<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show">
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" style="border-radius:var(--a-r);border:none;box-shadow:var(--a-shadow-s)">
   {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endfor %}
 {% endif %}
 
-{# ── Итоговые карточки ── #}
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-2">
-    <div class="stat-card text-center">
-      <div class="label">Всего</div>
-      <div class="value">{{ transactions|length }}</div>
-      <div class="text-muted" style="font-size:.72rem">в наличии: {{ in_balance|length }}</div>
+{# ── Stat cards ── #}
+<div class="veh-stats">
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(0,122,255,.12);color:var(--a-blue)">
+      <i class="bi bi-car-front"></i>
     </div>
+    <div class="veh-stat-val">{{ transactions|length }}</div>
+    <div class="veh-stat-lbl">Всего авто</div>
+    <div class="veh-stat-sub">в наличии: {{ in_balance|length }}</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="stat-card text-center" style="border-left:3px solid #16a34a">
-      <div class="label">Приход</div>
-      <div class="value text-money text-success">{{ total_in|currency }}</div>
+
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(52,199,89,.12);color:var(--a-green)">
+      <i class="bi bi-arrow-down-circle"></i>
     </div>
+    <div class="veh-stat-val text-money-a" style="color:var(--a-green)">{{ total_in|currency }}</div>
+    <div class="veh-stat-lbl">Приход</div>
   </div>
-  <div class="col-6 col-md-2">
-    <div class="stat-card text-center" style="border-left:3px solid #dc2626">
-      <div class="label">Расход</div>
-      <div class="value text-money text-danger">{{ total_out|currency }}</div>
+
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(255,59,48,.1);color:var(--a-red)">
+      <i class="bi bi-arrow-up-circle"></i>
     </div>
+    <div class="veh-stat-val text-money-a" style="color:var(--a-red)">{{ total_out|currency }}</div>
+    <div class="veh-stat-lbl">Расход</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card text-center" style="border-left:3px solid #16a34a">
-      <div class="label text-success fw-semibold">Прибыль</div>
-      <div class="value text-money text-success">
-        {% if total_profit %}+{{ total_profit|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
-      </div>
-      <div class="text-muted" style="font-size:.72rem">приход − расход &gt; 0</div>
+
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(52,199,89,.12);color:var(--a-green)">
+      <i class="bi bi-graph-up-arrow"></i>
     </div>
+    <div class="veh-stat-val text-money-a {% if not total_profit %}text-money-a{% endif %}"
+         style="color:{% if total_profit %}var(--a-green){% else %}var(--a-gray){% endif %}">
+      {% if total_profit %}+{{ total_profit|currency }}{% else %}—{% endif %}
+    </div>
+    <div class="veh-stat-lbl">Прибыль</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card text-center" style="border-left:3px solid #dc2626">
-      <div class="label text-danger fw-semibold">Убыток</div>
-      <div class="value text-money text-danger">
-        {% if total_deficit %}{{ total_deficit|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
-      </div>
-      <div class="text-muted" style="font-size:.72rem">расход − приход &gt; 0</div>
+
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(255,59,48,.08);color:var(--a-red)">
+      <i class="bi bi-graph-down-arrow"></i>
     </div>
+    <div class="veh-stat-val text-money-a"
+         style="color:{% if total_deficit %}var(--a-red){% else %}var(--a-gray){% endif %}">
+      {% if total_deficit %}{{ total_deficit|currency }}{% else %}—{% endif %}
+    </div>
+    <div class="veh-stat-lbl">Убыток</div>
   </div>
 </div>
 
-{# ── Фильтры ── #}
-<form method="get" class="mb-3">
-  <div class="row g-2 align-items-end">
-    <div class="col-sm-2">
-      <label class="form-label small text-muted mb-1">Компания</label>
-      <select name="org" class="form-select form-select-sm">
+{# ── Filter ── #}
+<form method="get" class="veh-filter">
+  <div class="row g-2 align-items-center">
+    <div class="col-12 col-sm-4 col-md-3">
+      <div class="veh-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" value="{{ filter_q }}" placeholder="Авто, подрядчик, назначение…">
+      </div>
+    </div>
+    <div class="col-6 col-sm-3 col-md-2">
+      <select name="org" class="veh-select">
         <option value="">Все компании</option>
         {% for o in orgs %}
         <option value="{{ o.pk }}" {% if filter_org == o.pk|stringformat:"s" %}selected{% endif %}>{{ o.name }}</option>
         {% endfor %}
       </select>
     </div>
-    <div class="col-sm-2">
-      <label class="form-label small text-muted mb-1">Блок</label>
-      <select name="block" class="form-select form-select-sm">
+    <div class="col-6 col-sm-3 col-md-2">
+      <select name="block" class="veh-select">
         <option value="">Все блоки</option>
         {% for b in blocks %}
         <option value="{{ b.pk }}" {% if filter_block == b.pk|stringformat:"s" %}selected{% endif %}>
-          {{ b.residential_complex.name }} / Блок {{ b.name }}
+          {{ b.residential_complex.name }} — Блок {{ b.name }}
         </option>
         {% endfor %}
       </select>
     </div>
-    <div class="col-sm-2">
-      <label class="form-label small text-muted mb-1">Статус</label>
-      <select name="status" class="form-select form-select-sm">
-        <option value="">Все</option>
+    <div class="col-6 col-sm-3 col-md-2">
+      <select name="status" class="veh-select">
+        <option value="">Все статусы</option>
         <option value="available" {% if filter_status == 'available' %}selected{% endif %}>В наличии</option>
         <option value="sold" {% if filter_status == 'sold' %}selected{% endif %}>Продана</option>
       </select>
     </div>
-    <div class="col-sm-4">
-      <label class="form-label small text-muted mb-1">Поиск по авто / подрядчику</label>
-      <input type="text" name="q" value="{{ filter_q }}" class="form-control form-control-sm" placeholder="Марка, подрядчик, назначение…">
-    </div>
-    <div class="col-sm-2 d-flex gap-2">
-      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Найти</button>
-      <a href="{% url 'vehicle_list' %}" class="btn btn-outline-secondary btn-sm">×</a>
+    <div class="col-6 col-sm-auto d-flex gap-2">
+      <button type="submit" class="veh-filter-apply">Найти</button>
+      <a href="{% url 'vehicle_list' %}" class="veh-filter-clear d-flex align-items-center justify-content-center">×</a>
     </div>
   </div>
 </form>
 
 {# ── В наличии ── #}
 {% if in_balance and not filter_status %}
-<div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" style="font-size:.875rem">
-  <i class="bi bi-info-circle-fill"></i>
-  <span>В наличии (не продано): <strong>{{ in_balance|length }} авто</strong> —
-  {% for t in in_balance %}<span class="badge bg-info text-dark me-1">{{ t.vehicle_name|truncatechars:35 }}</span>{% endfor %}
+<div class="veh-notice">
+  <i class="bi bi-info-circle-fill mt-1" style="flex-shrink:0"></i>
+  <span>
+    В наличии: <strong>{{ in_balance|length }} авто</strong> —
+    {% for t in in_balance %}<span style="background:rgba(0,122,255,.1);border-radius:6px;padding:1px 7px;margin:0 2px;font-size:.71rem">{{ t.vehicle_name|truncatechars:30 }}</span>{% endfor %}
   </span>
 </div>
 {% endif %}
 
-{# ── Таблица ── #}
-<div class="data-table">
-  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-    <span class="section-title">Операции</span>
-    <small class="text-muted">{{ transactions|length }} записей</small>
+{# ── Section header ── #}
+<div class="veh-section-hdr">
+  <h2>Операции</h2>
+  <span>{{ transactions|length }} записей</span>
+</div>
+
+{% if transactions %}
+
+{# ────────── MOBILE: cards ────────── #}
+<div class="mobile-only veh-cards">
+  {% for t in transactions %}
+  <div class="veh-card">
+    <div class="veh-card-head">
+      <div style="flex:1">
+        <div class="veh-card-title">{{ t.vehicle_name|truncatechars:55 }}</div>
+        <div class="veh-card-sub">
+          {{ t.date|date:"d.m.Y" }}
+          {% if t.organization %} · {{ t.organization.name }}{% endif %}
+          {% if t.source_text %} · {{ t.source_text|truncatechars:25 }}{% endif %}
+        </div>
+      </div>
+      <button type="button" class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %} toggle-sold-btn"
+              data-action="{% url 'vehicle_toggle_sold' t.pk %}"
+              data-name="{{ t.vehicle_name|truncatechars:50 }}"
+              data-direction="{% if t.is_sold %}available{% else %}sold{% endif %}">
+        <i class="bi bi-{% if t.is_sold %}check-circle-fill{% else %}circle{% endif %}"></i>
+        {% if t.is_sold %}Продана{% else %}В наличии{% endif %}
+      </button>
+    </div>
+
+    <div class="veh-card-money">
+      <div class="veh-money-item">
+        <span class="veh-money-lbl">Приход</span>
+        <span class="veh-money-val" style="color:{% if t.amount_in %}var(--a-green){% else %}var(--a-gray){% endif %}">
+          {% if t.amount_in %}{{ t.amount_in|currency }}{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="veh-money-item" style="border-left:1px solid var(--a-sep);border-right:1px solid var(--a-sep)">
+        <span class="veh-money-lbl">Расход</span>
+        <span class="veh-money-val" style="color:{% if t.amount_out %}var(--a-red){% else %}var(--a-gray){% endif %}">
+          {% if t.amount_out %}{{ t.amount_out|currency }}{% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="veh-money-item">
+        <span class="veh-money-lbl">Итого</span>
+        <span class="veh-money-val" style="color:{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+          {% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}
+          {% elif t.loss > 0 %}−{{ t.loss|currency }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <div class="veh-card-foot">
+      <div class="veh-card-info">
+        {% if t.counterparty %}<div><i class="bi bi-person" style="color:var(--a-gray)"></i> {{ t.counterparty|truncatechars:30 }}</div>{% endif %}
+        {% if t.purpose %}<div><i class="bi bi-tag" style="color:var(--a-gray)"></i> {{ t.purpose|truncatechars:30 }}</div>{% endif %}
+        {% if t.target_block %}<div><i class="bi bi-building" style="color:var(--a-gray)"></i> {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}</div>
+        {% elif t.target_text %}<div><i class="bi bi-geo" style="color:var(--a-gray)"></i> {{ t.target_text|truncatechars:30 }}</div>{% endif %}
+      </div>
+      <div class="d-flex gap-1">
+        <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit">
+          <i class="bi bi-pencil"></i>
+        </a>
+        <form method="post" action="{% url 'vehicle_delete' t.pk %}"
+              onsubmit="return confirm('Удалить «{{ t.vehicle_name|truncatechars:40 }}»?')" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="veh-icon-btn veh-icon-del">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
-  {% if transactions %}
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0" style="font-size:.83rem">
-      <thead class="table-light">
+  {% endfor %}
+
+  {# Mobile totals #}
+  <div class="veh-card" style="border:2px solid var(--a-sep)">
+    <div class="veh-card-money">
+      <div class="veh-money-item">
+        <span class="veh-money-lbl">Итого приход</span>
+        <span class="veh-money-val" style="color:var(--a-green)">{{ total_in|currency }}</span>
+      </div>
+      <div class="veh-money-item" style="border-left:1px solid var(--a-sep);border-right:1px solid var(--a-sep)">
+        <span class="veh-money-lbl">Итого расход</span>
+        <span class="veh-money-val" style="color:var(--a-red)">{{ total_out|currency }}</span>
+      </div>
+      <div class="veh-money-item">
+        <span class="veh-money-lbl">Нетто</span>
+        <span class="veh-money-val" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+          {% if total_loss < 0 %}+{{ total_loss|abs_value|currency }}
+          {% elif total_loss > 0 %}−{{ total_loss|currency }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ────────── DESKTOP: table ────────── #}
+<div class="desk-only veh-table-wrap">
+  <div style="overflow-x:auto">
+    <table class="veh-table">
+      <thead>
         <tr>
           <th>Дата</th>
-          <th>Авто / откуда поступила</th>
+          <th>Автомобиль</th>
           <th>Статус</th>
-          <th class="text-end text-success">Приход</th>
-          <th class="text-end text-danger">Расход</th>
-          <th class="text-end">Результат</th>
+          <th class="text-r" style="color:var(--a-green)">Приход</th>
+          <th class="text-r" style="color:var(--a-red)">Расход</th>
+          <th class="text-r">Итого</th>
           <th>Подрядчик</th>
-          <th>Объект расхода</th>
-          <th>За что</th>
-          <th style="width:80px"></th>
+          <th>Объект / за что</th>
+          <th style="width:72px"></th>
         </tr>
       </thead>
       <tbody>
         {% for t in transactions %}
-        <tr {% if not t.is_sold %}class="table-info"{% endif %}>
-          <td class="text-muted text-nowrap">{{ t.date|date:"d.m.Y" }}</td>
+        <tr {% if not t.is_sold %}class="available"{% endif %}>
+          <td style="color:var(--a-text3);white-space:nowrap;font-size:.78rem">{{ t.date|date:"d.m.Y" }}</td>
           <td>
-            <span class="fw-semibold">{{ t.vehicle_name|truncatechars:45 }}</span>
-            {% if t.organization %}<div class="text-muted" style="font-size:.72rem">{{ t.organization.name }}</div>{% endif %}
-            <div class="text-muted" style="font-size:.75rem">
-              <i class="bi bi-arrow-down-circle text-success me-1"></i>
-              {% if t.source_block %}
-                <a href="{% url 'block_detail' t.source_block.pk %}" class="text-decoration-none text-muted">
-                  {{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}
-                </a>
-              {% elif t.source_text %}
-                {{ t.source_text|truncatechars:40 }}
-              {% else %}
-                <span class="fst-italic">откуда не указано</span>
-              {% endif %}
-            </div>
-            {% if t.is_sold or t.target_block or t.target_text or t.counterparty %}
-            <div class="text-muted" style="font-size:.75rem">
-              <i class="bi bi-arrow-up-circle text-danger me-1"></i>
-              {% if t.target_block %}
-                <a href="{% url 'block_detail' t.target_block.pk %}" class="text-decoration-none text-muted">
-                  {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}
-                </a>
-              {% elif t.target_text %}
-                {{ t.target_text|truncatechars:30 }}
-              {% endif %}
-              {% if t.counterparty %}<span class="ms-1 text-muted fst-italic">— {{ t.counterparty|truncatechars:25 }}</span>{% endif %}
+            <div style="font-weight:600;color:var(--a-text)">{{ t.vehicle_name|truncatechars:40 }}</div>
+            {% if t.organization %}<div style="font-size:.72rem;color:var(--a-text3)">{{ t.organization.name }}</div>{% endif %}
+            {% if t.source_text or t.source_block %}
+            <div style="font-size:.72rem;color:var(--a-text3)">
+              <i class="bi bi-arrow-down-circle" style="color:var(--a-green)"></i>
+              {% if t.source_block %}{{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}
+              {% else %}{{ t.source_text|truncatechars:35 }}{% endif %}
             </div>
             {% endif %}
           </td>
           <td>
-            {% if t.is_sold %}
-              <button type="button" class="btn btn-sm btn-danger toggle-sold-btn" style="min-width:90px"
-                      data-action="{% url 'vehicle_toggle_sold' t.pk %}"
-                      data-name="{{ t.vehicle_name|truncatechars:50 }}"
-                      data-direction="available">
-                <i class="bi bi-check-circle-fill me-1"></i>Продана
-              </button>
-            {% else %}
-              <button type="button" class="btn btn-sm btn-success toggle-sold-btn" style="min-width:90px"
-                      data-action="{% url 'vehicle_toggle_sold' t.pk %}"
-                      data-name="{{ t.vehicle_name|truncatechars:50 }}"
-                      data-direction="sold">
-                <i class="bi bi-circle me-1"></i>В наличии
-              </button>
-            {% endif %}
+            <button type="button"
+                    class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %} toggle-sold-btn"
+                    data-action="{% url 'vehicle_toggle_sold' t.pk %}"
+                    data-name="{{ t.vehicle_name|truncatechars:50 }}"
+                    data-direction="{% if t.is_sold %}available{% else %}sold{% endif %}">
+              <i class="bi bi-{% if t.is_sold %}check-circle-fill{% else %}circle{% endif %}"></i>
+              {% if t.is_sold %}Продана{% else %}В наличии{% endif %}
+            </button>
           </td>
-          <td class="text-end text-money {% if t.amount_in > 0 %}text-success{% elif t.amount_in < 0 %}text-danger{% else %}text-muted{% endif %}">
-            {% if t.amount_in != 0 %}{{ t.amount_in|currency }}{% else %}—{% endif %}
+          <td class="text-r text-money-a" style="color:{% if t.amount_in %}var(--a-green){% else %}var(--a-gray){% endif %}">
+            {% if t.amount_in %}{{ t.amount_in|currency }}{% else %}—{% endif %}
           </td>
-          <td class="text-end text-money {% if t.amount_out > 0 %}text-danger{% else %}text-muted{% endif %}">
-            {% if t.amount_out != 0 %}{{ t.amount_out|currency }}{% else %}—{% endif %}
+          <td class="text-r text-money-a" style="color:{% if t.amount_out %}var(--a-red){% else %}var(--a-gray){% endif %}">
+            {% if t.amount_out %}{{ t.amount_out|currency }}{% else %}—{% endif %}
           </td>
-          <td class="text-end text-money fw-semibold {% if t.loss < 0 %}text-success{% elif t.loss > 0 %}text-danger{% else %}text-muted{% endif %}">
+          <td class="text-r text-money-a" style="font-weight:600;color:{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
             {% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}
             {% elif t.loss > 0 %}−{{ t.loss|currency }}
             {% else %}—{% endif %}
           </td>
-          <td class="text-muted small">{{ t.counterparty|truncatechars:30 }}</td>
-          <td class="text-muted small">
-            {% if t.target_block %}
-              <a href="{% url 'block_detail' t.target_block.pk %}" class="text-decoration-none text-muted">
-                {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}
-              </a>
-            {% else %}
-              {{ t.target_text|truncatechars:20 }}
-            {% endif %}
+          <td style="color:var(--a-text3);font-size:.78rem">{{ t.counterparty|truncatechars:25 }}</td>
+          <td style="color:var(--a-text3);font-size:.78rem">
+            {% if t.target_block %}<a href="{% url 'block_detail' t.target_block.pk %}" style="color:var(--a-blue);text-decoration:none">{{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}</a>
+            {% elif t.target_text %}{{ t.target_text|truncatechars:18 }}{% endif %}
+            {% if t.purpose %}<div style="font-size:.7rem;color:var(--a-gray)">{{ t.purpose|truncatechars:22 }}</div>{% endif %}
           </td>
-          <td class="text-muted small">{{ t.purpose|truncatechars:30 }}</td>
           <td>
             <div class="d-flex gap-1">
-              <a href="{% url 'vehicle_edit' t.pk %}" class="btn btn-xs btn-outline-secondary">
+              <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit" title="Редактировать">
                 <i class="bi bi-pencil"></i>
               </a>
               <form method="post" action="{% url 'vehicle_delete' t.pk %}"
                     onsubmit="return confirm('Удалить операцию?')" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-xs btn-outline-danger">
+                <button type="submit" class="veh-icon-btn veh-icon-del" title="Удалить">
                   <i class="bi bi-trash"></i>
                 </button>
               </form>
@@ -235,48 +551,53 @@
         </tr>
         {% endfor %}
       </tbody>
-      <tfoot class="table-light fw-semibold">
+      <tfoot>
         <tr>
           <td colspan="3">Итого</td>
-          <td class="text-end text-money text-success">{{ total_in|currency }}</td>
-          <td class="text-end text-money text-danger">{{ total_out|currency }}</td>
-          <td class="text-end text-money fw-bold {% if total_loss < 0 %}text-success{% elif total_loss > 0 %}text-danger{% else %}text-muted{% endif %}">
+          <td class="text-r text-money-a" style="color:var(--a-green)">{{ total_in|currency }}</td>
+          <td class="text-r text-money-a" style="color:var(--a-red)">{{ total_out|currency }}</td>
+          <td class="text-r text-money-a" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
             {% if total_loss < 0 %}+{{ total_loss|abs_value|currency }}
             {% elif total_loss > 0 %}−{{ total_loss|currency }}
             {% else %}—{% endif %}
           </td>
-          <td colspan="4"></td>
+          <td colspan="3"></td>
         </tr>
       </tfoot>
     </table>
   </div>
-  {% else %}
-  <div class="p-5 text-center text-muted">
-    <i class="bi bi-car-front fs-2 d-block mb-3"></i>
-    Операций нет.
-    <a href="{% url 'vehicle_import' %}">Импортировать из Excel</a> или
-    <a href="{% url 'vehicle_create' %}">добавить вручную</a>.
-  </div>
-  {% endif %}
 </div>
 
-{# ── Модал подтверждения смены статуса ── #}
-<div class="modal fade" id="toggleSoldModal" tabindex="-1" aria-labelledby="toggleSoldModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+{% else %}
+<div class="veh-empty">
+  <i class="bi bi-car-front"></i>
+  <p>Операций пока нет.</p>
+  <a href="{% url 'vehicle_import' %}" class="veh-btn veh-btn-secondary me-2">
+    <i class="bi bi-arrow-up-tray me-1"></i>Импорт Excel
+  </a>
+  <a href="{% url 'vehicle_create' %}" class="veh-btn veh-btn-primary">
+    <i class="bi bi-plus me-1"></i>Добавить
+  </a>
+</div>
+{% endif %}
+
+{# ── Modal ── #}
+<div class="modal fade veh-modal" id="toggleSoldModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <div class="modal-header" id="toggleSoldModalHeader">
         <h5 class="modal-title" id="toggleSoldModalLabel"></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <p id="toggleSoldModalBody" class="mb-0"></p>
+      <div class="modal-body" style="padding:16px 20px">
+        <p id="toggleSoldModalBody" class="mb-0" style="font-size:.9rem"></p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="veh-btn veh-btn-secondary" data-bs-dismiss="modal">Отмена</button>
         <form method="post" id="toggleSoldForm" class="d-inline">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <button type="submit" class="btn" id="toggleSoldConfirmBtn">Подтвердить</button>
+          <button type="submit" class="veh-btn" id="toggleSoldConfirmBtn">Подтвердить</button>
         </form>
       </div>
     </div>
@@ -293,8 +614,6 @@
       var name      = btn.dataset.name;
       var direction = btn.dataset.direction;
       var action    = btn.dataset.action;
-      var modal     = document.getElementById('toggleSoldModal');
-      var header    = document.getElementById('toggleSoldModalHeader');
       var label     = document.getElementById('toggleSoldModalLabel');
       var body      = document.getElementById('toggleSoldModalBody');
       var confirmBtn= document.getElementById('toggleSoldConfirmBtn');
@@ -303,20 +622,20 @@
       form.action = action;
 
       if (direction === 'sold') {
-        header.className = 'modal-header bg-danger bg-opacity-10';
         label.textContent = 'Отметить как проданную';
-        body.innerHTML = 'Отметить <strong>' + name + '</strong> как <span class="text-danger fw-semibold">Продана</span>?';
-        confirmBtn.className = 'btn btn-danger';
-        confirmBtn.textContent = 'Да, продана';
+        body.innerHTML = 'Отметить <strong>' + name + '</strong> как <span style="color:var(--a-red);font-weight:600">Продана</span>?';
+        confirmBtn.style.background = 'var(--a-red)';
+        confirmBtn.style.color = '#fff';
+        confirmBtn.textContent = 'Продана';
       } else {
-        header.className = 'modal-header bg-success bg-opacity-10';
         label.textContent = 'Вернуть в наличие';
-        body.innerHTML = 'Вернуть <strong>' + name + '</strong> в статус <span class="text-success fw-semibold">В наличии</span>?';
-        confirmBtn.className = 'btn btn-success';
-        confirmBtn.textContent = 'Да, вернуть';
+        body.innerHTML = 'Вернуть <strong>' + name + '</strong> в статус <span style="color:var(--a-green);font-weight:600">В наличии</span>?';
+        confirmBtn.style.background = 'var(--a-green)';
+        confirmBtn.style.color = '#fff';
+        confirmBtn.textContent = 'Вернуть';
       }
 
-      new bootstrap.Modal(modal).show();
+      new bootstrap.Modal(document.getElementById('toggleSoldModal')).show();
     });
   });
 })();

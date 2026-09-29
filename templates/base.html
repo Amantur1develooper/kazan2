@@ -206,7 +206,13 @@
   </div>
 
   <nav class="sidebar-nav">
-    {% if is_builder %}
+    {% if is_vehicles_only %}
+    {# Склад авто — только раздел транспорта #}
+    <div class="sidebar-section-title">Транспорт</div>
+    <a href="{% url 'vehicle_list' %}" class="sidebar-link {% if 'vehicle' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-car-front"></i> Склад авто
+    </a>
+    {% elif is_builder %}
     {# Строитель — только план-факт #}
     <div class="sidebar-section-title">Производство</div>
     <a href="{% url 'planfact_index' %}" class="sidebar-link {% if 'planfact' in request.resolver_match.url_name or 'asm' in request.resolver_match.url_name %}active{% endif %}">

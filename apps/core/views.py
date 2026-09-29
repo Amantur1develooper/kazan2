@@ -16,6 +16,8 @@ class SmartLoginView(LoginView):
         user = self.request.user
         is_admin = user.is_staff or user.groups.filter(name='Производство').exists()
         if not is_admin:
+            if user.groups.filter(name='Склад авто').exists():
+                return '/vehicles/'
             from apps.planfact.models import BlockAccess
             if BlockAccess.objects.filter(user=user).exists():
                 return '/planfact/'
