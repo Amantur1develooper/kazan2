@@ -68,10 +68,10 @@
 /* ── Stat cards ── */
 .veh-stats {
   display:grid;
-  grid-template-columns:repeat(5,1fr);
+  grid-template-columns:repeat(6,1fr);
   gap:12px; margin-bottom:20px;
 }
-@media(max-width:900px){ .veh-stats{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:1100px){ .veh-stats{ grid-template-columns:repeat(3,1fr); } }
 @media(max-width:600px){ .veh-stats{ grid-template-columns:repeat(2,1fr); gap:10px; } }
 
 .veh-stat {
@@ -194,37 +194,73 @@
 .veh-pill-avail { background:rgba(52,199,89,.1); color:var(--a-green); }
 
 /* ── Mobile cards ── */
-.veh-cards { display:flex; flex-direction:column; gap:10px; }
+.veh-cards { display:flex; flex-direction:column; gap:14px; }
+
 .veh-card {
   background:var(--a-card); border-radius:var(--a-r);
-  box-shadow:var(--a-shadow-s); overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  overflow:hidden; position:relative;
 }
-.veh-card-head {
-  padding:14px 16px 10px;
+.veh-card::before {
+  content:''; position:absolute; left:0; top:0; bottom:0;
+  width:4px; border-radius:4px 0 0 4px;
+}
+.veh-card.card-avail::before { background:var(--a-green); }
+.veh-card.card-sold::before  { background:var(--a-gray3); }
+
+/* Top row: photo + info + status */
+.veh-card-top {
+  display:flex; gap:12px; padding:14px 14px 12px 18px;
   border-bottom:1px solid var(--a-sep);
-  display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
 }
+.veh-card-photo {
+  width:72px; height:60px; border-radius:10px;
+  object-fit:cover; flex-shrink:0;
+  border:1px solid var(--a-sep);
+}
+.veh-card-photo-placeholder {
+  width:72px; height:60px; border-radius:10px; flex-shrink:0;
+  background:var(--a-bg); border:1px solid var(--a-sep);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--a-gray3); font-size:1.4rem;
+}
+.veh-card-info-col { flex:1; min-width:0; }
 .veh-card-title {
   font-size:.97rem; font-weight:700; color:var(--a-text);
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
-  letter-spacing:-.2px; flex:1;
+  letter-spacing:-.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.veh-card-sub {
-  font-size:.72rem; color:var(--a-text3); margin-top:3px;
+.veh-card-vin {
+  font-size:.68rem; color:var(--a-gray); font-family:monospace;
+  letter-spacing:.04em; margin-top:1px;
 }
+.veh-card-meta {
+  font-size:.72rem; color:var(--a-text3); margin-top:4px;
+  display:flex; flex-wrap:wrap; gap:4px;
+}
+.veh-card-meta-tag {
+  background:var(--a-bg); border-radius:6px; padding:2px 7px;
+  font-size:.68rem; color:var(--a-text3);
+}
+
+/* Money row */
 .veh-card-money {
   display:grid; grid-template-columns:1fr 1fr 1fr;
-  padding:12px 16px;
+  padding:10px 14px 10px 18px;
   border-bottom:1px solid var(--a-sep);
+  background:#FAFAFA;
 }
-.veh-money-item { display:flex; flex-direction:column; align-items:center; gap:3px; }
-.veh-money-lbl { font-size:.62rem; font-weight:500; color:var(--a-text3); text-transform:uppercase; letter-spacing:.04em; }
-.veh-money-val { font-size:.92rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.veh-money-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.veh-money-lbl { font-size:.6rem; font-weight:600; color:var(--a-text3); text-transform:uppercase; letter-spacing:.05em; }
+.veh-money-val { font-size:.9rem; font-weight:700; font-variant-numeric:tabular-nums; }
+
+/* Footer row */
 .veh-card-foot {
-  padding:10px 16px;
+  padding:10px 14px 10px 18px;
   display:flex; align-items:center; justify-content:space-between; gap:8px;
 }
-.veh-card-info { font-size:.72rem; color:var(--a-text3); flex:1; }
+.veh-card-foot-info { font-size:.72rem; color:var(--a-text3); flex:1; line-height:1.5; }
+.veh-card-foot-info i { color:var(--a-gray2); margin-right:3px; }
 
 /* ── Action icon buttons ── */
 .veh-icon-btn {
@@ -246,6 +282,21 @@
   .desk-only   { display:none; }
 }
 
+/* ── Passport badge ── */
+.veh-passport-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  background:rgba(52,199,89,.1); color:#248a3d;
+  border-radius:6px; padding:2px 7px;
+  font-size:.68rem; font-weight:600;
+}
+
+/* ── Thumbnail ── */
+.veh-thumb {
+  width:52px; height:44px; object-fit:cover;
+  border-radius:8px; flex-shrink:0;
+  border:1px solid var(--a-sep);
+}
+
 /* ── Empty state ── */
 .veh-empty {
   background:var(--a-card); border-radius:var(--a-r);
@@ -254,6 +305,18 @@
 }
 .veh-empty i { font-size:2.5rem; color:var(--a-gray3); display:block; margin-bottom:12px; }
 .veh-empty p { font-size:.9rem; margin-bottom:16px; }
+
+/* ── Detail modal info rows ── */
+.dm-row { display:flex; flex-direction:column; gap:2px; }
+.dm-lbl { font-size:.68rem; font-weight:600; color:var(--a-text3); text-transform:uppercase; letter-spacing:.05em; }
+.dm-val { font-size:.88rem; color:var(--a-text); font-weight:500; }
+#detailPhotosRow { display:flex !important; }
+@media(max-width:540px){
+  #detailPhotosRow { flex-direction:column !important; }
+  #detailPhotoVehicleWrap { border-right:none !important; border-bottom:1px solid var(--a-sep); }
+  #detailInfoGrid { grid-template-columns:1fr !important; }
+  #detailRowNotes { grid-column:1 !important; }
+}
 
 /* ── Modal Apple style ── */
 .veh-modal .modal-content {
@@ -283,6 +346,15 @@
     <div class="veh-stat-val">{{ transactions|length }}</div>
     <div class="veh-stat-lbl">Всего авто</div>
     <div class="veh-stat-sub">в наличии: {{ in_balance|length }}</div>
+  </div>
+
+  <div class="veh-stat">
+    <div class="veh-stat-icon" style="background:rgba(0,122,255,.08);color:var(--a-blue)">
+      <i class="bi bi-boxes"></i>
+    </div>
+    <div class="veh-stat-val text-money-a" style="color:var(--a-blue)">{{ in_balance_total|currency }}</div>
+    <div class="veh-stat-lbl">На складе</div>
+    <div class="veh-stat-sub">{{ in_balance|length }} авто в наличии</div>
   </div>
 
   <div class="veh-stat">
@@ -387,17 +459,47 @@
 {# ────────── MOBILE: cards ────────── #}
 <div class="mobile-only veh-cards">
   {% for t in transactions %}
-  <div class="veh-card">
-    <div class="veh-card-head">
-      <div style="flex:1">
-        <div class="veh-card-title">{{ t.vehicle_name|truncatechars:55 }}</div>
-        <div class="veh-card-sub">
-          {{ t.date|date:"d.m.Y" }}
-          {% if t.organization %} · {{ t.organization.name }}{% endif %}
-          {% if t.source_text %} · {{ t.source_text|truncatechars:25 }}{% endif %}
+  <div class="veh-card {% if t.is_sold %}card-sold{% else %}card-avail{% endif %} veh-detail-trigger"
+       data-vname="{{ t.vehicle_name }}"
+       data-vin="{{ t.vin }}"
+       data-date="{{ t.date|date:'d.m.Y' }}"
+       data-sold="{% if t.is_sold %}1{% else %}0{% endif %}"
+       data-org="{{ t.organization.name|default:'' }}"
+       data-in="{{ t.amount_in|currency }}"
+       data-out="{{ t.amount_out|currency }}"
+       data-loss-html="{% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}-{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
+       data-loss-color="{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
+       data-counterparty="{{ t.counterparty }}"
+       data-purpose="{{ t.purpose }}"
+       data-source="{% if t.source_block %}{{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}{% else %}{{ t.source_text }}{% endif %}"
+       data-target="{% if t.target_block %}{{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}{% else %}{{ t.target_text }}{% endif %}"
+       data-notes="{{ t.notes }}"
+       data-img="{% if t.image %}{{ t.image.url }}{% endif %}"
+       data-passport="{% if t.image_passport %}{{ t.image_passport.url }}{% endif %}"
+       data-edit-url="{% url 'vehicle_edit' t.pk %}">
+
+    {# Top: фото + инфо + статус #}
+    <div class="veh-card-top">
+      {% if t.image %}
+      <img src="{{ t.image.url }}" alt="" class="veh-card-photo">
+      {% else %}
+      <div class="veh-card-photo-placeholder"><i class="bi bi-car-front"></i></div>
+      {% endif %}
+
+      <div class="veh-card-info-col">
+        <div class="veh-card-title">{{ t.vehicle_name|truncatechars:42 }}</div>
+        {% if t.vin %}<div class="veh-card-vin">VIN: {{ t.vin }}</div>{% endif %}
+        <div class="veh-card-meta">
+          <span class="veh-card-meta-tag">{{ t.date|date:"d.m.Y" }}</span>
+          {% if t.organization %}<span class="veh-card-meta-tag">{{ t.organization.name|truncatechars:18 }}</span>{% endif %}
+          {% if t.source_text %}<span class="veh-card-meta-tag">{{ t.source_text|truncatechars:18 }}</span>{% endif %}
+          {% if t.image_passport %}<span class="veh-passport-badge"><i class="bi bi-file-earmark-check-fill"></i> Тех. паспорт</span>{% endif %}
         </div>
       </div>
-      <button type="button" class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %} toggle-sold-btn"
+
+      <button type="button"
+              class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %} toggle-sold-btn"
+              style="align-self:flex-start;flex-shrink:0"
               data-action="{% url 'vehicle_toggle_sold' t.pk %}"
               data-name="{{ t.vehicle_name|truncatechars:50 }}"
               data-direction="{% if t.is_sold %}available{% else %}sold{% endif %}">
@@ -406,6 +508,7 @@
       </button>
     </div>
 
+    {# Money #}
     <div class="veh-card-money">
       <div class="veh-money-item">
         <span class="veh-money-lbl">Приход</span>
@@ -421,34 +524,34 @@
       </div>
       <div class="veh-money-item">
         <span class="veh-money-lbl">Итого</span>
-        <span class="veh-money-val" style="color:{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
-          {% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}
-          {% elif t.loss > 0 %}−{{ t.loss|currency }}
-          {% else %}—{% endif %}
+        <span class="veh-money-val" style="color:{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
+          {% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}−{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
         </span>
       </div>
     </div>
 
+    {# Footer: доп. инфо + кнопки #}
     <div class="veh-card-foot">
-      <div class="veh-card-info">
-        {% if t.counterparty %}<div><i class="bi bi-person" style="color:var(--a-gray)"></i> {{ t.counterparty|truncatechars:30 }}</div>{% endif %}
-        {% if t.purpose %}<div><i class="bi bi-tag" style="color:var(--a-gray)"></i> {{ t.purpose|truncatechars:30 }}</div>{% endif %}
-        {% if t.target_block %}<div><i class="bi bi-building" style="color:var(--a-gray)"></i> {{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}</div>
-        {% elif t.target_text %}<div><i class="bi bi-geo" style="color:var(--a-gray)"></i> {{ t.target_text|truncatechars:30 }}</div>{% endif %}
+      <div class="veh-card-foot-info">
+        {% if t.counterparty %}<div><i class="bi bi-person-fill"></i>{{ t.counterparty|truncatechars:28 }}</div>{% endif %}
+        {% if t.purpose %}<div><i class="bi bi-tag-fill"></i>{{ t.purpose|truncatechars:28 }}</div>{% endif %}
+        {% if t.target_block %}<div><i class="bi bi-building"></i>{{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}</div>
+        {% elif t.target_text %}<div><i class="bi bi-geo-alt-fill"></i>{{ t.target_text|truncatechars:28 }}</div>{% endif %}
       </div>
-      <div class="d-flex gap-1">
-        <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit">
+      <div class="d-flex gap-1 align-items-center" style="flex-shrink:0">
+        <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit" title="Редактировать">
           <i class="bi bi-pencil"></i>
         </a>
         <form method="post" action="{% url 'vehicle_delete' t.pk %}"
               onsubmit="return confirm('Удалить «{{ t.vehicle_name|truncatechars:40 }}»?')" class="d-inline">
           {% csrf_token %}
-          <button type="submit" class="veh-icon-btn veh-icon-del">
+          <button type="submit" class="veh-icon-btn veh-icon-del" title="Удалить">
             <i class="bi bi-trash"></i>
           </button>
         </form>
       </div>
     </div>
+
   </div>
   {% endfor %}
 
@@ -465,9 +568,9 @@
       </div>
       <div class="veh-money-item">
         <span class="veh-money-lbl">Нетто</span>
-        <span class="veh-money-val" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
-          {% if total_loss < 0 %}+{{ total_loss|abs_value|currency }}
-          {% elif total_loss > 0 %}−{{ total_loss|currency }}
+        <span class="veh-money-val" style="color:{% if total_loss > 0 %}var(--a-green){% elif total_loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+          {% if total_loss > 0 %}+{{ total_loss|currency }}
+          {% elif total_loss < 0 %}−{{ total_loss|abs_value|currency }}
           {% else %}—{% endif %}
         </span>
       </div>
@@ -494,10 +597,35 @@
       </thead>
       <tbody>
         {% for t in transactions %}
-        <tr {% if not t.is_sold %}class="available"{% endif %}>
+        <tr class="{% if not t.is_sold %}available {% endif %}veh-detail-trigger"
+            style="cursor:pointer"
+            data-vname="{{ t.vehicle_name }}"
+            data-vin="{{ t.vin }}"
+            data-date="{{ t.date|date:'d.m.Y' }}"
+            data-sold="{% if t.is_sold %}1{% else %}0{% endif %}"
+            data-org="{{ t.organization.name|default:'' }}"
+            data-in="{{ t.amount_in|currency }}"
+            data-out="{{ t.amount_out|currency }}"
+            data-loss-html="{% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}-{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
+            data-loss-color="{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
+            data-counterparty="{{ t.counterparty }}"
+            data-purpose="{{ t.purpose }}"
+            data-source="{% if t.source_block %}{{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}{% else %}{{ t.source_text }}{% endif %}"
+            data-target="{% if t.target_block %}{{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}{% else %}{{ t.target_text }}{% endif %}"
+            data-notes="{{ t.notes }}"
+            data-img="{% if t.image %}{{ t.image.url }}{% endif %}"
+            data-passport="{% if t.image_passport %}{{ t.image_passport.url }}{% endif %}"
+            data-edit-url="{% url 'vehicle_edit' t.pk %}">
           <td style="color:var(--a-text3);white-space:nowrap;font-size:.78rem">{{ t.date|date:"d.m.Y" }}</td>
           <td>
-            <div style="font-weight:600;color:var(--a-text)">{{ t.vehicle_name|truncatechars:40 }}</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              {% if t.image %}<img src="{{ t.image.url }}" alt="" class="veh-thumb">{% endif %}
+              <div>
+                <div style="font-weight:600;color:var(--a-text)">{{ t.vehicle_name|truncatechars:38 }}</div>
+                {% if t.vin %}<div style="font-size:.7rem;color:var(--a-gray);font-family:monospace;letter-spacing:.04em">VIN: {{ t.vin }}</div>{% endif %}
+                {% if t.image_passport %}<span class="veh-passport-badge" style="margin-top:3px"><i class="bi bi-file-earmark-check-fill"></i> Тех. паспорт</span>{% endif %}
+              </div>
+            </div>
             {% if t.organization %}<div style="font-size:.72rem;color:var(--a-text3)">{{ t.organization.name }}</div>{% endif %}
             {% if t.source_text or t.source_block %}
             <div style="font-size:.72rem;color:var(--a-text3)">
@@ -523,10 +651,8 @@
           <td class="text-r text-money-a" style="color:{% if t.amount_out %}var(--a-red){% else %}var(--a-gray){% endif %}">
             {% if t.amount_out %}{{ t.amount_out|currency }}{% else %}—{% endif %}
           </td>
-          <td class="text-r text-money-a" style="font-weight:600;color:{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
-            {% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}
-            {% elif t.loss > 0 %}−{{ t.loss|currency }}
-            {% else %}—{% endif %}
+          <td class="text-r text-money-a" style="font-weight:600;color:{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
+            {% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}−{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
           </td>
           <td style="color:var(--a-text3);font-size:.78rem">{{ t.counterparty|truncatechars:25 }}</td>
           <td style="color:var(--a-text3);font-size:.78rem">
@@ -556,9 +682,9 @@
           <td colspan="3">Итого</td>
           <td class="text-r text-money-a" style="color:var(--a-green)">{{ total_in|currency }}</td>
           <td class="text-r text-money-a" style="color:var(--a-red)">{{ total_out|currency }}</td>
-          <td class="text-r text-money-a" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
-            {% if total_loss < 0 %}+{{ total_loss|abs_value|currency }}
-            {% elif total_loss > 0 %}−{{ total_loss|currency }}
+          <td class="text-r text-money-a" style="color:{% if total_loss > 0 %}var(--a-green){% elif total_loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+            {% if total_loss > 0 %}+{{ total_loss|currency }}
+            {% elif total_loss < 0 %}−{{ total_loss|abs_value|currency }}
             {% else %}—{% endif %}
           </td>
           <td colspan="3"></td>
@@ -580,6 +706,86 @@
   </a>
 </div>
 {% endif %}
+
+{# ── Detail Modal ── #}
+<div class="modal fade veh-modal" id="vehicleDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header" style="padding:16px 20px 12px">
+        <div style="flex:1;min-width:0">
+          <h5 class="modal-title" id="detailModalName" style="font-size:1.05rem;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></h5>
+          <div id="detailModalSub" style="font-size:.75rem;color:var(--a-text3);margin-top:2px"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px">
+          <span id="detailModalStatus" class="veh-pill"></span>
+          <a id="detailModalEdit" href="#" class="veh-icon-btn veh-icon-edit" title="Редактировать">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding:0">
+
+        {# Photos #}
+        <div id="detailPhotosRow" style="display:none;gap:0;border-bottom:1px solid var(--a-sep)">
+          <div id="detailPhotoVehicleWrap" style="display:none;flex:1;padding:16px 20px;border-right:1px solid var(--a-sep)">
+            <div style="font-size:.72rem;font-weight:600;color:var(--a-text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+              <i class="bi bi-car-front me-1"></i>Фото авто
+            </div>
+            <img id="detailPhotoVehicle" src="" alt="Фото авто"
+                 style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;border:1px solid var(--a-sep)">
+            <a id="detailDownloadVehicle" href="#" download class="veh-btn veh-btn-secondary veh-btn-sm"
+               style="margin-top:10px;width:100%;justify-content:center">
+              <i class="bi bi-download me-1"></i>Скачать фото
+            </a>
+          </div>
+          <div id="detailPhotoPassportWrap" style="display:none;flex:1;padding:16px 20px">
+            <div style="font-size:.72rem;font-weight:600;color:var(--a-text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+              <i class="bi bi-file-earmark-text me-1"></i>Тех. паспорт
+            </div>
+            <img id="detailPhotoPassport" src="" alt="Тех. паспорт"
+                 style="width:100%;max-height:240px;object-fit:contain;border-radius:10px;border:1px solid var(--a-sep)">
+            <a id="detailDownloadPassport" href="#" download class="veh-btn veh-btn-secondary veh-btn-sm"
+               style="margin-top:10px;width:100%;justify-content:center">
+              <i class="bi bi-download me-1"></i>Скачать паспорт
+            </a>
+          </div>
+        </div>
+
+        {# Info grid #}
+        <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px 20px" id="detailInfoGrid">
+          <div id="detailRowDate"       class="dm-row"><span class="dm-lbl">Дата</span>         <span id="detailDate"         class="dm-val"></span></div>
+          <div id="detailRowOrg"        class="dm-row"><span class="dm-lbl">Компания</span>     <span id="detailOrg"          class="dm-val"></span></div>
+          <div id="detailRowVin"        class="dm-row"><span class="dm-lbl">VIN</span>           <span id="detailVin"          class="dm-val" style="font-family:monospace"></span></div>
+          <div id="detailRowSource"     class="dm-row"><span class="dm-lbl">Поступление</span>  <span id="detailSource"       class="dm-val"></span></div>
+          <div id="detailRowCounterp"   class="dm-row"><span class="dm-lbl">Подрядчик</span>    <span id="detailCounterp"     class="dm-val"></span></div>
+          <div id="detailRowTarget"     class="dm-row"><span class="dm-lbl">Объект расхода</span><span id="detailTarget"      class="dm-val"></span></div>
+          <div id="detailRowPurpose"    class="dm-row"><span class="dm-lbl">Назначение</span>   <span id="detailPurpose"      class="dm-val"></span></div>
+          <div id="detailRowNotes"      class="dm-row" style="grid-column:1/-1"><span class="dm-lbl">Примечания</span><span id="detailNotes" class="dm-val"></span></div>
+        </div>
+
+        {# Money #}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--a-sep);background:#FAFAFA">
+          <div class="veh-money-item" style="padding:14px 10px;border-right:1px solid var(--a-sep)">
+            <span class="veh-money-lbl">Приход</span>
+            <span id="detailIn"  class="veh-money-val" style="color:var(--a-green)"></span>
+          </div>
+          <div class="veh-money-item" style="padding:14px 10px;border-right:1px solid var(--a-sep)">
+            <span class="veh-money-lbl">Расход</span>
+            <span id="detailOut" class="veh-money-val" style="color:var(--a-red)"></span>
+          </div>
+          <div class="veh-money-item" style="padding:14px 10px">
+            <span class="veh-money-lbl">Итого</span>
+            <span id="detailLoss" class="veh-money-val"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
 
 {# ── Modal ── #}
 <div class="modal fade veh-modal" id="toggleSoldModal" tabindex="-1" aria-hidden="true">
@@ -609,6 +815,84 @@
 {% block scripts %}{{ block.super }}
 <script>
 (function () {
+
+  // ── Detail modal ──
+  function show(el) { el.style.display = ''; }
+  function hide(el) { el.style.display = 'none'; }
+
+  document.querySelectorAll('.veh-detail-trigger').forEach(function (trigger) {
+    trigger.addEventListener('click', function (e) {
+      // Don't open if clicking on a button, link, form, or input
+      if (e.target.closest('button,a,form,input,select,textarea,label')) return;
+
+      var d = trigger.dataset;
+
+      // Name + sub
+      document.getElementById('detailModalName').textContent = d.vname;
+      var sub = d.date;
+      if (d.org) sub += ' · ' + d.org;
+      document.getElementById('detailModalSub').textContent = sub;
+
+      // Status pill
+      var pill = document.getElementById('detailModalStatus');
+      if (d.sold === '1') {
+        pill.textContent = 'Продана';
+        pill.className = 'veh-pill veh-pill-sold';
+      } else {
+        pill.textContent = 'В наличии';
+        pill.className = 'veh-pill veh-pill-avail';
+      }
+
+      // Edit link
+      document.getElementById('detailModalEdit').href = d.editUrl;
+
+      // Photos
+      var photosRow      = document.getElementById('detailPhotosRow');
+      var vehicleWrap    = document.getElementById('detailPhotoVehicleWrap');
+      var passportWrap   = document.getElementById('detailPhotoPassportWrap');
+
+      if (d.img) {
+        document.getElementById('detailPhotoVehicle').src       = d.img;
+        document.getElementById('detailDownloadVehicle').href   = d.img;
+        show(vehicleWrap);
+      } else { hide(vehicleWrap); }
+
+      if (d.passport) {
+        document.getElementById('detailPhotoPassport').src      = d.passport;
+        document.getElementById('detailDownloadPassport').href  = d.passport;
+        show(passportWrap);
+      } else { hide(passportWrap); }
+
+      if (d.img || d.passport) { show(photosRow); } else { hide(photosRow); }
+
+      // Info rows
+      function setRow(rowId, valId, val) {
+        var row = document.getElementById(rowId);
+        var span = document.getElementById(valId);
+        if (val) { span.textContent = val; show(row); }
+        else { hide(row); }
+      }
+      document.getElementById('detailDate').textContent = d.date;
+      show(document.getElementById('detailRowDate'));
+      setRow('detailRowOrg',      'detailOrg',      d.org);
+      setRow('detailRowVin',      'detailVin',      d.vin);
+      setRow('detailRowSource',   'detailSource',   d.source);
+      setRow('detailRowCounterp', 'detailCounterp', d.counterparty);
+      setRow('detailRowTarget',   'detailTarget',   d.target);
+      setRow('detailRowPurpose',  'detailPurpose',  d.purpose);
+      setRow('detailRowNotes',    'detailNotes',    d.notes);
+
+      // Money
+      document.getElementById('detailIn').textContent  = d.in;
+      document.getElementById('detailOut').textContent = d.out;
+      var lossEl = document.getElementById('detailLoss');
+      lossEl.textContent = d.lossHtml.replace('-', '−');
+      lossEl.style.color = d.lossColor;
+
+      new bootstrap.Modal(document.getElementById('vehicleDetailModal')).show();
+    });
+  });
+
   document.querySelectorAll('.toggle-sold-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var name      = btn.dataset.name;

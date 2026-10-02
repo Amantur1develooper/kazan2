@@ -65,6 +65,7 @@ def vehicle_list(request):
     if q:
         qs = qs.filter(
             Q(vehicle_name__icontains=q) |
+            Q(vin__icontains=q) |
             Q(counterparty__icontains=q) |
             Q(purpose__icontains=q) |
             Q(source_text__icontains=q)
@@ -75,10 +76,11 @@ def vehicle_list(request):
     # Totals
     total_in     = sum(t.amount_in  for t in transactions)
     total_out    = sum(t.amount_out for t in transactions)
-    total_loss   = sum(t.loss       for t in transactions)
-    total_profit  = sum(-t.loss for t in transactions if t.loss < 0)  # приход − расход > 0
-    total_deficit = sum(t.loss  for t in transactions if t.loss > 0)  # расход − приход > 0
-    in_balance   = [t for t in transactions if not t.is_sold]
+    total_loss   = sum(t.loss for t in transactions if t.amount_out)
+    total_profit  = sum(t.loss  for t in transactions if t.amount_out and t.loss > 0)
+    total_deficit = sum(-t.loss for t in transactions if t.amount_out and t.loss < 0)
+    in_balance        = [t for t in transactions if not t.is_sold]
+    in_balance_total  = sum(t.amount_in for t in in_balance)
 
     orgs   = Organization.objects.order_by('name')
     blocks = Block.objects.select_related('residential_complex').order_by(
@@ -92,7 +94,8 @@ def vehicle_list(request):
         'total_loss':     total_loss,
         'total_profit':   total_profit,
         'total_deficit':  total_deficit,
-        'in_balance':     in_balance,
+        'in_balance':        in_balance,
+        'in_balance_total':  in_balance_total,
         'orgs':           orgs,
         'blocks':         blocks,
         'filter_org':     org_id,
@@ -171,10 +174,11 @@ def vehicle_create(request):
     if request.method == 'POST':
         try:
             p = request.POST
-            VehicleTransaction.objects.create(
+            obj = VehicleTransaction.objects.create(
                 organization_id = p.get('organization') or None,
                 date            = p['date'],
                 vehicle_name    = p['vehicle_name'].strip(),
+                vin             = p.get('vin', '').strip().upper(),
                 source_block_id = p.get('source_block') or None,
                 source_text     = p.get('source_text', '').strip(),
                 amount_in       = Decimal(p.get('amount_in', '0') or '0'),
@@ -186,6 +190,12 @@ def vehicle_create(request):
                 is_sold         = 'is_sold' in p,
                 notes           = p.get('notes', '').strip(),
             )
+            if request.FILES.get('image'):
+                obj.image = request.FILES['image']
+            if request.FILES.get('image_passport'):
+                obj.image_passport = request.FILES['image_passport']
+            if request.FILES.get('image') or request.FILES.get('image_passport'):
+                obj.save(update_fields=['image', 'image_passport'])
             messages.success(request, 'Операция добавлена.')
             return redirect('vehicle_list')
         except Exception as e:
@@ -208,6 +218,7 @@ def vehicle_edit(request, pk):
             obj.organization_id = p.get('organization') or None
             obj.date            = p['date']
             obj.vehicle_name    = p['vehicle_name'].strip()
+            obj.vin             = p.get('vin', '').strip().upper()
             obj.source_block_id = p.get('source_block') or None
             obj.source_text     = p.get('source_text', '').strip()
             obj.amount_in       = Decimal(p.get('amount_in', '0') or '0')
@@ -218,6 +229,14 @@ def vehicle_edit(request, pk):
             obj.purpose         = p.get('purpose', '').strip()
             obj.is_sold         = 'is_sold' in p
             obj.notes           = p.get('notes', '').strip()
+            if request.FILES.get('image'):
+                obj.image = request.FILES['image']
+            elif p.get('image_clear'):
+                obj.image = None
+            if request.FILES.get('image_passport'):
+                obj.image_passport = request.FILES['image_passport']
+            elif p.get('image_passport_clear'):
+                obj.image_passport = None
             obj.save()
             messages.success(request, 'Операция обновлена.')
             return redirect('vehicle_list')

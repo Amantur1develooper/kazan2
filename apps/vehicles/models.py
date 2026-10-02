@@ -15,6 +15,9 @@ class VehicleTransaction(models.Model):
     )
     date = models.DateField('Дата')
     vehicle_name = models.CharField('Марка / описание авто', max_length=300)
+    vin          = models.CharField('VIN номер', max_length=17, blank=True)
+    image        = models.ImageField('Фото', upload_to='vehicles/', blank=True, null=True)
+    image_passport = models.ImageField('Фото тех. паспорта', upload_to='vehicles/passports/', blank=True, null=True)
 
     # Откуда машина
     source_block = models.ForeignKey(

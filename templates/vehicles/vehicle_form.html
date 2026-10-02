@@ -174,6 +174,22 @@
 .vf-preview-lbl { font-size:.68rem; font-weight:600; color:var(--a-text3); text-transform:uppercase; letter-spacing:.04em; }
 .vf-preview-val { font-size:.95rem; font-weight:700; font-variant-numeric:tabular-nums; }
 
+/* Photo drop zone */
+.vf-photo-drop {
+  border:2px dashed var(--a-sep); border-radius:var(--a-r);
+  min-height:160px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  cursor:pointer; transition:border-color .15s, background .15s;
+  overflow:hidden; position:relative; padding:20px;
+}
+.vf-photo-drop:hover { border-color:var(--a-blue); background:rgba(0,122,255,.03); }
+.vf-photo-drop:has(img[style*="display:none"]):hover,
+.vf-photo-drop:not(:has(.vf-photo-preview[src])):hover { background:rgba(0,122,255,.03); }
+.vf-photo-preview {
+  width:100%; max-height:280px; object-fit:contain;
+  border-radius:10px; display:block;
+}
+
 /* Actions */
 .vf-actions {
   display:flex; gap:10px; justify-content:flex-end; align-items:center;
@@ -191,8 +207,69 @@
 {% endif %}
 
 <div style="max-width:680px;margin:0 auto">
-<form method="post" id="vfForm">
+<form method="post" enctype="multipart/form-data" id="vfForm">
 {% csrf_token %}
+
+{# ── Фото ── #}
+<div class="vf-card">
+  <div class="vf-card-head">
+    <div class="vf-card-head-icon" style="background:rgba(255,149,0,.1);color:#FF9500">
+      <i class="bi bi-camera"></i>
+    </div>
+    <span class="vf-card-head-title">Фотографии</span>
+  </div>
+  <div class="vf-card-body">
+    <div class="vf-row vf-row-2">
+
+      {# Фото машины #}
+      <div class="vf-field">
+        <label class="vf-label">Фото автомобиля</label>
+        <div id="photoDropZone" class="vf-photo-drop" onclick="document.getElementById('imageInput').click()">
+          {% if obj and obj.image %}
+          <img id="photoPreview" src="{{ obj.image.url }}" class="vf-photo-preview" alt="Фото">
+          {% else %}
+          <img id="photoPreview" class="vf-photo-preview" style="display:none" alt="Фото">
+          {% endif %}
+          <div id="photoPlaceholder" {% if obj and obj.image %}style="display:none"{% endif %}>
+            <i class="bi bi-car-front" style="font-size:1.8rem;color:var(--a-gray3);display:block;margin-bottom:6px"></i>
+            <div style="font-size:.82rem;font-weight:600;color:var(--a-text3)">Фото авто</div>
+            <div style="font-size:.7rem;color:var(--a-gray);margin-top:3px">JPG, PNG, HEIC</div>
+          </div>
+        </div>
+        <input type="file" name="image" id="imageInput" accept="image/*" style="display:none">
+        {% if obj and obj.image %}
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;color:var(--a-red);cursor:pointer;margin-top:6px">
+          <input type="checkbox" name="image_clear" value="1" style="accent-color:var(--a-red)"> Удалить фото
+        </label>
+        {% endif %}
+      </div>
+
+      {# Фото тех. паспорта #}
+      <div class="vf-field">
+        <label class="vf-label">Фото тех. паспорта</label>
+        <div id="passportDropZone" class="vf-photo-drop" onclick="document.getElementById('passportInput').click()">
+          {% if obj and obj.image_passport %}
+          <img id="passportPreview" src="{{ obj.image_passport.url }}" class="vf-photo-preview" alt="Тех. паспорт">
+          {% else %}
+          <img id="passportPreview" class="vf-photo-preview" style="display:none" alt="Тех. паспорт">
+          {% endif %}
+          <div id="passportPlaceholder" {% if obj and obj.image_passport %}style="display:none"{% endif %}>
+            <i class="bi bi-file-earmark-text" style="font-size:1.8rem;color:var(--a-gray3);display:block;margin-bottom:6px"></i>
+            <div style="font-size:.82rem;font-weight:600;color:var(--a-text3)">Тех. паспорт</div>
+            <div style="font-size:.7rem;color:var(--a-gray);margin-top:3px">JPG, PNG, HEIC</div>
+          </div>
+        </div>
+        <input type="file" name="image_passport" id="passportInput" accept="image/*" style="display:none">
+        {% if obj and obj.image_passport %}
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;color:var(--a-red);cursor:pointer;margin-top:6px">
+          <input type="checkbox" name="image_passport_clear" value="1" style="accent-color:var(--a-red)"> Удалить фото
+        </label>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
 
 {# ── Основное ── #}
 <div class="vf-card">
@@ -221,11 +298,21 @@
                value="{{ obj.date|date:'Y-m-d'|default:'' }}">
       </div>
     </div>
-    <div class="vf-field">
-      <label class="vf-label">Марка / описание авто <span class="req">*</span></label>
-      <input type="text" name="vehicle_name" class="vf-input"
-             placeholder="Например: Хонда Аккорд черный 2003г (гос. номер 609)"
-             value="{{ obj.vehicle_name|default:'' }}" required>
+    <div class="vf-row vf-row-2">
+      <div class="vf-field">
+        <label class="vf-label">Марка / описание авто <span class="req">*</span></label>
+        <input type="text" name="vehicle_name" class="vf-input"
+               placeholder="Хонда Аккорд черный 2003г"
+               value="{{ obj.vehicle_name|default:'' }}" required>
+      </div>
+      <div class="vf-field">
+        <label class="vf-label">VIN номер</label>
+        <input type="text" name="vin" class="vf-input"
+               placeholder="Например: XTA210930Y2715969"
+               value="{{ obj.vin|default:'' }}"
+               style="text-transform:uppercase" maxlength="17">
+        <span class="vf-hint">Необязательно · до 17 символов</span>
+      </div>
     </div>
   </div>
 </div>
@@ -440,6 +527,72 @@
   inEl.addEventListener('input', update);
   outEl.addEventListener('input', update);
   update();
+
+  // Photo preview
+  var imgInput   = document.getElementById('imageInput');
+  var imgPreview = document.getElementById('photoPreview');
+  var imgHolder  = document.getElementById('photoPlaceholder');
+  var dropZone   = document.getElementById('photoDropZone');
+
+  if (imgInput) {
+    imgInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        imgPreview.src = e.target.result;
+        imgPreview.style.display = 'block';
+        if (imgHolder) imgHolder.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setupDrop(dropZone, imgInput);
+  }
+
+  // Passport photo
+  var passInput    = document.getElementById('passportInput');
+  var passPreview  = document.getElementById('passportPreview');
+  var passHolder   = document.getElementById('passportPlaceholder');
+  var passDropZone = document.getElementById('passportDropZone');
+
+  if (passInput) {
+    passInput.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        passPreview.src = e.target.result;
+        passPreview.style.display = 'block';
+        if (passHolder) passHolder.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    });
+    setupDrop(passDropZone, passInput);
+  }
+
+  function setupDrop(zone, input) {
+    zone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--a-blue)';
+      zone.style.background  = 'rgba(0,122,255,.05)';
+    });
+    zone.addEventListener('dragleave', function () {
+      zone.style.borderColor = '';
+      zone.style.background  = '';
+    });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zone.style.borderColor = '';
+      zone.style.background  = '';
+      var file = e.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      var dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change'));
+    });
+  }
 })();
 </script>
 {% endblock %}
