@@ -6,7 +6,7 @@ from django.db.models.functions import Coalesce
 from django.db.models import Value
 
 from apps.projects.models import Organization, Block, ResidentialComplex
-from apps.core.decorators import vehicles_access_required
+from apps.core.decorators import vehicles_access_required, vehicles_write_required
 from .models import VehicleTransaction
 from .parser import parse_vehicles_excel
 
@@ -77,8 +77,8 @@ def vehicle_list(request):
     total_in     = sum(t.amount_in  for t in transactions)
     total_out    = sum(t.amount_out for t in transactions)
     total_loss   = sum(t.loss for t in transactions if t.amount_out)
-    total_profit  = sum(t.loss  for t in transactions if t.amount_out and t.loss > 0)
-    total_deficit = sum(-t.loss for t in transactions if t.amount_out and t.loss < 0)
+    total_profit  = sum(-t.loss for t in transactions if t.amount_out and t.loss < 0)
+    total_deficit = sum(t.loss  for t in transactions if t.amount_out and t.loss > 0)
     in_balance        = [t for t in transactions if not t.is_sold]
     in_balance_total  = sum(t.amount_in for t in in_balance)
 
@@ -108,7 +108,7 @@ def vehicle_list(request):
 
 # ── Import ────────────────────────────────────────────────────────────────────
 
-@vehicles_access_required
+@vehicles_write_required
 def vehicle_import(request):
     orgs   = list(Organization.objects.order_by('name'))
     blocks = list(Block.objects.select_related('residential_complex').order_by(
@@ -165,7 +165,7 @@ def vehicle_import(request):
 
 # ── Create / Edit / Delete ────────────────────────────────────────────────────
 
-@vehicles_access_required
+@vehicles_write_required
 def vehicle_create(request):
     orgs   = list(Organization.objects.order_by('name'))
     blocks = list(Block.objects.select_related('residential_complex').order_by(
@@ -205,7 +205,7 @@ def vehicle_create(request):
     })
 
 
-@vehicles_access_required
+@vehicles_write_required
 def vehicle_edit(request, pk):
     obj    = get_object_or_404(VehicleTransaction, pk=pk)
     orgs   = list(Organization.objects.order_by('name'))
@@ -247,7 +247,7 @@ def vehicle_edit(request, pk):
     })
 
 
-@vehicles_access_required
+@vehicles_write_required
 def vehicle_toggle_sold(request, pk):
     obj = get_object_or_404(VehicleTransaction, pk=pk)
     if request.method == 'POST':
@@ -257,7 +257,7 @@ def vehicle_toggle_sold(request, pk):
     return redirect(next_url)
 
 
-@vehicles_access_required
+@vehicles_write_required
 def vehicle_delete(request, pk):
     obj = get_object_or_404(VehicleTransaction, pk=pk)
     if request.method == 'POST':

@@ -15,29 +15,51 @@ def editor_required(view_func):
     return wrapper
 
 
+def _is_admin(user):
+    return user.is_staff or user.groups.filter(name='Производство').exists()
+
+def _has_vehicles_any(user):
+    return user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists()
+
+def _has_vehicles_write(user):
+    return user.groups.filter(name='Склад авто').exists()
+
+
 def vehicles_access_required(view_func):
-    """Allow only admins and 'Склад авто' group members."""
+    """Allow admins, 'Склад авто' and 'Склад авто (просмотр)' members."""
     @login_required
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         user = request.user
-        is_admin = user.is_staff or user.groups.filter(name='Производство').exists()
-        is_vehicles = user.groups.filter(name='Склад авто').exists()
-        if not is_admin and not is_vehicles:
+        if not _is_admin(user) and not _has_vehicles_any(user):
             messages.error(request, 'У вас нет доступа к разделу «Склад авто».')
             return redirect('dashboard')
         return view_func(request, *args, **kwargs)
     return wrapper
 
 
-def non_vehicles_required(view_func):
-    """Block 'Склад авто'-only users from accessing other parts of the system."""
+def vehicles_write_required(view_func):
+    """Allow only admins and 'Склад авто' (full access) members."""
     @login_required
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         user = request.user
-        is_admin = user.is_staff or user.groups.filter(name='Производство').exists()
-        if not is_admin and user.groups.filter(name='Склад авто').exists():
+        if not _is_admin(user) and not _has_vehicles_write(user):
+            messages.error(request, 'У вас нет прав на изменение данных в «Склад авто».')
+            return redirect('vehicle_list')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def non_vehicles_required(view_func):
+    """Block vehicles-only users from accessing other parts of the system."""
+    @login_required
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+        if not _is_admin(user) and _has_vehicles_any(user) and not _has_vehicles_write(user):
+            return redirect('vehicle_list')
+        if not _is_admin(user) and _has_vehicles_write(user):
             return redirect('vehicle_list')
         return view_func(request, *args, **kwargs)
     return wrapper

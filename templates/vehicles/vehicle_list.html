@@ -11,6 +11,7 @@
     </h1>
     <p class="text-muted mb-0" style="font-size:.88rem">Учёт автомобилей как расчётного средства</p>
   </div>
+  {% if not is_vehicles_readonly %}
   <div class="d-flex gap-2">
     <a href="{% url 'vehicle_import' %}" class="veh-btn veh-btn-secondary">
       <i class="bi bi-arrow-up-tray me-1"></i>Импорт
@@ -19,6 +20,7 @@
       <i class="bi bi-plus me-1"></i>Добавить
     </a>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -467,8 +469,8 @@
        data-org="{{ t.organization.name|default:'' }}"
        data-in="{{ t.amount_in|currency }}"
        data-out="{{ t.amount_out|currency }}"
-       data-loss-html="{% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}-{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
-       data-loss-color="{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
+       data-loss-html="{% if t.amount_out %}{% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}{% elif t.loss > 0 %}-{{ t.loss|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
+       data-loss-color="{% if t.amount_out %}{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
        data-counterparty="{{ t.counterparty }}"
        data-purpose="{{ t.purpose }}"
        data-source="{% if t.source_block %}{{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}{% else %}{{ t.source_text }}{% endif %}"
@@ -497,6 +499,12 @@
         </div>
       </div>
 
+      {% if is_vehicles_readonly %}
+      <span class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %}" style="align-self:flex-start;flex-shrink:0;cursor:default">
+        <i class="bi bi-{% if t.is_sold %}check-circle-fill{% else %}circle{% endif %}"></i>
+        {% if t.is_sold %}Продана{% else %}В наличии{% endif %}
+      </span>
+      {% else %}
       <button type="button"
               class="veh-pill {% if t.is_sold %}veh-pill-sold{% else %}veh-pill-avail{% endif %} toggle-sold-btn"
               style="align-self:flex-start;flex-shrink:0"
@@ -506,6 +514,7 @@
         <i class="bi bi-{% if t.is_sold %}check-circle-fill{% else %}circle{% endif %}"></i>
         {% if t.is_sold %}Продана{% else %}В наличии{% endif %}
       </button>
+      {% endif %}
     </div>
 
     {# Money #}
@@ -524,8 +533,8 @@
       </div>
       <div class="veh-money-item">
         <span class="veh-money-lbl">Итого</span>
-        <span class="veh-money-val" style="color:{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
-          {% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}−{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
+        <span class="veh-money-val" style="color:{% if t.amount_out %}{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
+          {% if t.amount_out %}{% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}{% elif t.loss > 0 %}−{{ t.loss|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
         </span>
       </div>
     </div>
@@ -538,6 +547,7 @@
         {% if t.target_block %}<div><i class="bi bi-building"></i>{{ t.target_block.residential_complex.name }} / Блок {{ t.target_block.name }}</div>
         {% elif t.target_text %}<div><i class="bi bi-geo-alt-fill"></i>{{ t.target_text|truncatechars:28 }}</div>{% endif %}
       </div>
+      {% if not is_vehicles_readonly %}
       <div class="d-flex gap-1 align-items-center" style="flex-shrink:0">
         <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit" title="Редактировать">
           <i class="bi bi-pencil"></i>
@@ -550,6 +560,7 @@
           </button>
         </form>
       </div>
+      {% endif %}
     </div>
 
   </div>
@@ -568,7 +579,7 @@
       </div>
       <div class="veh-money-item">
         <span class="veh-money-lbl">Нетто</span>
-        <span class="veh-money-val" style="color:{% if total_loss > 0 %}var(--a-green){% elif total_loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+        <span class="veh-money-val" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
           {% if total_loss > 0 %}+{{ total_loss|currency }}
           {% elif total_loss < 0 %}−{{ total_loss|abs_value|currency }}
           {% else %}—{% endif %}
@@ -606,8 +617,8 @@
             data-org="{{ t.organization.name|default:'' }}"
             data-in="{{ t.amount_in|currency }}"
             data-out="{{ t.amount_out|currency }}"
-            data-loss-html="{% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}-{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
-            data-loss-color="{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
+            data-loss-html="{% if t.amount_out %}{% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}{% elif t.loss > 0 %}-{{ t.loss|currency }}{% else %}—{% endif %}{% else %}—{% endif %}"
+            data-loss-color="{% if t.amount_out %}{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}"
             data-counterparty="{{ t.counterparty }}"
             data-purpose="{{ t.purpose }}"
             data-source="{% if t.source_block %}{{ t.source_block.residential_complex.name }} / Блок {{ t.source_block.name }}{% else %}{{ t.source_text }}{% endif %}"
@@ -651,8 +662,8 @@
           <td class="text-r text-money-a" style="color:{% if t.amount_out %}var(--a-red){% else %}var(--a-gray){% endif %}">
             {% if t.amount_out %}{{ t.amount_out|currency }}{% else %}—{% endif %}
           </td>
-          <td class="text-r text-money-a" style="font-weight:600;color:{% if t.amount_out %}{% if t.loss > 0 %}var(--a-green){% elif t.loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
-            {% if t.amount_out %}{% if t.loss > 0 %}+{{ t.loss|currency }}{% elif t.loss < 0 %}−{{ t.loss|abs_value|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
+          <td class="text-r text-money-a" style="font-weight:600;color:{% if t.amount_out %}{% if t.loss < 0 %}var(--a-green){% elif t.loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}{% else %}var(--a-gray){% endif %}">
+            {% if t.amount_out %}{% if t.loss < 0 %}+{{ t.loss|abs_value|currency }}{% elif t.loss > 0 %}−{{ t.loss|currency }}{% else %}—{% endif %}{% else %}—{% endif %}
           </td>
           <td style="color:var(--a-text3);font-size:.78rem">{{ t.counterparty|truncatechars:25 }}</td>
           <td style="color:var(--a-text3);font-size:.78rem">
@@ -661,6 +672,7 @@
             {% if t.purpose %}<div style="font-size:.7rem;color:var(--a-gray)">{{ t.purpose|truncatechars:22 }}</div>{% endif %}
           </td>
           <td>
+            {% if not is_vehicles_readonly %}
             <div class="d-flex gap-1">
               <a href="{% url 'vehicle_edit' t.pk %}" class="veh-icon-btn veh-icon-edit" title="Редактировать">
                 <i class="bi bi-pencil"></i>
@@ -673,6 +685,7 @@
                 </button>
               </form>
             </div>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -682,9 +695,9 @@
           <td colspan="3">Итого</td>
           <td class="text-r text-money-a" style="color:var(--a-green)">{{ total_in|currency }}</td>
           <td class="text-r text-money-a" style="color:var(--a-red)">{{ total_out|currency }}</td>
-          <td class="text-r text-money-a" style="color:{% if total_loss > 0 %}var(--a-green){% elif total_loss < 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
-            {% if total_loss > 0 %}+{{ total_loss|currency }}
-            {% elif total_loss < 0 %}−{{ total_loss|abs_value|currency }}
+          <td class="text-r text-money-a" style="color:{% if total_loss < 0 %}var(--a-green){% elif total_loss > 0 %}var(--a-red){% else %}var(--a-gray){% endif %}">
+            {% if total_loss < 0 %}+{{ total_loss|abs_value|currency }}
+            {% elif total_loss > 0 %}−{{ total_loss|currency }}
             {% else %}—{% endif %}
           </td>
           <td colspan="3"></td>
@@ -719,9 +732,11 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px">
           <span id="detailModalStatus" class="veh-pill"></span>
+          {% if not is_vehicles_readonly %}
           <a id="detailModalEdit" href="#" class="veh-icon-btn veh-icon-edit" title="Редактировать">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
       </div>
@@ -844,7 +859,8 @@
       }
 
       // Edit link
-      document.getElementById('detailModalEdit').href = d.editUrl;
+      var editBtn = document.getElementById('detailModalEdit');
+      if (editBtn) editBtn.href = d.editUrl;
 
       // Photos
       var photosRow      = document.getElementById('detailPhotosRow');
