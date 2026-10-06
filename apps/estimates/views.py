@@ -292,6 +292,86 @@ def estimate_detail(request, pk):
         total_dds = Decimal('0')
         has_dds = False
 
+    # ── АСМ + АВР (план-факт через estimate_item FK) ────────────────────────────
+    try:
+        from apps.planfact.models import AsmItem, AvrItem
+        from django.db.models import ExpressionWrapper, F
+        from django.db.models import DecimalField as _DecF
+        from collections import defaultdict as _dd3
+
+        _pf_expr = ExpressionWrapper(
+            F('quantity') * F('unit_price'),
+            output_field=_DecF(max_digits=15, decimal_places=2),
+        )
+
+        # AsmItem totals + breakdown
+        _asm_totals = (
+            AsmItem.objects
+            .filter(estimate_item__section__estimate=estimate)
+            .values('estimate_item_id')
+            .annotate(s=Sum(_pf_expr))
+        )
+        asm_by_item = {r['estimate_item_id']: r['s'] or Decimal('0') for r in _asm_totals}
+
+        _asm_recs = _dd3(list)
+        for _ai in (
+            AsmItem.objects
+            .filter(estimate_item__section__estimate=estimate)
+            .select_related('document')
+            .order_by('estimate_item_id', 'document__doc_date', 'document__doc_number')
+        ):
+            _asm_recs[_ai.estimate_item_id].append(_ai)
+
+        # AvrItem totals + breakdown
+        _avr_totals = (
+            AvrItem.objects
+            .filter(estimate_item__section__estimate=estimate)
+            .values('estimate_item_id')
+            .annotate(s=Sum(_pf_expr))
+        )
+        avr_by_item = {r['estimate_item_id']: r['s'] or Decimal('0') for r in _avr_totals}
+
+        _avr_recs = _dd3(list)
+        for _avi in (
+            AvrItem.objects
+            .filter(estimate_item__section__estimate=estimate)
+            .select_related('document')
+            .order_by('estimate_item_id', 'document__doc_date', 'document__doc_number')
+        ):
+            _avr_recs[_avi.estimate_item_id].append(_avi)
+
+        for item in all_items:
+            item.asm_expense   = asm_by_item.get(item.pk, Decimal('0'))
+            item.asm_breakdown = _asm_recs.get(item.pk, [])
+            item.avr_expense   = avr_by_item.get(item.pk, Decimal('0'))
+            item.avr_breakdown = _avr_recs.get(item.pk, [])
+            item.pf_act_total  = item.asm_expense + item.avr_expense
+
+        def _compute_asm(section):
+            total = sum(i.pf_act_total for i in section.plan_items)
+            for child in section.plan_children:
+                total += _compute_asm(child)
+            section.asm_expense = total
+            return total
+
+        for sec in top_sections:
+            _compute_asm(sec)
+
+        total_asm = sum(s.asm_expense for s in top_sections)
+        has_asm = total_asm > 0
+
+    except Exception:
+        for item in all_items:
+            item.asm_expense   = Decimal('0')
+            item.asm_breakdown = []
+            item.avr_expense   = Decimal('0')
+            item.avr_breakdown = []
+            item.pf_act_total  = Decimal('0')
+        for s in all_sections:
+            s.asm_expense = Decimal('0')
+        total_asm = Decimal('0')
+        has_asm = False
+
     # ── Внесметные расходы ───────────────────────────────────────────────────────
     extra_expenses = list(ExtraBlockExpense.objects.filter(block=estimate.block).order_by('-date', '-created_at'))
     extra_total    = sum(e.amount for e in extra_expenses)
@@ -306,6 +386,8 @@ def estimate_detail(request, pk):
         'total_deviation': total_actual - total_plan,
         'total_dds': total_dds,
         'has_dds': has_dds,
+        'total_asm': total_asm,
+        'has_asm': has_asm,
         'versions': versions,
         'linked_item_ids': linked_item_ids,
         'extra_expenses': extra_expenses,

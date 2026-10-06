@@ -1104,7 +1104,7 @@ def asm_edit(request, asm_pk):
         return redirect('planfact_index')
 
     is_admin = _is_admin_user(request.user)
-    items = list(doc.items.all())
+    items = list(doc.items.select_related('estimate_item').all())
 
     if request.method == 'POST':
         action = request.POST.get('action', 'save')
@@ -1117,6 +1117,14 @@ def asm_edit(request, asm_pk):
             doc.accepted_amount = Decimal(raw_amt) if raw_amt else doc.total_amount
             doc.save()
             messages.success(request, 'АСМ принят и заблокирован.')
+            return redirect('asm_edit', asm_pk=doc.pk)
+
+        if action == 'link_estimate' and is_admin:
+            for item in list(doc.items.all()):
+                ei_val = request.POST.get(f'estimate_item_{item.pk}', '')
+                item.estimate_item_id = int(ei_val) if ei_val else None
+                item.save(update_fields=['estimate_item'])
+            messages.success(request, 'Привязки к смете обновлены.')
             return redirect('asm_edit', asm_pk=doc.pk)
 
         if doc.is_accepted:
@@ -1146,6 +1154,9 @@ def asm_edit(request, asm_pk):
                 item.quantity = request.POST.get(f'qty_{item.pk}', '0') or 0
                 item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
                 item.notes    = request.POST.get(f'notes_{item.pk}', '').strip()
+                if is_admin:
+                    ei_val = request.POST.get(f'estimate_item_{item.pk}', '')
+                    item.estimate_item_id = int(ei_val) if ei_val else None
                 item.save()
 
         new_names  = request.POST.getlist('new_name')
@@ -1176,12 +1187,19 @@ def asm_edit(request, asm_pk):
     EMPTY_ROWS = 8
     _lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=doc.block, floor_number=doc.floor_number)}
     floor_label = _get_floor_label(_lm, doc.floor_number)
+    from apps.estimates.models import EstimateItem
+    estimate_items = list(
+        EstimateItem.objects.filter(section__estimate__block=doc.block)
+        .select_related('section__estimate')
+        .order_by('section__estimate__id', 'section__order', 'order')
+    )
     return render(request, 'planfact/asm_edit.html', {
         'doc': doc, 'items': items,
         'blk': doc.block, 'floor_label': floor_label,
         'empty_rows': range(EMPTY_ROWS),
         'is_admin': is_admin,
         'photos': doc.photos.all() if hasattr(doc, 'photos') else [],
+        'estimate_items': estimate_items,
     })
 
 
@@ -1497,7 +1515,7 @@ def avr_edit(request, avr_pk):
         messages.error(request, 'Нет доступа.')
         return redirect('planfact_index')
     is_admin = _is_admin_user(request.user)
-    items = list(doc.items.all())
+    items = list(doc.items.select_related('estimate_item').all())
 
     if request.method == 'POST':
         action = request.POST.get('action', 'save')
@@ -1523,6 +1541,14 @@ def avr_edit(request, avr_pk):
             doc.accepted_amount = Decimal(raw_amt) if raw_amt else doc.total_amount
             doc.save()
             messages.success(request, 'АВР принят и заблокирован.')
+            return redirect('avr_edit', avr_pk=doc.pk)
+
+        if action == 'link_estimate' and is_admin:
+            for item in list(doc.items.all()):
+                ei_val = request.POST.get(f'estimate_item_{item.pk}', '')
+                item.estimate_item_id = int(ei_val) if ei_val else None
+                item.save(update_fields=['estimate_item'])
+            messages.success(request, 'Привязки к смете обновлены.')
             return redirect('avr_edit', avr_pk=doc.pk)
 
         # Block all edits once accepted
@@ -1562,6 +1588,9 @@ def avr_edit(request, avr_pk):
                 item.quantity = request.POST.get(f'qty_{item.pk}', '0') or 0
                 item.unit_price = request.POST.get(f'price_{item.pk}', '0') or 0
                 item.notes    = request.POST.get(f'notes_{item.pk}', '').strip()
+                if is_admin:
+                    ei_val = request.POST.get(f'estimate_item_{item.pk}', '')
+                    item.estimate_item_id = int(ei_val) if ei_val else None
                 item.save()
 
         new_names  = request.POST.getlist('new_name')
@@ -1594,12 +1623,19 @@ def avr_edit(request, avr_pk):
         floor_label = _get_floor_label(_lm, doc.floor_number)
     else:
         floor_label = 'Общий'
+    from apps.estimates.models import EstimateItem
+    estimate_items = list(
+        EstimateItem.objects.filter(section__estimate__block=doc.block)
+        .select_related('section__estimate')
+        .order_by('section__estimate__id', 'section__order', 'order')
+    )
     return render(request, 'planfact/avr_edit.html', {
         'doc': doc, 'items': items,
         'blk': doc.block, 'floor_label': floor_label,
         'empty_rows': range(EMPTY_ROWS),
         'is_admin': is_admin,
         'photos': doc.photos.all(),
+        'estimate_items': estimate_items,
     })
 
 

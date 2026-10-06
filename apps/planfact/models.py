@@ -181,7 +181,12 @@ class AsmItem(models.Model):
     unit       = models.CharField('Ед. измерения', max_length=30)
     quantity   = models.DecimalField('Количество',  max_digits=12, decimal_places=3, default=0)
     unit_price = models.DecimalField('Цена за ед.', max_digits=12, decimal_places=2, default=0)
-    notes      = models.CharField('Примечание', max_length=200, blank=True)
+    notes         = models.CharField('Примечание', max_length=200, blank=True)
+    estimate_item = models.ForeignKey(
+        'estimates.EstimateItem', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='asm_items',
+        verbose_name='Позиция сметы'
+    )
 
     class Meta:
         verbose_name = 'Строка АСМ'
@@ -326,13 +331,18 @@ class AvrPhoto(models.Model):
 
 
 class AvrItem(models.Model):
-    document   = models.ForeignKey(AvrDocument, on_delete=models.CASCADE, related_name='items')
-    order      = models.PositiveIntegerField('Порядок', default=0)
-    name       = models.CharField('Наименование работ', max_length=300)
-    unit       = models.CharField('Ед. измерения', max_length=30, blank=True)
-    quantity   = models.DecimalField('Кол-во', max_digits=12, decimal_places=3, default=0)
-    unit_price = models.DecimalField('Цена', max_digits=12, decimal_places=2, default=0)
-    notes      = models.CharField('Примечание', max_length=200, blank=True)
+    document      = models.ForeignKey(AvrDocument, on_delete=models.CASCADE, related_name='items')
+    order         = models.PositiveIntegerField('Порядок', default=0)
+    name          = models.CharField('Наименование работ', max_length=300)
+    unit          = models.CharField('Ед. измерения', max_length=30, blank=True)
+    quantity      = models.DecimalField('Кол-во', max_digits=12, decimal_places=3, default=0)
+    unit_price    = models.DecimalField('Цена', max_digits=12, decimal_places=2, default=0)
+    notes         = models.CharField('Примечание', max_length=200, blank=True)
+    estimate_item = models.ForeignKey(
+        'estimates.EstimateItem', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='avr_items',
+        verbose_name='Позиция сметы'
+    )
 
     class Meta:
         ordering = ['order', 'id']

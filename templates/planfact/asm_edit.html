@@ -10,6 +10,12 @@
 .asm-table input { font-size:.82rem; }
 .del-check { width:20px; }
 .new-row td { background:#f0fdf4; }
+.ei-linked { background:#eff6ff; border-color:#93c5fd !important; }
+.ei-badge { display:inline-flex; align-items:center; font-size:.7rem; font-weight:700; color:#1d4ed8;
+            background:#dbeafe; border-radius:4px; padding:2px 6px; white-space:nowrap; }
+.ei-row { display:grid; grid-template-columns:24px 1fr 1.5fr auto; align-items:center;
+          gap:10px; padding:7px 0; border-bottom:1px solid #e0f2fe; }
+.ei-row:last-child { border-bottom:none; }
 </style>
 {% endblock %}
 
@@ -181,6 +187,66 @@
   </fieldset>
 </form>
 
+{% if is_admin %}
+<form method="post" style="margin-top:20px">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="link_estimate">
+  <div class="card-section mb-3" style="border:2px solid #bfdbfe;background:#f0f9ff">
+    <div style="padding:.7rem 1rem .4rem;border-bottom:1px solid #bfdbfe;display:flex;align-items:center;gap:8px">
+      <i class="bi bi-link-45deg" style="color:#2563eb;font-size:1.1rem"></i>
+      <span style="font-size:.88rem;font-weight:700;color:#1d4ed8">Привязка к позициям сметы</span>
+      <span style="font-size:.72rem;color:#3b82f6">(только для администратора)</span>
+    </div>
+    <div style="padding:10px 16px">
+      {% if estimate_items %}
+      <datalist id="ei-datalist">
+        {% for ei in estimate_items %}
+        <option value="{% if ei.code %}{{ ei.code }} — {% endif %}{{ ei.name }}" data-id="{{ ei.pk }}"></option>
+        {% endfor %}
+      </datalist>
+      <div style="font-size:.72rem;color:#3b82f6;margin-bottom:8px">
+        Начните вводить код или название — выберите позицию из выпадающего списка, затем сохраните.
+      </div>
+      {% for item in items %}
+      <div class="ei-row">
+        <span style="font-size:.78rem;color:#94a3b8;font-weight:700">{{ forloop.counter }}</span>
+        <span style="font-size:.82rem;font-weight:500;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ item.name }}">{{ item.name }}</span>
+        <div>
+          <input type="hidden" name="estimate_item_{{ item.pk }}" id="ei-id-{{ item.pk }}"
+                 value="{{ item.estimate_item_id|default:'' }}">
+          <input type="text" list="ei-datalist" id="ei-txt-{{ item.pk }}"
+                 class="form-control form-control-sm{% if item.estimate_item_id %} ei-linked{% endif %}"
+                 placeholder="Поиск по коду / названию..."
+                 value="{% if item.estimate_item %}{% if item.estimate_item.code %}{{ item.estimate_item.code }} — {% endif %}{{ item.estimate_item.name }}{% endif %}"
+                 oninput="eiSync('{{ item.pk }}', this)">
+        </div>
+        {% if item.estimate_item %}
+        <span class="ei-badge"><i class="bi bi-check2 me-1"></i>{{ item.estimate_item.code }}</span>
+        {% else %}
+        <span style="font-size:.72rem;color:#cbd5e1">—</span>
+        {% endif %}
+      </div>
+      {% empty %}
+      <div style="font-size:.83rem;color:#6b7280">Нет строк для привязки.</div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:.83rem;color:#6b7280;padding:4px 0">
+        <i class="bi bi-info-circle me-1"></i>Для этого блока нет позиций сметы.
+      </div>
+      {% endif %}
+      {% if estimate_items %}
+      <div style="margin-top:12px">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-save me-1"></i>Сохранить привязки
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endif %}
+
 {% if is_admin and not doc.is_accepted %}
 <div style="margin-top:24px;border:2px dashed #93c5fd;border-radius:12px;padding:20px;background:#eff6ff">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -219,8 +285,21 @@
 {% endif %}
 
 <script>
-function calcRow(el){
-  // Not recalculating server totals inline — just visual hint
+function eiSync(pk, input){
+  const dl = document.getElementById('ei-datalist');
+  const hidden = document.getElementById('ei-id-' + pk);
+  if(!dl || !hidden) return;
+  const val = input.value.trim();
+  if(!val){ hidden.value=''; input.classList.remove('ei-linked'); return; }
+  for(const opt of dl.options){
+    if(opt.value === val){
+      hidden.value = opt.getAttribute('data-id') || '';
+      input.classList.toggle('ei-linked', !!hidden.value);
+      return;
+    }
+  }
+  hidden.value='';
+  input.classList.remove('ei-linked');
 }
 function addRows(){
   const tbody = document.getElementById('items-body');

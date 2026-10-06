@@ -78,6 +78,19 @@
       </div>
     </div>
   </div>
+  {% if has_asm %}
+  <div class="col-sm-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="label">П/Ф (АСМ + АВР)</div>
+          <div class="value text-money" style="color:#16a34a">{{ total_asm|currency }}</div>
+        </div>
+        <div class="icon" style="background:#dcfce7;color:#16a34a"><i class="bi bi-clipboard-check"></i></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   {% if has_dds %}
   <div class="col-sm-3">
     <div class="stat-card">
@@ -221,6 +234,7 @@
           <th class="text-end" style="width:120px">Цена</th>
           <th class="text-end" style="width:130px">План (сом)</th>
           <th class="text-end" style="width:130px">Расходы ПФ</th>
+          {% if has_asm %}<th class="text-end" style="width:120px"><span style="color:#16a34a">П/Ф (факт)</span></th>{% endif %}
           {% if has_dds %}<th class="text-end" style="width:120px"><span class="text-info">ДДС</span></th>{% endif %}
           <th class="text-end" style="width:110px">Откл.</th>
           <th style="width:80px"></th>
@@ -245,6 +259,11 @@
           <td class="text-end text-money fw-bold {% if sec.pf_expense > 0 %}text-success{% endif %}">
             {% if sec.pf_expense > 0 %}{{ sec.pf_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
+          {% if has_asm %}
+          <td class="text-end fw-bold {% if sec.asm_expense > 0 %}{% else %}text-muted{% endif %}" style="{% if sec.asm_expense > 0 %}color:#16a34a{% endif %}">
+            {% if sec.asm_expense > 0 %}{{ sec.asm_expense|currency }}{% else %}—{% endif %}
+          </td>
+          {% endif %}
           {% if has_dds %}
           <td class="text-end fw-bold {% if sec.dds_expense > 0 %}text-info{% endif %}">
             {% if sec.dds_expense > 0 %}{{ sec.dds_expense|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
@@ -297,6 +316,11 @@
                   {% endif %}
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
+              {% if has_asm %}
+              <td class="text-end fw-semibold" style="{% if sec2.asm_expense > 0 %}color:#16a34a{% else %}color:#94a3b8{% endif %}">
+                {% if sec2.asm_expense > 0 %}{{ sec2.asm_expense|currency }}{% else %}—{% endif %}
+              </td>
+              {% endif %}
               {% if has_dds %}
               <td class="text-end fw-semibold {% if sec2.dds_expense > 0 %}text-info{% endif %}">
                 {% if sec2.dds_expense > 0 %}
@@ -332,7 +356,7 @@
             </tr>
             {% if sec2.misc_fes %}
             <tr id="misc-{{ sec2.pk }}" class="collapse">
-              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#fefce8;border-left:3px solid #eab308">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#fefce8;border-left:3px solid #eab308">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-warning">
@@ -376,7 +400,7 @@
             </tr>
             {% if sec2.misc_dds_records %}
             <tr id="misc-dds-{{ sec2.pk }}" class="collapse">
-              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-info">
@@ -467,6 +491,20 @@
                   </button>
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
+              {% if has_asm %}
+              <td class="text-end text-money fw-semibold" style="{% if item.pf_act_total > 0 %}color:#16a34a{% endif %}">
+                {% if item.pf_act_total > 0 %}
+                  <button class="btn btn-link p-0 text-decoration-none fw-semibold lh-1"
+                          style="font-size:inherit;color:#16a34a"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#asm-{{ item.pk }}"
+                          title="Раскрыть АСМ/АВР расходы">
+                    {{ item.pf_act_total|currency }}
+                    <i class="bi bi-clipboard-check ms-1" style="font-size:.6rem"></i>
+                  </button>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              {% endif %}
               {% if has_dds %}
               <td class="text-end text-money {% if item.dds_expense > 0 %}text-info fw-semibold{% endif %}">
                 {% if item.dds_expense > 0 %}
@@ -506,7 +544,7 @@
             </tr>
             {% if item.pf_floors %}
             <tr id="pf-{{ item.pk }}" class="collapse">
-              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #22c55e">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-success">
@@ -589,9 +627,98 @@
               </td>
             </tr>
             {% endif %}
+            {% if item.asm_breakdown or item.avr_breakdown %}
+            <tr id="asm-{{ item.pk }}" class="collapse">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#f0fdf4;border-left:3px solid #16a34a">
+                <div style="padding:.6rem 1rem .8rem">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="small fw-semibold" style="color:#16a34a">
+                      <i class="bi bi-clipboard-check me-1"></i>П/Ф расходы: {{ item.code }} {{ item.name }}
+                    </div>
+                    <span class="fw-bold small me-2" style="color:#16a34a">Итого: {{ item.pf_act_total|currency }}</span>
+                  </div>
+
+                  {% if item.asm_breakdown %}
+                  <div class="small fw-semibold mb-1" style="color:#0369a1">
+                    <i class="bi bi-box-seam me-1"></i>АСМ — Материалы
+                    <span class="badge ms-1" style="font-size:.65rem;font-weight:400;background:#e0f2fe;color:#0369a1">{{ item.asm_breakdown|length }} зап.</span>
+                  </div>
+                  <table class="table table-sm table-borderless mb-2" style="font-size:.78rem;background:#f0fdf4">
+                    <thead><tr class="text-muted">
+                      <th class="py-0">АСМ №</th><th class="py-0">Дата</th><th class="py-0">Материал</th>
+                      <th class="py-0 text-end">Кол-во</th><th class="py-0">Ед.</th>
+                      <th class="py-0 text-end">Цена</th><th class="py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for ai in item.asm_breakdown %}
+                      <tr>
+                        <td class="py-0 text-muted">
+                          <a href="{% url 'asm_edit' ai.document_id %}" style="color:#16a34a;font-size:.78rem">
+                            №{{ ai.document.doc_number|default:ai.document_id }}
+                          </a>
+                        </td>
+                        <td class="py-0 text-muted text-nowrap">{{ ai.document.doc_date|date:"d.m.Y" }}</td>
+                        <td class="py-0">{{ ai.name }}</td>
+                        <td class="py-0 text-end text-muted">{{ ai.quantity|floatformat:3 }}</td>
+                        <td class="py-0 text-muted">{{ ai.unit|default:"—" }}</td>
+                        <td class="py-0 text-end text-muted">{{ ai.unit_price|currency }}</td>
+                        <td class="py-0 text-end fw-semibold" style="color:#16a34a">{{ ai.total_amount|currency }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot><tr style="border-top:1px solid #bbf7d0">
+                      <td colspan="6" class="py-0 text-end text-muted">Итого АСМ:</td>
+                      <td class="py-0 text-end fw-bold" style="color:#16a34a">{{ item.asm_expense|currency }}</td>
+                    </tr></tfoot>
+                  </table>
+                  {% endif %}
+
+                  {% if item.avr_breakdown %}
+                  <div class="small fw-semibold mb-1" style="color:#15803d">
+                    <i class="bi bi-file-earmark-check me-1"></i>АВР — Работы
+                    <span class="badge ms-1" style="font-size:.65rem;font-weight:400;background:#dcfce7;color:#166534">{{ item.avr_breakdown|length }} зап.</span>
+                  </div>
+                  <table class="table table-sm table-borderless mb-2" style="font-size:.78rem;background:#f0fdf4">
+                    <thead><tr class="text-muted">
+                      <th class="py-0">АВР №</th><th class="py-0">Дата</th><th class="py-0">Работа</th>
+                      <th class="py-0 text-end">Кол-во</th><th class="py-0">Ед.</th>
+                      <th class="py-0 text-end">Цена</th><th class="py-0 text-end">Сумма</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for avi in item.avr_breakdown %}
+                      <tr>
+                        <td class="py-0 text-muted">
+                          <a href="{% url 'avr_edit' avi.document_id %}" style="color:#16a34a;font-size:.78rem">
+                            №{{ avi.document.doc_number|default:avi.document_id }}
+                          </a>
+                        </td>
+                        <td class="py-0 text-muted text-nowrap">{{ avi.document.doc_date|date:"d.m.Y" }}</td>
+                        <td class="py-0">{{ avi.name }}</td>
+                        <td class="py-0 text-end text-muted">{{ avi.quantity|floatformat:3 }}</td>
+                        <td class="py-0 text-muted">{{ avi.unit|default:"—" }}</td>
+                        <td class="py-0 text-end text-muted">{{ avi.unit_price|currency }}</td>
+                        <td class="py-0 text-end fw-semibold" style="color:#16a34a">{{ avi.total_amount|currency }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot><tr style="border-top:1px solid #bbf7d0">
+                      <td colspan="6" class="py-0 text-end text-muted">Итого АВР:</td>
+                      <td class="py-0 text-end fw-bold" style="color:#16a34a">{{ item.avr_expense|currency }}</td>
+                    </tr></tfoot>
+                  </table>
+                  {% endif %}
+
+                  <div class="d-flex justify-content-end me-2">
+                    <span class="small text-muted me-2">Итого АСМ + АВР:</span>
+                    <span class="fw-bold" style="color:#16a34a">{{ item.pf_act_total|currency }}</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% if item.dds_breakdown %}
             <tr id="dds-{{ item.pk }}" class="collapse">
-              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:0 0 0 calc({{ lvl|add:1 }}rem + 1.5rem);background:#eff6ff;border-left:3px solid #3b82f6">
                 <div style="padding:.6rem 1rem .8rem">
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="small fw-semibold text-info">
@@ -634,7 +761,7 @@
             {% endif %}
             {% if item_hist %}
             <tr id="hist-{{ item.pk }}" class="collapse" style="background:#fefce8">
-              <td colspan="{% if has_dds %}11{% else %}10{% endif %}" style="padding:.5rem 1rem .75rem calc({{ lvl|add:1 }}rem + 1.5rem)">
+              <td colspan="{% if has_dds and has_asm %}12{% elif has_dds or has_asm %}11{% else %}10{% endif %}" style="padding:.5rem 1rem .75rem calc({{ lvl|add:1 }}rem + 1.5rem)">
                 <div class="small fw-semibold text-warning mb-1">
                   <i class="bi bi-clock-history me-1"></i>История изменений: {{ item.code }} {{ item.name }}
                 </div>
@@ -672,6 +799,9 @@
           <td colspan="5" class="fw-bold">Итого</td>
           <td class="text-end fw-bold text-money">{{ total_plan|currency }}</td>
           <td class="text-end fw-bold text-money">{{ total_actual|currency }}</td>
+          {% if has_asm %}
+          <td class="text-end fw-bold text-money" style="color:#16a34a">{{ total_asm|currency }}</td>
+          {% endif %}
           {% if has_dds %}
           <td class="text-end fw-bold text-money text-info">{{ total_dds|currency }}</td>
           {% endif %}
