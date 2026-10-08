@@ -25,6 +25,24 @@ class SmartLoginView(LoginView):
 
 
 def dashboard(request):
+    if not request.user.is_authenticated:
+        from django.conf import settings
+        from django.shortcuts import redirect as _redirect
+        return _redirect(f'{settings.LOGIN_URL}?next={request.path}')
+
+    is_admin = request.user.is_staff or request.user.groups.filter(name='Производство').exists()
+    if not is_admin:
+        if request.user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists():
+            from django.shortcuts import redirect as _redirect
+            return _redirect('/vehicles/')
+        from apps.planfact.models import BlockAccess
+        if BlockAccess.objects.filter(user=request.user).exists():
+            from django.shortcuts import redirect as _redirect
+            return _redirect('/planfact/')
+        from django.shortcuts import redirect as _redirect
+        from django.conf import settings
+        return _redirect(f'{settings.LOGIN_URL}?next={request.path}')
+
     from apps.dds.models import CashFlowRecord, CashAccount
     from apps.estimates.models import ExtraBlockExpense
     from apps.vehicles.models import VehicleTransaction
