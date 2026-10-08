@@ -213,11 +213,17 @@
       <i class="bi bi-car-front"></i> Склад авто
     </a>
     {% elif is_builder %}
-    {# Строитель — только план-факт #}
+    {# Строитель — план-факт, и склад авто если есть доступ #}
     <div class="sidebar-section-title">Производство</div>
     <a href="{% url 'planfact_index' %}" class="sidebar-link {% if 'planfact' in request.resolver_match.url_name or 'asm' in request.resolver_match.url_name %}active{% endif %}">
       <i class="bi bi-building-check"></i> План-факт стройки
     </a>
+    {% if has_vehicles %}
+    <div class="sidebar-section-title">Транспорт</div>
+    <a href="{% url 'vehicle_list' %}" class="sidebar-link {% if 'vehicle' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-car-front"></i> Склад авто
+    </a>
+    {% endif %}
     {% else %}
     {# Полный доступ #}
     <div class="sidebar-section-title">Главное</div>

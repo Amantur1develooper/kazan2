@@ -16,11 +16,11 @@ class SmartLoginView(LoginView):
         user = self.request.user
         is_admin = user.is_staff or user.groups.filter(name='Производство').exists()
         if not is_admin:
-            if user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists():
-                return '/vehicles/'
             from apps.planfact.models import BlockAccess
             if BlockAccess.objects.filter(user=user).exists():
                 return '/planfact/'
+            if user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists():
+                return '/vehicles/'
         return super().get_success_url()
 
 
@@ -32,13 +32,13 @@ def dashboard(request):
 
     is_admin = request.user.is_staff or request.user.groups.filter(name='Производство').exists()
     if not is_admin:
-        if request.user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists():
-            from django.shortcuts import redirect as _redirect
-            return _redirect('/vehicles/')
         from apps.planfact.models import BlockAccess
         if BlockAccess.objects.filter(user=request.user).exists():
             from django.shortcuts import redirect as _redirect
             return _redirect('/planfact/')
+        if request.user.groups.filter(name__in=['Склад авто', 'Склад авто (просмотр)']).exists():
+            from django.shortcuts import redirect as _redirect
+            return _redirect('/vehicles/')
         from django.shortcuts import redirect as _redirect
         from django.conf import settings
         return _redirect(f'{settings.LOGIN_URL}?next={request.path}')

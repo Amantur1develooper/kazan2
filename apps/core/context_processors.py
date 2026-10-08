@@ -8,13 +8,16 @@ def user_role(request):
     is_admin = request.user.is_staff or request.user.groups.filter(name='Производство').exists()
     has_vehicles_write    = not is_admin and request.user.groups.filter(name='Склад авто').exists()
     has_vehicles_readonly = not is_admin and not has_vehicles_write and request.user.groups.filter(name='Склад авто (просмотр)').exists()
-    is_vehicles_only = has_vehicles_write or has_vehicles_readonly
-    is_builder = not is_admin and not is_vehicles_only and BlockAccess.objects.filter(user=request.user).exists()
+    has_vehicles = has_vehicles_write or has_vehicles_readonly
+    has_block_access = not is_admin and BlockAccess.objects.filter(user=request.user).exists()
+    is_vehicles_only = has_vehicles and not has_block_access
+    is_builder = has_block_access
     return {
         'is_admin_user':       is_admin,
         'is_builder':          is_builder,
         'is_vehicles_only':    is_vehicles_only,
         'is_vehicles_readonly': has_vehicles_readonly,
+        'has_vehicles':        has_vehicles,
     }
 
 
