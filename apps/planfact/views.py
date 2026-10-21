@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from apps.projects.models import Block
 from .models import (WorkCategory, FloorWork, LandscapingWork, WorkAct, BlockFloorConfig,
-                     FloorBudget, AsmDocument, AsmItem, BlockAccess,
+                     FloorBudget, AsmDocument, AsmItem, BlockAccess, BuilderProfile,
                      CalendarPlan, CalendarTask, CalendarMonthPlan,
                      AvrDocument, AvrItem, AvrPhoto, FloorCategoryAssignment,
                      FloorLabel, MONTHS_RU, MONTHS_SHORT)
@@ -281,6 +281,31 @@ def finance_planfact_list(request):
     for r in avr_item_rows:
         avr_map[r['block_id']] += r['total']
 
+    # Смета блока (план) и факт по смете: строки АСМ/АВР, привязанные к позициям
+    # сметы (estimate_item). Считается так же, как на странице сметы.
+    from apps.estimates.models import Estimate
+    estimate_map = {
+        e['block_id']: e for e in
+        Estimate.objects.filter(block__in=all_blocks).values('pk', 'block_id', 'total_amount')
+    }
+    _item_expr = ExpressionWrapper(
+        F('quantity') * F('unit_price'),
+        output_field=DecimalField(max_digits=15, decimal_places=2),
+    )
+    linked_map = defaultdict(lambda: D0)
+    unlinked_cnt = defaultdict(int)
+    for model in (AsmItem, AvrItem):
+        for r in (
+            model.objects.filter(document__block__in=all_blocks, estimate_item__isnull=False)
+            .values('document__block_id').annotate(total=Coalesce(Sum(_item_expr), Value(D0)))
+        ):
+            linked_map[r['document__block_id']] += r['total']
+        for r in (
+            model.objects.filter(document__block__in=all_blocks, estimate_item__isnull=True)
+            .values('document__block_id').annotate(n=Count('id'))
+        ):
+            unlinked_cnt[r['document__block_id']] += r['n']
+
     # Build per-block rows grouped by RC
     rc_groups = defaultdict(list)
     for blk in all_blocks:
@@ -290,8 +315,13 @@ def finance_planfact_list(request):
         asm    = asm_map.get(blk.pk, D0)
         avr    = avr_map[blk.pk]
         total_fact = asm + avr
+        est    = estimate_map.get(blk.pk)
         rc_groups[blk.residential_complex].append({
             'block':      blk,
+            'estimate_pk': est['pk'] if est else None,
+            'estimate':   est['total_amount'] if est else D0,
+            'linked':     linked_map[blk.pk],
+            'unlinked':   unlinked_cnt[blk.pk],
             'plan':       plan,
             'dds':        dds,
             'pf':         pf,
@@ -303,7 +333,11 @@ def finance_planfact_list(request):
 
     rc_summary = []
     grand_plan = grand_dds = grand_pf = grand_asm = grand_avr = D0
+    grand_estimate = grand_linked = D0
+    grand_unlinked = 0
     for rc, rows in rc_groups.items():
+        s_est    = sum(r['estimate'] for r in rows)
+        s_linked = sum(r['linked'] for r in rows)
         s_plan = sum(r['plan'] for r in rows)
         s_dds  = sum(r['dds']  for r in rows)
         s_pf   = sum(r['pf']   for r in rows)
@@ -317,7 +351,12 @@ def finance_planfact_list(request):
             'pf':   s_pf,
             'asm':  s_asm,
             'avr':  s_avr,
+            'estimate': s_est,
+            'linked':   s_linked,
         })
+        grand_estimate += s_est
+        grand_linked   += s_linked
+        grand_unlinked += sum(r['unlinked'] for r in rows)
         grand_plan += s_plan
         grand_dds  += s_dds
         grand_pf   += s_pf
@@ -331,6 +370,9 @@ def finance_planfact_list(request):
         'grand_pf':    grand_pf,
         'grand_asm':   grand_asm,
         'grand_avr':   grand_avr,
+        'grand_estimate': grand_estimate,
+        'grand_linked':   grand_linked,
+        'grand_unlinked': grand_unlinked,
         'is_admin':    _is_admin_user(request.user),
     })
 
@@ -1674,9 +1716,11 @@ def avr_delete(request, avr_pk):
 # ─── Builder user management (staff only) ───────────────────────────────────
 
 @staff_required
+@staff_required
 def manage_users(request):
     builders = (User.objects.filter(is_staff=False, is_superuser=False)
                 .prefetch_related('block_accesses__block__residential_complex')
+                .select_related('builder_profile')
                 .order_by('username'))
     return render(request, 'planfact/manage_users.html', {'builders': builders})
 
@@ -1703,6 +1747,7 @@ def manage_user_create(request):
                 username=username, password=password,
                 first_name=first_name, last_name=last_name,
             )
+            BuilderProfile.objects.create(user=user, plain_password=password)
             for bid in block_ids:
                 BlockAccess.objects.create(user=user, block_id=bid)
             messages.success(request, f'Строитель «{username}» создан.')
@@ -1731,6 +1776,9 @@ def manage_user_edit(request, user_pk):
             if new_pwd:
                 builder.set_password(new_pwd)
                 builder.save()
+                profile, _ = BuilderProfile.objects.get_or_create(user=builder)
+                profile.plain_password = new_pwd
+                profile.save()
                 messages.success(request, 'Пароль изменён.')
             else:
                 messages.error(request, 'Введите новый пароль.')
@@ -1741,8 +1789,13 @@ def manage_user_edit(request, user_pk):
             return redirect('manage_users')
         return redirect('manage_user_edit', user_pk=builder.pk)
 
+    try:
+        plain_password = builder.builder_profile.plain_password
+    except Exception:
+        plain_password = ''
     return render(request, 'planfact/manage_user_edit.html', {
         'builder': builder,
         'all_blocks': all_blocks,
         'current_ids': current_ids,
+        'plain_password': plain_password,
     })

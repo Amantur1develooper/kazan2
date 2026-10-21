@@ -52,13 +52,25 @@
 
   {# — Смена пароля — #}
   <div class="card-section p-4 mb-4">
-    <h6 class="fw-bold text-warning mb-3"><i class="bi bi-key me-1"></i>Сменить пароль</h6>
+    <h6 class="fw-bold text-warning mb-3"><i class="bi bi-key me-1"></i>Пароль</h6>
+    {% if plain_password %}
+    <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+      <i class="bi bi-lock-fill" style="color:#ca8a04;font-size:1.1rem"></i>
+      <div>
+        <div style="font-size:.75rem;color:#92400e;font-weight:600;margin-bottom:2px">Текущий пароль</div>
+        <span style="font-family:monospace;font-size:1.1rem;font-weight:700;color:#1e293b;letter-spacing:.08em">{{ plain_password }}</span>
+      </div>
+    </div>
+    {% endif %}
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="reset_password">
+      <div style="font-size:.78rem;color:#6b7280;margin-bottom:6px">
+        Можно использовать простой пароль, например 6 цифр: <code>837528</code>
+      </div>
       <div class="d-flex gap-2">
-        <input type="password" name="new_password" class="form-control" placeholder="Новый пароль"
-               autocomplete="new-password" required>
+        <input type="text" name="new_password" class="form-control" placeholder="Новый пароль"
+               autocomplete="new-password" required style="font-family:monospace;letter-spacing:.05em">
         <button type="submit" class="btn btn-warning text-white flex-shrink-0">
           <i class="bi bi-arrow-repeat me-1"></i>Изменить
         </button>

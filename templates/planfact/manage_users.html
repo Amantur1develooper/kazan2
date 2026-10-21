@@ -27,8 +27,9 @@
       <tr>
         <th>Логин</th>
         <th>Имя</th>
+        <th>Пароль</th>
         <th>Блоки (доступ)</th>
-        <th style="width:100px"></th>
+        <th style="width:60px"></th>
       </tr>
     </thead>
     <tbody>
@@ -36,6 +37,16 @@
       <tr>
         <td class="fw-semibold">{{ u.username }}</td>
         <td>{{ u.get_full_name|default:"—" }}</td>
+        <td>
+          {% if u.builder_profile.plain_password %}
+          <span style="font-family:monospace;font-size:.9rem;background:#f1f5f9;border:1px solid #e2e8f0;
+                       border-radius:6px;padding:2px 8px;color:#1e293b;letter-spacing:.05em">
+            {{ u.builder_profile.plain_password }}
+          </span>
+          {% else %}
+          <span class="text-muted" style="font-size:.82rem">—</span>
+          {% endif %}
+        </td>
         <td>
           {% for ba in u.block_accesses.all %}
           <span class="badge bg-primary me-1">{{ ba.block.residential_complex.name }} / Блок {{ ba.block.name }}</span>

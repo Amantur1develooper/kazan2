@@ -251,6 +251,21 @@ class BlockAccess(models.Model):
         return f"{self.user.username} → Блок {self.block.name}"
 
 
+class BuilderProfile(models.Model):
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE,
+        related_name='builder_profile', verbose_name='Пользователь'
+    )
+    plain_password = models.CharField('Пароль', max_length=128, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Профиль строителя'
+        verbose_name_plural = 'Профили строителей'
+
+    def __str__(self):
+        return f"Профиль: {self.user.username}"
+
+
 class FloorCategoryAssignment(models.Model):
     """Какие виды работ назначены на конкретный этаж блока.
     Если для этажа записей нет — по умолчанию все категории активны."""
