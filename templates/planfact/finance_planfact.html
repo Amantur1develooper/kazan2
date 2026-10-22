@@ -17,6 +17,32 @@
 
 {% block content %}
 
+{# ── Смета vs факт по смете (АСМ/АВР, привязанные к позициям сметы) ── #}
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-6">
+    <div class="stat-card" style="border-left:3px solid #0f766e">
+      <div class="label">Смета (план) — все блоки</div>
+      <div class="value text-money" style="font-size:1.1rem;color:#0f766e">{{ grand_estimate|currency }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    {% with gpct=grand_linked|percent:grand_estimate %}
+    <div class="stat-card" style="border-left:3px solid #0891b2">
+      <div class="label">Факт по смете <small class="text-muted">АСМ + АВР, привязанные к позициям</small></div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="value text-money" style="font-size:1.1rem;color:#0891b2">{{ grand_linked|currency }}</div>
+        {% if grand_estimate %}<span class="badge" style="background:#cffafe;color:#0e7490">{{ gpct }}% сметы</span>{% endif %}
+      </div>
+      {% if grand_unlinked %}
+      <div class="text-muted" style="font-size:.75rem">
+        <i class="bi bi-link-45deg"></i> Не привязано к смете: {{ grand_unlinked }} строк АСМ/АВР — привяжите их в документе, чтобы они попали в факт
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
+  </div>
+</div>
+
 {# ── Итоги ── #}
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-2">
@@ -61,6 +87,8 @@
       <i class="bi bi-building me-2 text-primary"></i>{{ group.rc.name }}
     </span>
     <div class="d-flex gap-3" style="font-size:.82rem">
+      {% if group.estimate %}<span class="text-muted">Смета: <strong style="color:#0f766e">{{ group.estimate|currency }}</strong></span>{% endif %}
+      {% if group.linked %}<span class="text-muted">Факт по смете: <strong style="color:#0891b2">{{ group.linked|currency }}</strong></span>{% endif %}
       <span class="text-muted">План: <strong class="text-warning">{{ group.plan|currency }}</strong></span>
       {% if group.pf %}<span class="text-muted">Загружено: <strong style="color:#7c3aed">{{ group.pf|currency }}</strong></span>{% endif %}
     </div>
@@ -70,7 +98,9 @@
       <thead class="table-light">
         <tr>
           <th>Блок</th>
-          <th class="text-end text-warning">Бюджет (план)</th>
+          <th class="text-end" style="color:#0f766e">Смета <small class="d-block fw-normal text-muted">план по смете</small></th>
+          <th class="text-end" style="color:#0891b2">Факт по смете <small class="d-block fw-normal text-muted">АСМ+АВР по позициям</small></th>
+          <th class="text-end text-warning">Бюджет <small class="d-block fw-normal text-muted">по этажам</small></th>
           <th class="text-end" style="color:#7c3aed">Загружено <small class="d-block fw-normal text-muted">план-факт Excel</small></th>
           <th class="text-end" style="color:#b45309">ДДС — всего <small class="d-block fw-normal text-muted">все расходы</small></th>
           <th class="text-end text-primary">АСМ</th>
@@ -85,6 +115,33 @@
         {% with pct=row.pf|percent:row.plan %}
         <tr>
           <td class="fw-semibold">Блок {{ row.block.name }}</td>
+
+          <td class="text-end text-money" style="color:#0f766e">
+            {% if row.estimate_pk %}
+              <a href="{% url 'estimate_detail' row.estimate_pk %}" style="color:inherit" title="Открыть смету">{{ row.estimate|currency }}</a>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+
+          <td class="text-end" style="min-width:150px">
+            {% if row.linked %}
+              {% with lpct=row.linked|percent:row.estimate %}
+              <div class="text-money fw-semibold" style="color:#0891b2">{{ row.linked|currency }}</div>
+              {% if row.estimate %}
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                <div style="flex:1;height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:{% if lpct > 100 %}100{% else %}{{ lpct|clean_num }}{% endif %}%;background:{% if lpct > 100 %}#dc2626{% else %}#0891b2{% endif %}"></div>
+                </div>
+                <span style="font-size:.72rem;font-weight:700;color:{% if lpct > 100 %}#dc2626{% else %}#0e7490{% endif %}">{{ lpct }}%</span>
+              </div>
+              {% endif %}
+              {% endwith %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+            {% if row.unlinked %}
+              <div class="text-muted" style="font-size:.7rem" title="Строки АСМ/АВР без позиции сметы">
+                <i class="bi bi-link-45deg"></i>не привязано: {{ row.unlinked }}
+              </div>
+            {% endif %}
+          </td>
 
           <td class="text-end text-money text-warning">
             {% if row.plan %}{{ row.plan|currency }}{% else %}<span class="text-muted">—</span>{% endif %}
@@ -155,6 +212,8 @@
       <tfoot class="table-light fw-semibold">
         <tr>
           <td>Итого</td>
+          <td class="text-end text-money" style="color:#0f766e">{{ group.estimate|currency }}</td>
+          <td class="text-end text-money" style="color:#0891b2">{{ group.linked|currency }}</td>
           <td class="text-end text-money text-warning">{{ group.plan|currency }}</td>
           <td class="text-end text-money fw-bold" style="color:#7c3aed">{% if group.pf %}{{ group.pf|currency }}{% else %}—{% endif %}</td>
           <td class="text-end text-money" style="color:#92400e">{{ group.dds|currency }}</td>
