@@ -605,8 +605,9 @@
 
           {# ASM by category #}
           <div style="padding:10px 16px 4px">
-            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px">
-              АСМ — Акт списания материалов
+            <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+              <span style="font-size:1rem;font-weight:900;color:#1d4ed8;letter-spacing:.5px">АСМ</span>
+              <span style="font-size:.72rem;color:#94a3b8;font-weight:600">— Акт списания материалов</span>
             </div>
             {% for c in floor.categories %}
             <a href="{% url 'asm_list' blk.pk floor.number c.category.pk %}"
@@ -636,8 +637,9 @@
 
           {# AVR by category — with progress bars #}
           <div style="padding:4px 16px 12px;border-top:1px solid #f1f5f9;margin-top:2px">
-            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:10px;margin-top:8px">
-              АВР — Выполнение работ
+            <div style="margin-bottom:10px;margin-top:8px;display:flex;align-items:center;gap:8px">
+              <span style="font-size:1rem;font-weight:900;color:#15803d;letter-spacing:.5px">АВР</span>
+              <span style="font-size:.72rem;color:#94a3b8;font-weight:600">— Выполнение работ</span>
             </div>
             {% for c in floor.categories %}
             <a href="{% url 'avr_list' blk.pk floor.number c.category.pk %}"
@@ -797,7 +799,7 @@
           </div>
           <div style="font-size:.68rem;color:#94a3b8;margin-top:1px">{{ doc.doc_date|date:"d.m.Y" }}</div>
         </div>
-        <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:800;white-space:nowrap;flex-shrink:0;
+        <span style="padding:3px 11px;border-radius:20px;font-size:.88rem;font-weight:900;white-space:nowrap;flex-shrink:0;letter-spacing:.3px;
                      background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
                      color:{% if dtype == 'avr' %}#1d4ed8{% else %}#92400e{% endif %}">
           {% if dtype == 'avr' %}АВР{% else %}АСМ{% endif %}
