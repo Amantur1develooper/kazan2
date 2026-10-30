@@ -75,54 +75,129 @@
   background:#1e293b; border-radius:0 0 3px 3px;
 }
 
+/* ── Базовые стили для меток типов в карточках ── */
+.doc-type-badge {
+  display:inline-block;
+  padding:3px 11px;
+  border-radius:20px;
+  font-size:.88rem;
+  font-weight:900;
+  letter-spacing:.3px;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+/* Метка АСМ/АВР в строке этажа */
+.floor-type-label {
+  font-size:.62rem;
+  font-weight:800;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+}
+/* Кнопки выбора АСМ/АВР в модалке */
+.fp-choose-btn {
+  flex:1;
+  padding:22px 10px;
+  border-radius:14px;
+  cursor:pointer;
+  transition:.15s;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:7px;
+  -webkit-tap-highlight-color:transparent;
+}
+.fp-choose-btn .fp-icon { font-size:2.2rem; }
+.fp-choose-btn .fp-title { font-size:1.5rem; font-weight:900; letter-spacing:.5px; }
+.fp-choose-btn .fp-sub { font-size:.75rem; font-weight:600; }
+
 /* ── Mobile ── */
 @media (max-width: 600px) {
   .expense-grid { grid-template-columns: repeat(2,1fr) !important; gap: .5rem !important; }
-  /* Bigger touch targets in floor modal */
-  .floor-cat-link { min-height: 52px !important; padding: 12px 14px !important; }
-  .floor-cat-link span { font-size: .95rem !important; }
-  /* Bigger floor rows */
 
+  /* ── Модалка на весь экран ── */
+  #floorModal .modal-dialog {
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 100% !important;
+  }
+  #floorModal .modal-content {
+    border-radius: 0 !important;
+    min-height: 100svh;
+    border: none !important;
+  }
+  #floorModal .modal-body {
+    overflow-y: auto !important;
+    max-height: calc(100svh - 52px) !important;
+    padding: 0 !important;
+  }
+  #floorModal .modal-header {
+    padding: 12px 16px !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+  }
+  #floorModal .modal-title {
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+  }
+
+  /* ── Кнопки выбора АСМ / АВР ── */
+  .fp-choose-btn { padding: 28px 8px !important; }
+  .fp-choose-btn .fp-icon { font-size: 2.6rem !important; }
+  .fp-choose-btn .fp-title { font-size: 1.8rem !important; }
+  .fp-choose-btn .fp-sub { font-size: .8rem !important; }
+  #floorModal [id$="-chooser"] { padding: 16px 12px !important; gap: 10px !important; }
+
+  /* ── Категории в АСМ/АВР разделах ── */
+  .floor-cat-link { min-height: 56px !important; padding: 13px 14px !important; }
+  .floor-cat-link span { font-size: 1rem !important; }
+
+  /* ── Кнопка «Назад» в разделе ── */
+  #floorModal [id$="-asm"] button,
+  #floorModal [id$="-avr"] button {
+    font-size: .95rem !important;
+    padding: 8px 0 !important;
+  }
+
+  /* ── Метка АСМ/АВР в строке этажа ── */
+  .floor-type-label { font-size: .75rem !important; }
+
+  /* ── Бейджи АСМ/АВР в списках ── */
+  .doc-type-badge { font-size: 1rem !important; padding: 4px 14px !important; }
+
+  /* ── Building visualization ── */
   .bld-wrap { max-width: 100%; }
-
-  /* Tall, easy-to-tap floors */
-  .bld-row { height: 64px; }
-
-  /* Floor number: wider, bigger font, show label */
+  .bld-row { height: 68px; }
   .bld-num {
     width: 54px; min-width: 54px;
     font-size: .95rem; font-weight: 900;
     flex-direction: column; gap: 2px;
   }
   .bld-num .floor-label { display: block; font-size: .58rem; color: #94a3b8; font-weight: 500; }
-
-  /* Roof */
   .bld-roof { margin-left: 54px; height: 26px; }
   .bld-ground { margin-left: 54px; }
   .bld-foundation { margin-left: 54px; }
   .bld-ground::after { font-size: .55rem; top: -14px; }
-
-  /* Big % badge */
   .bld-pct {
-    font-size: 1.1rem !important;
+    font-size: 1.15rem !important;
     font-weight: 900 !important;
-    padding: 4px 10px !important;
+    padding: 5px 11px !important;
     border-radius: 8px !important;
-    background: rgba(255,255,255,.75) !important;
-    backdrop-filter: blur(4px) !important;
+    background: rgba(255,255,255,.8) !important;
   }
-
-  /* Hide admin amounts on mobile to save space */
   .bld-amounts { display: none; }
   .bld-plan-box { display: none; }
   .bld-sep { display: none; }
   .bld-amt-val { display: none; }
-
-  /* ASM strip taller */
-  .bld-row .bld-body > div:last-child { flex-basis: 20px !important; }
-
-  /* Category color tops thicker */
   .bld-row .bld-body div[style*="height:3px"] { height: 5px !important; }
+
+  /* ── Карточки документов (последние / ожидают) ── */
+  .doc-card-content { gap: 8px !important; padding: 10px 12px !important; }
+  .doc-card-number { font-size: 1.05rem !important; }
+  .doc-card-meta { font-size: .75rem !important; }
 }
 
 /* Legend */
@@ -504,7 +579,7 @@
               </span>
               {% endif %}
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
-                <span style="font-size:.5rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#64748b;opacity:.8">АВР</span>
+                <span class="floor-type-label" style="color:#64748b;opacity:.8">АВР</span>
                 <span class="bld-pct" style="padding:2px 7px;font-size:.88rem;color:{% if p >= 100 %}#15803d{% elif p >= 67 %}#16a34a{% elif p >= 34 %}#65a30d{% elif p > 0 %}#ca8a04{% else %}#94a3b8{% endif %}">
                   {{ p|floatformat:0 }}%
                 </span>
@@ -522,7 +597,7 @@
               {% endif %}
             {% endif %}
             <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 7px;justify-content:space-between;z-index:1">
-              <span style="font-size:.56rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#64748b">АСМ</span>
+              <span class="floor-type-label" style="color:#64748b">АСМ</span>
               {% if floor.asm_total > 0 %}
                 {% if floor.planned_amount %}
                   <span style="font-size:.62rem;font-weight:800;color:{% if floor.asm_overspend %}#dc2626{% elif floor.asm_vs_plan_raw >= 80 %}#c2410c{% else %}#1d4ed8{% endif %}">
@@ -551,13 +626,13 @@
 
 {# ── Floor modal (content pre-rendered by Django) ── #}
 <div class="modal fade" id="floorModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header py-2">
-        <h5 class="modal-title" id="floorModalLabel">Этаж</h5>
+        <h5 class="modal-title fw-bold" id="floorModalLabel">Этаж</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body p-0">
+      <div class="modal-body p-0" style="overflow-y:auto">
         {% for floor in floors %}
         <div class="floor-panel d-none" id="fp{{ floor.number }}">
 
@@ -606,20 +681,22 @@
           {# ── Выбор раздела: две большие кнопки ── #}
           <div id="fp{{ floor.number }}-chooser" style="padding:18px 16px;display:flex;gap:12px">
             <button onclick="fpShowTab('{{ floor.number }}','asm')"
-                    style="flex:1;padding:20px 12px;border-radius:14px;border:2px solid #bfdbfe;background:#eff6ff;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px"
+                    class="fp-choose-btn"
+                    style="border:2px solid #bfdbfe;background:#eff6ff"
                     onmouseover="this.style.background='#dbeafe';this.style.borderColor='#93c5fd'"
                     onmouseout="this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'">
-              <i class="bi bi-clipboard-check" style="font-size:2rem;color:#2563eb"></i>
-              <span style="font-size:1.4rem;font-weight:900;color:#1d4ed8;letter-spacing:.5px">АСМ</span>
-              <span style="font-size:.72rem;color:#3b82f6;font-weight:600">Акт списания материалов</span>
+              <i class="bi bi-clipboard-check fp-icon" style="color:#2563eb"></i>
+              <span class="fp-title" style="color:#1d4ed8">АСМ</span>
+              <span class="fp-sub" style="color:#3b82f6">Акт списания материалов</span>
             </button>
             <button onclick="fpShowTab('{{ floor.number }}','avr')"
-                    style="flex:1;padding:20px 12px;border-radius:14px;border:2px solid #bbf7d0;background:#f0fdf4;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px"
+                    class="fp-choose-btn"
+                    style="border:2px solid #bbf7d0;background:#f0fdf4"
                     onmouseover="this.style.background='#dcfce7';this.style.borderColor='#86efac'"
                     onmouseout="this.style.background='#f0fdf4';this.style.borderColor='#bbf7d0'">
-              <i class="bi bi-file-earmark-check" style="font-size:2rem;color:#16a34a"></i>
-              <span style="font-size:1.4rem;font-weight:900;color:#15803d;letter-spacing:.5px">АВР</span>
-              <span style="font-size:.72rem;color:#16a34a;font-weight:600">Выполнение работ</span>
+              <i class="bi bi-file-earmark-check fp-icon" style="color:#16a34a"></i>
+              <span class="fp-title" style="color:#15803d">АВР</span>
+              <span class="fp-sub" style="color:#16a34a">Выполнение работ</span>
             </button>
           </div>
 
@@ -827,8 +904,8 @@
           </div>
           <div style="font-size:.68rem;color:#94a3b8;margin-top:1px">{{ doc.doc_date|date:"d.m.Y" }}</div>
         </div>
-        <span style="padding:3px 11px;border-radius:20px;font-size:.88rem;font-weight:900;white-space:nowrap;flex-shrink:0;letter-spacing:.3px;
-                     background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
+        <span class="doc-type-badge"
+              style="background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
                      color:{% if dtype == 'avr' %}#1d4ed8{% else %}#92400e{% endif %}">
           {% if dtype == 'avr' %}АВР{% else %}АСМ{% endif %}
         </span>
@@ -891,8 +968,8 @@
           <div style="font-size:.68rem;color:#94a3b8;margin-top:1px">{{ doc.doc_date|date:"d.m.Y" }}</div>
         </div>
         {# Type badge #}
-        <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:800;letter-spacing:.3px;white-space:nowrap;flex-shrink:0;
-                     background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
+        <span class="doc-type-badge"
+              style="background:{% if dtype == 'avr' %}#dbeafe{% else %}#fef3c7{% endif %};
                      color:{% if dtype == 'avr' %}#1d4ed8{% else %}#92400e{% endif %}">
           {% if dtype == 'avr' %}АВР{% else %}АСМ{% endif %}
         </span>
