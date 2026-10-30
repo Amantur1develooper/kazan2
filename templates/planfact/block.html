@@ -603,82 +603,110 @@
           {% endif %}
           {% endwith %}
 
-          {# ASM by category #}
-          <div style="padding:10px 16px 4px">
-            <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
-              <span style="font-size:1rem;font-weight:900;color:#1d4ed8;letter-spacing:.5px">АСМ</span>
-              <span style="font-size:.72rem;color:#94a3b8;font-weight:600">— Акт списания материалов</span>
-            </div>
-            {% for c in floor.categories %}
-            <a href="{% url 'asm_list' blk.pk floor.number c.category.pk %}"
-               class="d-flex align-items-center justify-content-between text-decoration-none mb-2 floor-cat-link"
-               style="padding:9px 12px;border-radius:8px;background:{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %};border:1px solid {% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %};opacity:{% if c.assigned %}1{% else %}.45{% endif %};transition:.1s"
-               onmouseover="this.style.opacity='1';this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'"
-               onmouseout="this.style.opacity='{% if c.assigned %}1{% else %}.45{% endif %}';this.style.background='{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %}';this.style.borderColor='{% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %}'">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="width:9px;height:9px;border-radius:2px;background:{% if c.assigned %}{{ c.category.color }}{% else %}#cbd5e1{% endif %};flex-shrink:0"></span>
-                <span style="font-weight:600;font-size:.88rem;color:{% if c.assigned %}#0f172a{% else %}#94a3b8{% endif %}">{{ c.category.name }}</span>
-                {% if not c.assigned %}<span style="font-size:.65rem;color:#94a3b8">(не назначено)</span>{% endif %}
-                {% if c.asm_count > 0 %}
-                <span style="font-size:.7rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-weight:700">
-                  ×{{ c.asm_count }}
-                </span>
-                {% endif %}
-              </div>
-              <span style="font-size:.75rem;color:#2563eb;font-weight:600">
-                {% if is_admin and c.asm_total > 0 %}{{ c.asm_total|floatformat:0 }} сом · {% endif %}
-                <i class="bi bi-chevron-right"></i>
-              </span>
-            </a>
-            {% empty %}
-            <p class="text-muted" style="font-size:.85rem">Виды работ не созданы.</p>
-            {% endfor %}
+          {# ── Выбор раздела: две большие кнопки ── #}
+          <div id="fp{{ floor.number }}-chooser" style="padding:18px 16px;display:flex;gap:12px">
+            <button onclick="fpShowTab('{{ floor.number }}','asm')"
+                    style="flex:1;padding:20px 12px;border-radius:14px;border:2px solid #bfdbfe;background:#eff6ff;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px"
+                    onmouseover="this.style.background='#dbeafe';this.style.borderColor='#93c5fd'"
+                    onmouseout="this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'">
+              <i class="bi bi-clipboard-check" style="font-size:2rem;color:#2563eb"></i>
+              <span style="font-size:1.4rem;font-weight:900;color:#1d4ed8;letter-spacing:.5px">АСМ</span>
+              <span style="font-size:.72rem;color:#3b82f6;font-weight:600">Акт списания материалов</span>
+            </button>
+            <button onclick="fpShowTab('{{ floor.number }}','avr')"
+                    style="flex:1;padding:20px 12px;border-radius:14px;border:2px solid #bbf7d0;background:#f0fdf4;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px"
+                    onmouseover="this.style.background='#dcfce7';this.style.borderColor='#86efac'"
+                    onmouseout="this.style.background='#f0fdf4';this.style.borderColor='#bbf7d0'">
+              <i class="bi bi-file-earmark-check" style="font-size:2rem;color:#16a34a"></i>
+              <span style="font-size:1.4rem;font-weight:900;color:#15803d;letter-spacing:.5px">АВР</span>
+              <span style="font-size:.72rem;color:#16a34a;font-weight:600">Выполнение работ</span>
+            </button>
           </div>
 
-          {# AVR by category — with progress bars #}
-          <div style="padding:4px 16px 12px;border-top:1px solid #f1f5f9;margin-top:2px">
-            <div style="margin-bottom:10px;margin-top:8px;display:flex;align-items:center;gap:8px">
-              <span style="font-size:1rem;font-weight:900;color:#15803d;letter-spacing:.5px">АВР</span>
-              <span style="font-size:.72rem;color:#94a3b8;font-weight:600">— Выполнение работ</span>
+          {# ── АСМ раздел ── #}
+          <div id="fp{{ floor.number }}-asm" style="display:none">
+            <div style="padding:8px 16px 4px;border-top:1px solid #dbeafe;background:#f8fbff">
+              <button onclick="fpBack('{{ floor.number }}')"
+                      style="background:none;border:none;color:#2563eb;font-size:.82rem;font-weight:600;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px">
+                <i class="bi bi-arrow-left"></i> Назад
+              </button>
             </div>
-            {% for c in floor.categories %}
-            <a href="{% url 'avr_list' blk.pk floor.number c.category.pk %}"
-               class="text-decoration-none d-block mb-3"
-               onmouseover="this.querySelector('.avr-card').style.borderColor='#86efac'"
-               onmouseout="this.querySelector('.avr-card').style.borderColor='{% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %}'"
-               style="opacity:{% if c.assigned %}1{% else %}.45{% endif %}">
-              <div class="avr-card" style="padding:9px 12px;border-radius:8px;background:{% if c.avr_pct >= 100 %}#f0fdf4{% elif c.avr_pct > 0 %}#f8fff8{% else %}#fafafa{% endif %};border:1px solid {% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %};transition:border-color .1s">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                  <div style="display:flex;align-items:center;gap:7px">
-                    <span style="width:8px;height:8px;border-radius:2px;background:{{ c.category.color }};flex-shrink:0"></span>
-                    <span style="font-weight:600;font-size:.85rem;color:#0f172a">{{ c.category.name }}</span>
-                  </div>
-                  <span style="font-size:.82rem;font-weight:800;color:{% if c.avr_pct >= 100 %}#15803d{% elif c.avr_pct > 0 %}#16a34a{% else %}#94a3b8{% endif %}">
-                    {{ c.avr_pct|floatformat:0 }}%
-                    <i class="bi bi-chevron-right ms-1" style="font-size:.7rem"></i>
+            <div style="padding:8px 16px 4px">
+              {% for c in floor.categories %}
+              <a href="{% url 'asm_list' blk.pk floor.number c.category.pk %}"
+                 class="d-flex align-items-center justify-content-between text-decoration-none mb-2 floor-cat-link"
+                 style="padding:9px 12px;border-radius:8px;background:{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %};border:1px solid {% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %};opacity:{% if c.assigned %}1{% else %}.45{% endif %};transition:.1s"
+                 onmouseover="this.style.opacity='1';this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'"
+                 onmouseout="this.style.opacity='{% if c.assigned %}1{% else %}.45{% endif %}';this.style.background='{% if c.assigned %}#f8fafc{% else %}#f8f8f8{% endif %}';this.style.borderColor='{% if c.assigned %}#e2e8f0{% else %}#f1f1f1{% endif %}'">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="width:9px;height:9px;border-radius:2px;background:{% if c.assigned %}{{ c.category.color }}{% else %}#cbd5e1{% endif %};flex-shrink:0"></span>
+                  <span style="font-weight:600;font-size:.88rem;color:{% if c.assigned %}#0f172a{% else %}#94a3b8{% endif %}">{{ c.category.name }}</span>
+                  {% if not c.assigned %}<span style="font-size:.65rem;color:#94a3b8">(не назначено)</span>{% endif %}
+                  {% if c.asm_count > 0 %}
+                  <span style="font-size:.7rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-weight:700">
+                    ×{{ c.asm_count }}
                   </span>
+                  {% endif %}
                 </div>
-                <div style="height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden">
-                  <div style="height:100%;width:{{ c.avr_pct|clean_num }}%;border-radius:4px;background:{% if c.avr_pct >= 100 %}#22c55e{% elif c.avr_pct >= 70 %}#4ade80{% elif c.avr_pct >= 40 %}#86efac{% else %}#bbf7d0{% endif %};transition:width .4s"></div>
-                </div>
-                {% if c.avr_pct >= 100 %}
-                <div style="font-size:.68rem;color:#15803d;font-weight:700;margin-top:4px">✓ Выполнено полностью</div>
-                {% elif c.avr_pct > 0 %}
-                <div style="font-size:.68rem;color:#64748b;margin-top:4px">В процессе — нажмите чтобы добавить АВР</div>
-                {% else %}
-                <div style="font-size:.68rem;color:#94a3b8;margin-top:4px">Нажмите чтобы создать АВР</div>
-                {% endif %}
-              </div>
-            </a>
-            {% empty %}
-            {% endfor %}
+                <span style="font-size:.75rem;color:#2563eb;font-weight:600">
+                  {% if is_admin and c.asm_total > 0 %}{{ c.asm_total|floatformat:0 }} сом · {% endif %}
+                  <i class="bi bi-chevron-right"></i>
+                </span>
+              </a>
+              {% empty %}
+              <p class="text-muted" style="font-size:.85rem">Виды работ не созданы.</p>
+              {% endfor %}
+            </div>
+            <div style="padding:8px 16px 14px;border-top:1px solid #f1f5f9;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+              {% if is_admin %}
+              <a href="{% url 'planfact_floor_edit' blk.pk floor.number %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil me-1"></i>План / факт
+              </a>
+              {% endif %}
+            </div>
           </div>
 
-          {# Plan/Fact link #}
-          <div style="padding:8px 16px 14px;border-top:1px solid #f1f5f9;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
-            <a href="{% url 'planfact_floor_edit' blk.pk floor.number %}" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-pencil me-1"></i>План / факт
-            </a>
+          {# ── АВР раздел ── #}
+          <div id="fp{{ floor.number }}-avr" style="display:none">
+            <div style="padding:8px 16px 4px;border-top:1px solid #bbf7d0;background:#f8fff8">
+              <button onclick="fpBack('{{ floor.number }}')"
+                      style="background:none;border:none;color:#15803d;font-size:.82rem;font-weight:600;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px">
+                <i class="bi bi-arrow-left"></i> Назад
+              </button>
+            </div>
+            <div style="padding:4px 16px 12px">
+              {% for c in floor.categories %}
+              <a href="{% url 'avr_list' blk.pk floor.number c.category.pk %}"
+                 class="text-decoration-none d-block mb-3"
+                 onmouseover="this.querySelector('.avr-card').style.borderColor='#86efac'"
+                 onmouseout="this.querySelector('.avr-card').style.borderColor='{% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %}'"
+                 style="opacity:{% if c.assigned %}1{% else %}.45{% endif %}">
+                <div class="avr-card" style="padding:9px 12px;border-radius:8px;background:{% if c.avr_pct >= 100 %}#f0fdf4{% elif c.avr_pct > 0 %}#f8fff8{% else %}#fafafa{% endif %};border:1px solid {% if c.avr_pct > 0 %}#bbf7d0{% else %}#e2e8f0{% endif %};transition:border-color .1s">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="width:8px;height:8px;border-radius:2px;background:{{ c.category.color }};flex-shrink:0"></span>
+                      <span style="font-weight:600;font-size:.85rem;color:#0f172a">{{ c.category.name }}</span>
+                    </div>
+                    <span style="font-size:.82rem;font-weight:800;color:{% if c.avr_pct >= 100 %}#15803d{% elif c.avr_pct > 0 %}#16a34a{% else %}#94a3b8{% endif %}">
+                      {{ c.avr_pct|floatformat:0 }}%
+                      <i class="bi bi-chevron-right ms-1" style="font-size:.7rem"></i>
+                    </span>
+                  </div>
+                  <div style="height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:{{ c.avr_pct|clean_num }}%;border-radius:4px;background:{% if c.avr_pct >= 100 %}#22c55e{% elif c.avr_pct >= 70 %}#4ade80{% elif c.avr_pct >= 40 %}#86efac{% else %}#bbf7d0{% endif %};transition:width .4s"></div>
+                  </div>
+                  {% if c.avr_pct >= 100 %}
+                  <div style="font-size:.68rem;color:#15803d;font-weight:700;margin-top:4px">✓ Выполнено полностью</div>
+                  {% elif c.avr_pct > 0 %}
+                  <div style="font-size:.68rem;color:#64748b;margin-top:4px">В процессе — нажмите чтобы добавить АВР</div>
+                  {% else %}
+                  <div style="font-size:.68rem;color:#94a3b8;margin-top:4px">Нажмите чтобы создать АВР</div>
+                  {% endif %}
+                </div>
+              </a>
+              {% empty %}
+              {% endfor %}
+            </div>
           </div>
 
         </div>
@@ -1155,10 +1183,29 @@ const _floorLabels = {
 function openFloorModal(fn) {
   document.querySelectorAll('.floor-panel').forEach(el => el.classList.add('d-none'));
   const panel = document.getElementById('fp' + fn);
-  if (panel) panel.classList.remove('d-none');
+  if (panel) {
+    panel.classList.remove('d-none');
+    fpReset(fn);
+  }
   document.getElementById('floorModalLabel').textContent =
     _floorLabels[String(fn)] || (fn < 0 ? 'Подвал ' + Math.abs(fn) : 'Этаж ' + fn);
   _modal.show();
+}
+function fpReset(fn) {
+  const chooser = document.getElementById('fp' + fn + '-chooser');
+  const asmEl   = document.getElementById('fp' + fn + '-asm');
+  const avrEl   = document.getElementById('fp' + fn + '-avr');
+  if (chooser) chooser.style.display = 'flex';
+  if (asmEl)   asmEl.style.display   = 'none';
+  if (avrEl)   avrEl.style.display   = 'none';
+}
+function fpShowTab(fn, tab) {
+  document.getElementById('fp' + fn + '-chooser').style.display = 'none';
+  document.getElementById('fp' + fn + '-asm').style.display = tab === 'asm' ? 'block' : 'none';
+  document.getElementById('fp' + fn + '-avr').style.display = tab === 'avr' ? 'block' : 'none';
+}
+function fpBack(fn) {
+  fpReset(fn);
 }
 </script>
 {% endblock %}
