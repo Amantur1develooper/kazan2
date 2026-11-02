@@ -1799,3 +1799,13 @@ def manage_user_edit(request, user_pk):
         'current_ids': current_ids,
         'plain_password': plain_password,
     })
+
+
+def nomenclature_autocomplete(request):
+    from django.http import JsonResponse
+    from apps.estimates.models import Nomenclature
+    q = request.GET.get('q', '').strip()
+    if len(q) < 2:
+        return JsonResponse({'results': []})
+    qs = Nomenclature.objects.filter(name__icontains=q, is_active=True).values('name', 'unit')[:20]
+    return JsonResponse({'results': list(qs)})

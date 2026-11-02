@@ -328,5 +328,72 @@ function saveAndPrint(){
   document.getElementById('form-action').value='save_print';
   document.getElementById('asm-form').submit();
 }
+
+// Nomenclature autocomplete
+(function(){
+  const drop = document.createElement('div');
+  drop.id = 'nom-drop';
+  drop.style.cssText = 'display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;font-size:.83rem';
+  document.body.appendChild(drop);
+
+  let activeInput = null, debTimer = null;
+
+  function isNameInput(el){
+    return el && el.tagName === 'INPUT' && (el.name === 'new_name' || /^name_\d+$/.test(el.name));
+  }
+  function getUnitInput(inp){
+    const td = inp.closest('td');
+    const next = td && td.nextElementSibling;
+    return next ? next.querySelector('input') : null;
+  }
+  function posDrop(inp){
+    const r = inp.getBoundingClientRect();
+    drop.style.left = r.left + 'px';
+    drop.style.top = (r.bottom + 2) + 'px';
+    drop.style.width = Math.max(r.width, 260) + 'px';
+  }
+  function hideDrop(){ drop.style.display='none'; activeInput=null; }
+  function showResults(results, inp){
+    if(!results.length){ drop.style.display='none'; return; }
+    drop.innerHTML='';
+    results.forEach(r=>{
+      const d = document.createElement('div');
+      d.style.cssText='padding:7px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center';
+      d.innerHTML='<span>'+r.name+'</span><span style="color:#64748b;font-size:.75rem;margin-left:8px">'+(r.unit||'')+'</span>';
+      d.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        inp.value = r.name;
+        const u = getUnitInput(inp);
+        if(u && r.unit) u.value = r.unit;
+        hideDrop();
+      });
+      d.addEventListener('mouseover', ()=>d.style.background='#f0f9ff');
+      d.addEventListener('mouseout',  ()=>d.style.background='');
+      drop.appendChild(d);
+    });
+    posDrop(inp);
+    drop.style.display='block';
+  }
+  async function doSearch(q, inp){
+    try{
+      const res = await fetch('/planfact/api/nomenclature/?q='+encodeURIComponent(q));
+      const data = await res.json();
+      if(activeInput===inp) showResults(data.results, inp);
+    }catch(e){}
+  }
+  document.addEventListener('input', e=>{
+    if(!isNameInput(e.target)) return;
+    activeInput = e.target;
+    clearTimeout(debTimer);
+    const q = e.target.value.trim();
+    if(q.length < 2){ drop.style.display='none'; return; }
+    debTimer = setTimeout(()=>doSearch(q, e.target), 300);
+  });
+  document.addEventListener('focusout', e=>{
+    if(isNameInput(e.target)) setTimeout(hideDrop, 150);
+  });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideDrop(); });
+  window.addEventListener('scroll', ()=>{ if(drop.style.display!=='none'&&activeInput) posDrop(activeInput); }, true);
+})();
 </script>
 {% endblock %}

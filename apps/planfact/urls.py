@@ -37,6 +37,8 @@ urlpatterns = [
     path('<int:block_pk>/progress/', views.progress_board, name='progress_board'),
     path('<int:block_pk>/progress/excel/', views.progress_board_excel, name='progress_board_excel'),
     path('<int:block_pk>/floor-categories/', views.floor_category_edit, name='floor_category_edit'),
+    # Nomenclature autocomplete API
+    path('api/nomenclature/', views.nomenclature_autocomplete, name='nomenclature_autocomplete'),
     # Builder user management
     path('users/', views.manage_users, name='manage_users'),
     path('users/create/', views.manage_user_create, name='manage_user_create'),
