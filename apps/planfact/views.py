@@ -8,7 +8,7 @@ from django.contrib import messages
 
 from django.contrib.auth.models import User
 from apps.projects.models import Block
-from .models import (WorkCategory, FloorWork, LandscapingWork, WorkAct, BlockFloorConfig,
+from .models import (WorkCategory, FloorWork, LandscapingWork, BlockFloorConfig,
                      FloorBudget, AsmDocument, AsmItem, BlockAccess, BuilderProfile,
                      CalendarPlan, CalendarTask, CalendarMonthPlan,
                      AvrDocument, AvrItem, AvrPhoto, FloorCategoryAssignment,
@@ -377,6 +377,123 @@ def finance_planfact_list(request):
     })
 
 
+def _build_block_analytics(block, floor_cats, label_map, budget_map):
+    """Breakdown of ASM/AVR spend: by floor, by work category, by contractor, top materials.
+
+    Document amount = accepted_amount if set, else sum(quantity * unit_price) of its items.
+    Accepted and pending (not yet accepted) amounts are tracked separately.
+    """
+    from collections import defaultdict
+    D0 = Decimal('0')
+
+    def _expr():
+        return ExpressionWrapper(F('items__quantity') * F('items__unit_price'),
+                                 output_field=DecimalField(max_digits=15, decimal_places=2))
+
+    def _bucket():
+        return {'asm_acc': D0, 'asm_pend': D0, 'avr_acc': D0, 'avr_pend': D0,
+                'asm_count': 0, 'avr_count': 0}
+
+    by_floor = defaultdict(_bucket)
+    by_cat = defaultdict(_bucket)
+    by_contractor = defaultdict(lambda: {'acc': D0, 'pend': D0, 'count': 0, 'rework': D0})
+    totals = _bucket()
+
+    asm_docs = (AsmDocument.objects.filter(block=block)
+                .annotate(items_total=Coalesce(Sum(_expr()), D0))
+                .values('floor_number', 'category_id', 'is_accepted',
+                        'accepted_amount', 'items_total'))
+    for d in asm_docs:
+        amt = d['accepted_amount'] if d['accepted_amount'] is not None else d['items_total']
+        key = 'asm_acc' if d['is_accepted'] else 'asm_pend'
+        for b in (by_floor[d['floor_number']], by_cat[d['category_id']], totals):
+            b[key] += amt
+            b['asm_count'] += 1
+
+    avr_docs = (AvrDocument.objects.filter(block=block)
+                .annotate(items_total=Coalesce(Sum(_expr()), D0))
+                .values('floor_number', 'category_id', 'is_accepted', 'is_rework',
+                        'accepted_amount', 'items_total', 'contractor'))
+    for d in avr_docs:
+        amt = d['accepted_amount'] if d['accepted_amount'] is not None else d['items_total']
+        key = 'avr_acc' if d['is_accepted'] else 'avr_pend'
+        for b in (by_floor[d['floor_number']], by_cat[d['category_id']], totals):
+            b[key] += amt
+            b['avr_count'] += 1
+        c = by_contractor[(d['contractor'] or '').strip() or 'Не указан']
+        c['acc' if d['is_accepted'] else 'pend'] += amt
+        c['count'] += 1
+        if d['is_rework']:
+            c['rework'] += amt
+
+    def _finish(b):
+        b['asm_all'] = b['asm_acc'] + b['asm_pend']
+        b['avr_all'] = b['avr_acc'] + b['avr_pend']
+        b['total_acc'] = b['asm_acc'] + b['avr_acc']
+        b['total_all'] = b['asm_all'] + b['avr_all']
+        return b
+
+    _finish(totals)
+    grand_all = totals['total_all']
+
+    def _share(v):
+        return round(float(v / grand_all * 100), 1) if grand_all > 0 else 0
+
+    # Floors: top floor first, same order as the building view
+    floor_rows = []
+    for fn in sorted(by_floor.keys(), key=lambda x: (x is None, -(x or 0))):
+        b = _finish(by_floor[fn])
+        if not (b['asm_count'] or b['avr_count']):
+            continue
+        budget = budget_map.get(fn) if fn is not None else None
+        plan = budget.planned_amount if budget else D0
+        b.update({
+            'floor_number': fn,
+            'label': _get_floor_label(label_map, fn) if fn is not None else 'Без этажа',
+            'plan': plan,
+            'plan_pct': round(float(b['total_all'] / plan * 100), 1) if plan > 0 else None,
+            'overspend': plan > 0 and b['total_all'] > plan,
+            'share': _share(b['total_all']),
+        })
+        floor_rows.append(b)
+
+    cat_names = {c.id: c.name for c in WorkCategory.objects.filter(id__in=by_cat.keys())}
+    cat_rows = []
+    for cid, b in by_cat.items():
+        _finish(b)
+        b['name'] = cat_names.get(cid, '—')
+        b['share'] = _share(b['total_all'])
+        cat_rows.append(b)
+    cat_rows.sort(key=lambda x: x['total_all'], reverse=True)
+
+    contractor_rows = []
+    for name, c in by_contractor.items():
+        c['name'] = name
+        c['total'] = c['acc'] + c['pend']
+        contractor_rows.append(c)
+    contractor_rows.sort(key=lambda x: x['total'], reverse=True)
+
+    materials = list(
+        AsmItem.objects.filter(document__block=block, quantity__gt=0)
+        .values('name', 'unit')
+        .annotate(qty=Coalesce(Sum('quantity'), Decimal('0')),
+                  amount=Coalesce(Sum(ExpressionWrapper(
+                      F('quantity') * F('unit_price'),
+                      output_field=DecimalField(max_digits=15, decimal_places=2))), D0),
+                  docs=Count('document', distinct=True))
+        .order_by('-amount', '-qty')[:15]
+    )
+
+    return {
+        'totals': totals,
+        'floors': floor_rows,
+        'categories': cat_rows,
+        'contractors': contractor_rows,
+        'materials': materials,
+        'has_data': bool(totals['asm_count'] or totals['avr_count']),
+    }
+
+
 @production_required
 def planfact_block(request, block_pk):
     if not _can_access_block(request.user, block_pk):
@@ -545,8 +662,6 @@ def planfact_block(request, block_pk):
     _all_docs.sort(key=lambda x: (x['date'], x['created_at']), reverse=True)
     recent_docs = _all_docs[:8]
 
-    recent_acts = list(WorkAct.objects.filter(block=block).order_by('-act_date')[:5])
-
     unprice_docs = []
     if _is_admin_user(request.user):
         unprice_docs = list(
@@ -595,7 +710,10 @@ def planfact_block(request, block_pk):
         key=lambda x: x['doc'].doc_date, reverse=True
     )
 
+    analytics = _build_block_analytics(block, floor_cats, label_map, budget_map)
+
     return render(request, 'planfact/block.html', {
+        'analytics': analytics,
         'blk': block,
         'config': config,
         'floors': floors,
@@ -612,7 +730,6 @@ def planfact_block(request, block_pk):
         'total_expenses': total_expenses,
         'building_pct': building_pct,
         'recent_docs': recent_docs,
-        'recent_acts': recent_acts,
         'pending_docs': pending_docs,
         'is_admin': _is_admin_user(request.user),
         'unprice_docs': unprice_docs,
@@ -685,44 +802,6 @@ def planfact_landscaping_edit(request, block_pk):
         'blk': block,
         'categories': categories,
         'works': works,
-    })
-
-
-@production_required
-def act_create(request, block_pk):
-    block = get_object_or_404(Block, pk=block_pk)
-    floor_works_qs = FloorWork.objects.filter(block=block, fact_amount__gt=0).select_related('category')
-    land_works_qs  = LandscapingWork.objects.filter(block=block, fact_amount__gt=0).select_related('category')
-
-    if request.method == 'POST':
-        act_type   = request.POST.get('act_type', 'avr')
-        act_number = request.POST.get('act_number', '').strip()
-        act_date   = request.POST.get('act_date', '').strip()
-        contractor = request.POST.get('contractor', '').strip()
-        notes      = request.POST.get('notes', '').strip()
-        fw_ids     = request.POST.getlist('floor_work_ids')
-        lw_ids     = request.POST.getlist('land_work_ids')
-
-        if not act_number or not act_date:
-            messages.error(request, 'Укажите номер и дату акта.')
-        else:
-            fws   = FloorWork.objects.filter(pk__in=fw_ids)
-            lws   = LandscapingWork.objects.filter(pk__in=lw_ids)
-            total = sum(w.fact_amount for w in fws) + sum(w.fact_amount for w in lws)
-            act   = WorkAct.objects.create(
-                act_type=act_type, act_number=act_number, act_date=act_date,
-                block=block, contractor=contractor, notes=notes,
-                total_amount=total, created_by=request.user,
-            )
-            act.floor_works.set(fws)
-            act.landscaping_works.set(lws)
-            messages.success(request, f'Акт №{act_number} создан.')
-            return redirect('act_print', pk=act.pk)
-
-    return render(request, 'planfact/act_create.html', {
-        'blk': block,
-        'floor_works': floor_works_qs,
-        'land_works': land_works_qs,
     })
 
 
@@ -1016,16 +1095,6 @@ def progress_board_excel(request, block_pk):
 
 
 @production_required
-def act_print(request, pk):
-    act = get_object_or_404(
-        WorkAct.objects.select_related('block', 'block__residential_complex', 'created_by')
-        .prefetch_related('floor_works__category', 'landscaping_works__category'),
-        pk=pk,
-    )
-    return render(request, 'planfact/act_print.html', {'act': act})
-
-
-@production_required
 def floor_budget_edit(request, block_pk):
     block  = get_object_or_404(Block.objects.select_related('residential_complex'), pk=block_pk)
     config, _ = BlockFloorConfig.objects.get_or_create(
@@ -1061,13 +1130,6 @@ def floor_budget_edit(request, block_pk):
     return render(request, 'planfact/floor_budget_edit.html', {
         'blk': block, 'rows': rows,
     })
-
-
-@production_required
-def act_list(request, block_pk):
-    block = get_object_or_404(Block, pk=block_pk)
-    acts  = WorkAct.objects.filter(block=block).order_by('-act_date')
-    return render(request, 'planfact/act_list.html', {'blk': block, 'acts': acts})
 
 
 # ─── ASM (Акт списания материалов) views ────────────────────────────────────

@@ -24,9 +24,6 @@ urlpatterns = [
     path('avr/<int:avr_pk>/', views.avr_edit, name='avr_edit'),
     path('avr/<int:avr_pk>/print/', views.avr_print, name='avr_print'),
     path('avr/<int:avr_pk>/delete/', views.avr_delete, name='avr_delete'),
-    path('<int:block_pk>/act/create/', views.act_create, name='act_create'),
-    path('<int:block_pk>/acts/', views.act_list, name='act_list'),
-    path('act/<int:pk>/print/', views.act_print, name='act_print'),
     # Calendar plan
     path('<int:block_pk>/calendar/', views.calendar_plan_list, name='calendar_plan_list'),
     path('<int:block_pk>/calendar/create/', views.calendar_plan_create, name='calendar_plan_create'),

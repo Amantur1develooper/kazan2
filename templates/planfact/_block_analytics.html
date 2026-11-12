@@ -1,0 +1,194 @@
+{% load finance_filters %}
+{# ── Аналитика: куда сколько ушло (АСМ + АВР) ── #}
+{% if is_admin %}
+<style>
+.an-tabs { display:flex; gap:.35rem; flex-wrap:wrap; }
+.an-tab { border:1px solid #e2e8f0; background:#fff; color:#475569; font-size:.78rem; font-weight:700;
+          padding:.3rem .7rem; border-radius:999px; cursor:pointer; }
+.an-tab.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+.an-pane { display:none; }
+.an-pane.active { display:block; }
+.an-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+.an-table th { font-size:.66rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b;
+               font-weight:700; text-align:right; padding:.45rem .5rem; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+.an-table th:first-child, .an-table td:first-child { text-align:left; }
+.an-table td { text-align:right; padding:.45rem .5rem; border-bottom:1px solid #f1f5f9; white-space:nowrap;
+               font-variant-numeric:tabular-nums; }
+.an-table tfoot td { font-weight:800; border-top:2px solid #e2e8f0; border-bottom:none; }
+.an-pend { display:block; font-size:.68rem; color:#b45309; font-weight:600; }
+.an-bar { height:5px; background:#f1f5f9; border-radius:3px; overflow:hidden; min-width:60px; margin-top:3px; }
+.an-bar > div { height:100%; background:#64748b; border-radius:3px; }
+.an-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.an-legend { font-size:.7rem; color:#94a3b8; margin-top:.6rem; }
+@media (max-width:600px) {
+  .an-table { font-size:.74rem; }
+  .an-table th, .an-table td { padding:.4rem .35rem; }
+}
+</style>
+
+<div class="card-section mb-4" id="block-analytics">
+  <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap">
+    <span class="section-title"><i class="bi bi-pie-chart me-2 text-primary"></i>Аналитика: куда сколько ушло</span>
+    {% if analytics.has_data %}
+    <div class="an-tabs" role="tablist">
+      <button type="button" class="an-tab active" data-pane="an-floors">По этажам</button>
+      <button type="button" class="an-tab" data-pane="an-cats">По видам работ</button>
+      <button type="button" class="an-tab" data-pane="an-contr">Подрядчики (АВР)</button>
+      <button type="button" class="an-tab" data-pane="an-mat">Материалы (АСМ)</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div style="padding:1rem 1.25rem">
+  {% if not analytics.has_data %}
+    <div style="text-align:center;color:#94a3b8;padding:1.5rem 0;font-size:.85rem">
+      По этому блоку ещё нет документов АСМ и АВР.
+    </div>
+  {% else %}
+
+    {# Итог в одну строку #}
+    <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.8rem;color:#475569">
+      <div>Всего по документам: <b style="color:#0f172a;font-size:.95rem">{{ analytics.totals.total_all|currency }}</b></div>
+      <div>из них принято: <b style="color:#15803d">{{ analytics.totals.total_acc|currency }}</b></div>
+      {% with pend=analytics.totals.total_all|subtract:analytics.totals.total_acc %}
+      {% if pend > 0 %}<div>ждёт приёмки: <b style="color:#b45309">{{ pend|currency }}</b></div>{% endif %}
+      {% endwith %}
+    </div>
+
+    {# ── По этажам ── #}
+    <div class="an-pane active" id="an-floors">
+      <div class="an-scroll">
+      <table class="an-table">
+        <thead><tr>
+          <th>Этаж</th><th>АСМ</th><th>АВР</th><th>Итого</th><th>План</th><th>% плана</th><th>Доля</th>
+        </tr></thead>
+        <tbody>
+        {% for r in analytics.floors %}
+          <tr>
+            <td><b>{{ r.label }}</b></td>
+            <td style="color:#1d4ed8">{{ r.asm_all|currency }}{% if r.asm_pend > 0 %}<span class="an-pend">ждёт {{ r.asm_pend|shortnum }}</span>{% endif %}</td>
+            <td style="color:#15803d">{{ r.avr_all|currency }}{% if r.avr_pend > 0 %}<span class="an-pend">ждёт {{ r.avr_pend|shortnum }}</span>{% endif %}</td>
+            <td><b>{{ r.total_all|currency }}</b></td>
+            <td style="color:#64748b">{% if r.plan > 0 %}{{ r.plan|currency }}{% else %}—{% endif %}</td>
+            <td style="{% if r.overspend %}color:#dc2626;font-weight:800{% endif %}">
+              {% if r.plan_pct is not None %}{{ r.plan_pct|floatformat:1 }}%{% if r.overspend %} ⚠{% endif %}{% else %}—{% endif %}
+            </td>
+            <td>
+              {{ r.share|floatformat:1 }}%
+              <div class="an-bar"><div style="width:{{ r.share|clean_num }}%"></div></div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr>
+          <td>Итого</td>
+          <td style="color:#1d4ed8">{{ analytics.totals.asm_all|currency }}</td>
+          <td style="color:#15803d">{{ analytics.totals.avr_all|currency }}</td>
+          <td>{{ analytics.totals.total_all|currency }}</td>
+          <td style="color:#64748b">{% if floor_budget_total %}{{ floor_budget_total|currency }}{% else %}—{% endif %}</td>
+          <td></td><td>100%</td>
+        </tr></tfoot>
+      </table>
+      </div>
+    </div>
+
+    {# ── По видам работ ── #}
+    <div class="an-pane" id="an-cats">
+      <div class="an-scroll">
+      <table class="an-table">
+        <thead><tr>
+          <th>Вид работ</th><th>АСМ</th><th>АВР</th><th>Итого</th><th>Док.</th><th>Доля</th>
+        </tr></thead>
+        <tbody>
+        {% for r in analytics.categories %}
+          <tr>
+            <td><b>{{ r.name }}</b></td>
+            <td style="color:#1d4ed8">{{ r.asm_all|currency }}{% if r.asm_pend > 0 %}<span class="an-pend">ждёт {{ r.asm_pend|shortnum }}</span>{% endif %}</td>
+            <td style="color:#15803d">{{ r.avr_all|currency }}{% if r.avr_pend > 0 %}<span class="an-pend">ждёт {{ r.avr_pend|shortnum }}</span>{% endif %}</td>
+            <td><b>{{ r.total_all|currency }}</b></td>
+            <td style="color:#64748b">{{ r.asm_count }} / {{ r.avr_count }}</td>
+            <td>
+              {{ r.share|floatformat:1 }}%
+              <div class="an-bar"><div style="width:{{ r.share|clean_num }}%"></div></div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="an-legend">Док. — количество документов АСМ / АВР</div>
+    </div>
+
+    {# ── Подрядчики ── #}
+    <div class="an-pane" id="an-contr">
+      {% if analytics.contractors %}
+      <div class="an-scroll">
+      <table class="an-table">
+        <thead><tr>
+          <th>Подрядчик</th><th>Принято</th><th>Ждёт приёмки</th><th>Итого</th><th>Вне сметы</th><th>АВР</th>
+        </tr></thead>
+        <tbody>
+        {% for r in analytics.contractors %}
+          <tr>
+            <td><b>{{ r.name }}</b></td>
+            <td style="color:#15803d">{{ r.acc|currency }}</td>
+            <td style="color:#b45309">{% if r.pend > 0 %}{{ r.pend|currency }}{% else %}—{% endif %}</td>
+            <td><b>{{ r.total|currency }}</b></td>
+            <td style="color:#c2410c">{% if r.rework > 0 %}{{ r.rework|currency }}{% else %}—{% endif %}</td>
+            <td style="color:#64748b">{{ r.count }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;color:#94a3b8;padding:1rem 0;font-size:.85rem">Документов АВР пока нет.</div>
+      {% endif %}
+    </div>
+
+    {# ── Материалы ── #}
+    <div class="an-pane" id="an-mat">
+      {% if analytics.materials %}
+      <div class="an-scroll">
+      <table class="an-table">
+        <thead><tr>
+          <th>Материал</th><th>Кол-во</th><th>Сумма</th><th>АСМ</th>
+        </tr></thead>
+        <tbody>
+        {% for m in analytics.materials %}
+          <tr>
+            <td><b>{{ m.name }}</b></td>
+            <td>{{ m.qty|floatformat:"-2" }} {{ m.unit }}</td>
+            <td>{% if m.amount > 0 %}{{ m.amount|currency }}{% else %}<span style="color:#dc2626;font-size:.72rem">без цены</span>{% endif %}</td>
+            <td style="color:#64748b">{{ m.docs }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div class="an-legend">Топ-15 материалов по сумме, все документы АСМ блока</div>
+      {% else %}
+      <div style="text-align:center;color:#94a3b8;padding:1rem 0;font-size:.85rem">Материалов в АСМ пока нет.</div>
+      {% endif %}
+    </div>
+
+    <div class="an-legend">Сумма документа = «Сумма к оплате», если указана при приёмке, иначе сумма по позициям. «Ждёт» — документ ещё не принят.</div>
+  {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('block-analytics');
+  if (!root) return;
+  root.querySelectorAll('.an-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      root.querySelectorAll('.an-tab').forEach(function (b) { b.classList.remove('active'); });
+      root.querySelectorAll('.an-pane').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.pane).classList.add('active');
+    });
+  });
+})();
+</script>
+{% endif %}
