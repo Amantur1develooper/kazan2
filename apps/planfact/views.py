@@ -392,7 +392,7 @@ def _build_block_analytics(block, floor_cats, label_map, budget_map):
 
     def _bucket():
         return {'asm_acc': D0, 'asm_pend': D0, 'avr_acc': D0, 'avr_pend': D0,
-                'asm_count': 0, 'avr_count': 0}
+                'asm_count': 0, 'avr_count': 0, 'asm_acc_count': 0, 'avr_acc_count': 0}
 
     by_floor = defaultdict(_bucket)
     by_cat = defaultdict(_bucket)
@@ -409,6 +409,7 @@ def _build_block_analytics(block, floor_cats, label_map, budget_map):
         for b in (by_floor[d['floor_number']], by_cat[d['category_id']], totals):
             b[key] += amt
             b['asm_count'] += 1
+            b['asm_acc_count'] += 1 if d['is_accepted'] else 0
 
     avr_docs = (AvrDocument.objects.filter(block=block)
                 .annotate(items_total=Coalesce(Sum(_expr()), D0))
@@ -420,6 +421,7 @@ def _build_block_analytics(block, floor_cats, label_map, budget_map):
         for b in (by_floor[d['floor_number']], by_cat[d['category_id']], totals):
             b[key] += amt
             b['avr_count'] += 1
+            b['avr_acc_count'] += 1 if d['is_accepted'] else 0
         c = by_contractor[(d['contractor'] or '').strip() or 'Не указан']
         c['acc' if d['is_accepted'] else 'pend'] += amt
         c['count'] += 1

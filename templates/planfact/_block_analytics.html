@@ -20,31 +20,49 @@
 .an-bar > div { height:100%; background:#64748b; border-radius:3px; }
 .an-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 .an-legend { font-size:.7rem; color:#94a3b8; margin-top:.6rem; }
+.an-toggle { width:100%; display:flex; justify-content:space-between; align-items:center; gap:.75rem;
+             padding:.9rem 1.25rem; background:none; border:0; border-radius:12px; text-align:left; cursor:pointer; }
+.an-toggle:hover { background:#f8fafc; }
+.an-toggle:not(.collapsed) { border-radius:12px 12px 0 0; }
+.an-toggle:focus-visible { outline:2px solid #2563eb; outline-offset:-2px; }
+.an-toggle-title { flex:1; min-width:0; }
+.an-toggle-meta { display:flex; align-items:center; gap:.6rem; flex-shrink:0; }
+.an-toggle-sum { font-size:.85rem; font-weight:800; color:#0f172a; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.an-chevron { font-size:.9rem; color:#64748b; transition:transform .2s; }
+.an-toggle:not(.collapsed) .an-chevron { transform:rotate(180deg); }
 @media (max-width:600px) {
   .an-table { font-size:.74rem; }
   .an-table th, .an-table td { padding:.4rem .35rem; }
+  .an-toggle { padding:.8rem 1rem; }
+  .an-toggle-sum { font-size:.78rem; }
 }
 </style>
 
 <div class="card-section mb-4" id="block-analytics">
-  <div style="padding:.9rem 1.25rem .6rem;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap">
-    <span class="section-title"><i class="bi bi-pie-chart me-2 text-primary"></i>Аналитика: куда сколько ушло</span>
-    {% if analytics.has_data %}
-    <div class="an-tabs" role="tablist">
-      <button type="button" class="an-tab active" data-pane="an-floors">По этажам</button>
-      <button type="button" class="an-tab" data-pane="an-cats">По видам работ</button>
-      <button type="button" class="an-tab" data-pane="an-contr">Подрядчики (АВР)</button>
-      <button type="button" class="an-tab" data-pane="an-mat">Материалы (АСМ)</button>
-    </div>
-    {% endif %}
-  </div>
+  {# Заголовок-переключатель: по умолчанию раздел свёрнут #}
+  <button type="button" class="an-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#an-body"
+          aria-expanded="false" aria-controls="an-body">
+    <span class="section-title an-toggle-title"><i class="bi bi-pie-chart me-2 text-primary"></i>Аналитика: куда сколько ушло</span>
+    <span class="an-toggle-meta">
+      {% if analytics.has_data %}<span class="an-toggle-sum">{{ analytics.totals.total_all|currency }}</span>{% endif %}
+      <i class="bi bi-chevron-down an-chevron" aria-hidden="true"></i>
+    </span>
+  </button>
 
-  <div style="padding:1rem 1.25rem">
+  <div class="collapse" id="an-body">
+  <div style="padding:1rem 1.25rem;border-top:1px solid #f1f5f9">
   {% if not analytics.has_data %}
     <div style="text-align:center;color:#94a3b8;padding:1.5rem 0;font-size:.85rem">
       По этому блоку ещё нет документов АСМ и АВР.
     </div>
   {% else %}
+
+    <div class="an-tabs mb-3" role="tablist">
+      <button type="button" class="an-tab active" data-pane="an-floors">По этажам</button>
+      <button type="button" class="an-tab" data-pane="an-cats">По видам работ</button>
+      <button type="button" class="an-tab" data-pane="an-contr">Подрядчики (АВР)</button>
+      <button type="button" class="an-tab" data-pane="an-mat">Материалы (АСМ)</button>
+    </div>
 
     {# Итог в одну строку #}
     <div style="display:flex;gap:1.25rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.8rem;color:#475569">
@@ -174,6 +192,7 @@
 
     <div class="an-legend">Сумма документа = «Сумма к оплате», если указана при приёмке, иначе сумма по позициям. «Ждёт» — документ ещё не принят.</div>
   {% endif %}
+  </div>
   </div>
 </div>
 

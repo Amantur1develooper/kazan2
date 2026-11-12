@@ -3,9 +3,12 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
-from apps.core.views import SmartLoginView
+from apps.core.views import SmartLoginView, favicon
 
 urlpatterns = [
+    path('favicon.ico', favicon, {'filename': 'favicon.ico'}),
+    path('favicon.svg', favicon, {'filename': 'favicon.svg'}),
+    path('apple-touch-icon.png', favicon, {'filename': 'apple-touch-icon.png'}),
     path('admin/', admin.site.urls),
     path('login/', SmartLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),

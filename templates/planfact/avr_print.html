@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>АВР {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %} от {{ doc.doc_date|date:"d.m.Y" }}</title>
+{% include "_favicon.html" %}
 {% load finance_filters %}
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }

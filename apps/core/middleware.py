@@ -1,6 +1,6 @@
 from django.shortcuts import redirect
 
-EXEMPT_PREFIXES = ('/login/', '/logout/', '/admin/')
+EXEMPT_PREFIXES = ('/login/', '/logout/', '/admin/', '/favicon.', '/apple-touch-icon.png')
 
 
 class LoginRequiredMiddleware:

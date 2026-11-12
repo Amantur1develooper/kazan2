@@ -5,8 +5,31 @@ from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 from django.db.models import Value
 from django.contrib.auth.views import LoginView
+from django.conf import settings
+from django.http import FileResponse, Http404
+from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_GET
 
 from apps.projects.models import Organization, ResidentialComplex, Stage, FloorExpense, Block
+
+
+_FAVICON_DIR = settings.BASE_DIR / 'static' / 'favicon'
+_FAVICON_TYPES = {
+    'favicon.svg': 'image/svg+xml',
+    'favicon.ico': 'image/x-icon',
+    'apple-touch-icon.png': 'image/png',
+}
+
+
+@require_GET
+@cache_control(public=True, max_age=60 * 60 * 24 * 7)
+def favicon(request, filename):
+    """Иконка сайта. Отдаётся напрямую, без collectstatic — работает при любом DEBUG."""
+    content_type = _FAVICON_TYPES.get(filename)
+    path = _FAVICON_DIR / filename
+    if not content_type or not path.is_file():
+        raise Http404
+    return FileResponse(open(path, 'rb'), content_type=content_type)
 
 
 class SmartLoginView(LoginView):

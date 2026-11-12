@@ -356,7 +356,7 @@
           <i class="bi bi-box-seam me-1"></i>АСМ — Материалы
         </div>
         <div style="font-size:1.15rem;font-weight:900;color:#1d4ed8">{{ asm_grand_total|currency }}</div>
-        <div style="font-size:.65rem;color:#64748b;margin-top:2px">принято · {{ analytics.totals.asm_count }} док.</div>
+        <div style="font-size:.65rem;color:#64748b;margin-top:2px">принято {{ analytics.totals.asm_acc_count }} из {{ analytics.totals.asm_count }} док.</div>
         {% if analytics.totals.asm_pend > 0 %}
         <div style="font-size:.72rem;color:#b45309;font-weight:700;margin-top:3px">+ {{ analytics.totals.asm_pend|currency }} ждёт приёмки</div>
         {% endif %}
@@ -376,7 +376,7 @@
           <i class="bi bi-file-earmark-check me-1"></i>АВР — Работы
         </div>
         <div style="font-size:1.15rem;font-weight:900;color:#15803d">{{ avr_grand_total|currency }}</div>
-        <div style="font-size:.65rem;color:#64748b;margin-top:2px">принято · {{ analytics.totals.avr_count }} док.</div>
+        <div style="font-size:.65rem;color:#64748b;margin-top:2px">принято {{ analytics.totals.avr_acc_count }} из {{ analytics.totals.avr_count }} док.</div>
         {% if analytics.totals.avr_pend > 0 %}
         <div style="font-size:.72rem;color:#b45309;font-weight:700;margin-top:3px">+ {{ analytics.totals.avr_pend|currency }} ждёт приёмки</div>
         {% endif %}
