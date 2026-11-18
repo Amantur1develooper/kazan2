@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import WorkCategory, BlockFloorConfig, FloorWork, LandscapingWork, WorkAct, CalendarPlan, CalendarTask, CalendarMonthPlan
+from .models import WorkCategory, BlockFloorConfig, FloorWork, LandscapingWork, WorkAct, CalendarPlan, CalendarTask, CalendarMonthPlan, DocumentMove
 
 
 @admin.register(WorkCategory)
@@ -49,3 +49,15 @@ class CalendarTaskAdmin(admin.ModelAdmin):
 class CalendarMonthPlanAdmin(admin.ModelAdmin):
     list_display = ['task', 'year', 'month', 'planned_amount', 'fact_amount']
     list_filter = ['year', 'month']
+
+
+@admin.register(DocumentMove)
+class DocumentMoveAdmin(admin.ModelAdmin):
+    """Журнал переносов АСМ/АВР — только просмотр."""
+    list_display = ['moved_at', 'doc_type', 'doc_id', 'from_place', 'to_place', 'moved_by', 'was_accepted']
+    list_filter = ['doc_type', 'was_accepted', 'to_block']
+    search_fields = ['from_place', 'to_place', 'doc_id']
+    readonly_fields = [f.name for f in DocumentMove._meta.fields]
+
+    def has_add_permission(self, request):
+        return False

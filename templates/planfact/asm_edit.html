@@ -17,6 +17,7 @@
           gap:10px; padding:7px 0; border-bottom:1px solid #e0f2fe; }
 .ei-row:last-child { border-bottom:none; }
 </style>
+{% include "planfact/_doc_move_css.html" %}
 {% endblock %}
 
 {% block page_header %}
@@ -37,9 +38,17 @@
       АСМ {% if doc.doc_number %}№{{ doc.doc_number }}{% endif %} / {{ floor_label }} / {{ doc.category.name }}
     </h1>
   </div>
-  <a href="{% url 'asm_print' doc.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">
-    <i class="bi bi-printer me-1"></i>Печать
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_move %}
+    <button type="button" class="btn btn-sm btn-move" data-bs-toggle="modal" data-bs-target="#moveDocModal"
+            title="Перенести на другой этаж, вид работ или в другой блок">
+      <i class="bi bi-arrow-left-right me-1"></i>Перенести
+    </button>
+    {% endif %}
+    <a href="{% url 'asm_print' doc.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">
+      <i class="bi bi-printer me-1"></i>Печать
+    </a>
+  </div>
 </div>
 {% endblock %}
 
@@ -396,4 +405,5 @@ function saveAndPrint(){
   window.addEventListener('scroll', ()=>{ if(drop.style.display!=='none'&&activeInput) posDrop(activeInput); }, true);
 })();
 </script>
+{% include "planfact/_doc_move.html" %}
 {% endblock %}

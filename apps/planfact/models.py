@@ -480,3 +480,32 @@ class CalendarMonthPlan(models.Model):
 
     def __str__(self):
         return f"{self.task.name} {self.year}/{self.month}"
+
+
+class DocumentMove(models.Model):
+    """Журнал переносов АСМ/АВР на другой этаж, вид работ или блок (исправление ошибок ввода)."""
+    DOC_TYPES = [('asm', 'АСМ'), ('avr', 'АВР')]
+    doc_type   = models.CharField('Тип документа', max_length=3, choices=DOC_TYPES)
+    doc_id     = models.PositiveIntegerField('ID документа')
+    from_block = models.ForeignKey('projects.Block', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+', verbose_name='Из блока')
+    to_block   = models.ForeignKey('projects.Block', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+', verbose_name='В блок')
+    # Текстовые снимки «ЖК / Блок / Этаж / Вид работ» — история читается, даже если блок переименуют
+    from_place = models.CharField('Откуда', max_length=300)
+    to_place   = models.CharField('Куда', max_length=300)
+    was_accepted  = models.BooleanField('Документ был принят', default=False)
+    links_moved   = models.PositiveIntegerField('Привязок к смете перенесено', default=0)
+    links_cleared = models.PositiveIntegerField('Привязок к смете снято', default=0)
+    moved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name='+', verbose_name='Перенёс')
+    moved_at = models.DateTimeField('Когда', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Перенос документа'
+        verbose_name_plural = 'Переносы АСМ/АВР'
+        ordering = ['-moved_at', '-id']
+        indexes = [models.Index(fields=['doc_type', 'doc_id'])]
+
+    def __str__(self):
+        return f"{self.get_doc_type_display()} #{self.doc_id}: {self.from_place} → {self.to_place}"

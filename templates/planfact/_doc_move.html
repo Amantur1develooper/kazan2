@@ -1,0 +1,151 @@
+{# Перенос АСМ/АВР на другой этаж / вид работ / блок + журнал переносов.
+   Кнопка открытия (#moveDocModal) стоит в шапке страницы документа,
+   стили — в _doc_move_css.html (подключается в extra_head, чтобы кнопка не мигала при загрузке). #}
+{% if doc_moves %}
+<div class="card-section mt-4" id="doc-moves">
+  <div style="padding:.7rem 1rem;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px">
+    <i class="bi bi-arrow-left-right" style="color:#d97706"></i>
+    <span style="font-size:.88rem;font-weight:700;color:#0f172a">История переносов</span>
+  </div>
+  <div style="padding:.3rem 1rem .6rem">
+    {% for m in doc_moves %}
+    <div class="mv-log">
+      <div class="mv-log-meta">
+        {{ m.moved_at|date:"d.m.Y H:i" }} ·
+        {% if m.moved_by %}{{ m.moved_by.get_full_name|default:m.moved_by.username }}{% else %}—{% endif %}
+        {% if m.was_accepted %} · <span class="mv-log-acc">документ был принят</span>{% endif %}
+      </div>
+      <div class="mv-log-path">{{ m.from_place }} <i class="bi bi-arrow-right mx-1" style="color:#d97706"></i><b>{{ m.to_place }}</b></div>
+      {% if m.links_moved or m.links_cleared %}
+      <div class="mv-log-meta">Привязки к смете: перенесено {{ m.links_moved }}, снято {{ m.links_cleared }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if can_move %}
+<div class="modal fade" id="moveDocModal" tabindex="-1" aria-labelledby="moveDocTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="{{ move_url }}" class="modal-content" id="move-doc-form">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title" id="moveDocTitle" style="font-size:1rem;font-weight:800">
+          <i class="bi bi-arrow-left-right me-2" style="color:#d97706"></i>Перенести {{ move_kind }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mv-now">
+          <div class="mv-cap">Сейчас</div>
+          <div>{{ move_current_place }}</div>
+        </div>
+        {% if doc.is_accepted %}
+        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.8rem">
+          <i class="bi bi-exclamation-triangle me-1"></i>Документ уже принят — его сумма перейдёт в расходы нового места.
+        </div>
+        {% endif %}
+
+        <label class="form-label mv-label" for="mv-block">Блок</label>
+        <select name="target_block" id="mv-block" class="form-select form-select-sm mb-2" required>
+          {% regroup move_blocks by residential_complex.name as move_groups %}
+          {% for g in move_groups %}
+          <optgroup label="{{ g.grouper }}">
+            {% for b in g.list %}
+            <option value="{{ b.pk }}"{% if b.pk == doc.block_id %} selected{% endif %}>Блок {{ b.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+
+        <label class="form-label mv-label" for="mv-floor">Этаж</label>
+        <select name="target_floor" id="mv-floor" class="form-select form-select-sm mb-2" required></select>
+
+        <label class="form-label mv-label" for="mv-cat">Вид работ</label>
+        <select name="target_category" id="mv-cat" class="form-select form-select-sm mb-3" required></select>
+
+        <div class="mv-to" id="mv-to" hidden>
+          <div class="mv-cap">Будет</div>
+          <div id="mv-to-text"></div>
+        </div>
+        {% if is_admin %}
+        <div class="mv-note" id="mv-block-note" hidden>
+          <i class="bi bi-info-circle me-1"></i>Другой блок: строки, привязанные к смете, привяжутся к таким же
+          позициям сметы нового блока, ненайденные — отвяжутся.
+        </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button type="submit" class="btn btn-warning btn-sm fw-bold" id="mv-submit" disabled>
+          <i class="bi bi-arrow-left-right me-1"></i>Перенести
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{{ move_data|json_script:"move-data" }}
+<script>
+(function () {
+  var form = document.getElementById('move-doc-form');
+  var raw  = document.getElementById('move-data');
+  if (!form || !raw) return;
+  var data = JSON.parse(raw.textContent), cur = data.current;
+  var selBlock = document.getElementById('mv-block'),
+      selFloor = document.getElementById('mv-floor'),
+      selCat   = document.getElementById('mv-cat'),
+      submit   = document.getElementById('mv-submit'),
+      toBox    = document.getElementById('mv-to'),
+      toText   = document.getElementById('mv-to-text'),
+      note     = document.getElementById('mv-block-note');
+
+  function opt(value, text, selected) {
+    var o = document.createElement('option');
+    o.value = value; o.textContent = text; o.selected = !!selected;
+    return o;
+  }
+  // Этажи выбранного блока; по возможности оставляем тот же номер этажа
+  function fillFloors(wanted) {
+    var floors = data.blocks[selBlock.value].floors;
+    var found = floors.some(function (f) { return String(f.n) === String(wanted); });
+    selFloor.innerHTML = '';
+    if (!found) selFloor.appendChild(opt('', '— выберите этаж —', true));
+    floors.forEach(function (f) { selFloor.appendChild(opt(f.n, f.label, String(f.n) === String(wanted))); });
+  }
+  // Виды работ, включённые на выбранном этаже (нет назначений — доступны все)
+  function fillCats(wanted) {
+    var allowed = data.blocks[selBlock.value].assigned[selFloor.value];
+    var list = allowed ? data.categories.filter(function (c) { return allowed.indexOf(c.id) !== -1; })
+                       : data.categories;
+    var found = list.some(function (c) { return String(c.id) === String(wanted); });
+    selCat.innerHTML = '';
+    if (!found) selCat.appendChild(opt('', '— выберите вид работ —', true));
+    list.forEach(function (c) { selCat.appendChild(opt(c.id, c.name, String(c.id) === String(wanted))); });
+  }
+  function text(sel) { return sel.options[sel.selectedIndex].textContent; }
+  function update() {
+    var ready = selFloor.value !== '' && selCat.value !== '';
+    var changed = selBlock.value !== String(cur.block) || selFloor.value !== String(cur.floor) ||
+                  selCat.value !== String(cur.category);
+    submit.disabled = !(ready && changed);
+    if (note) note.hidden = selBlock.value === String(cur.block);
+    toBox.hidden = !(ready && changed);
+    if (ready && changed) {
+      var bo = selBlock.options[selBlock.selectedIndex];
+      toText.textContent = bo.parentNode.label + ' / ' + bo.textContent + ' / ' + text(selFloor) + ' / ' + text(selCat);
+    }
+  }
+  function reset() {
+    selBlock.value = String(cur.block);
+    fillFloors(cur.floor); fillCats(cur.category); update();
+  }
+  selBlock.addEventListener('change', function () { fillFloors(selFloor.value); fillCats(selCat.value); update(); });
+  selFloor.addEventListener('change', function () { fillCats(selCat.value); update(); });
+  selCat.addEventListener('change', update);
+  document.getElementById('moveDocModal').addEventListener('show.bs.modal', reset);
+  form.addEventListener('submit', function () { setTimeout(function () { submit.disabled = true; }, 0); });
+  reset();
+})();
+</script>
+{% endif %}

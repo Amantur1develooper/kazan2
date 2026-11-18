@@ -16,6 +16,7 @@ urlpatterns = [
     path('asm/<int:asm_pk>/', views.asm_edit,   name='asm_edit'),
     path('asm/<int:asm_pk>/print/', views.asm_print, name='asm_print'),
     path('asm/<int:asm_pk>/delete/', views.asm_delete, name='asm_delete'),
+    path('asm/<int:asm_pk>/move/', views.asm_move, name='asm_move'),
     # AVR
     re_path(r'^(?P<block_pk>[0-9]+)/floor/(?P<floor_number>-?[0-9]+)/cat/(?P<category_id>[0-9]+)/avr/$',
             views.avr_list, name='avr_list'),
@@ -24,6 +25,7 @@ urlpatterns = [
     path('avr/<int:avr_pk>/', views.avr_edit, name='avr_edit'),
     path('avr/<int:avr_pk>/print/', views.avr_print, name='avr_print'),
     path('avr/<int:avr_pk>/delete/', views.avr_delete, name='avr_delete'),
+    path('avr/<int:avr_pk>/move/', views.avr_move, name='avr_move'),
     # Calendar plan
     path('<int:block_pk>/calendar/', views.calendar_plan_list, name='calendar_plan_list'),
     path('<int:block_pk>/calendar/create/', views.calendar_plan_create, name='calendar_plan_create'),

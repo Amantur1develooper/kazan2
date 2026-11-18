@@ -22,6 +22,7 @@
           gap:10px; padding:7px 0; border-bottom:1px solid #e0f2fe; }
 .ei-row:last-child { border-bottom:none; }
 </style>
+{% include "planfact/_doc_move_css.html" %}
 {% endblock %}
 
 {% block page_header %}
@@ -62,9 +63,17 @@
       {% endif %}
     </div>
   </div>
-  <a href="{% url 'avr_print' doc.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">
-    <i class="bi bi-printer me-1"></i>Печать
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if can_move %}
+    <button type="button" class="btn btn-sm btn-move" data-bs-toggle="modal" data-bs-target="#moveDocModal"
+            title="Перенести на другой этаж, вид работ или в другой блок">
+      <i class="bi bi-arrow-left-right me-1"></i>Перенести
+    </button>
+    {% endif %}
+    <a href="{% url 'avr_print' doc.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank">
+      <i class="bi bi-printer me-1"></i>Печать
+    </a>
+  </div>
 </div>
 {% endblock %}
 
@@ -491,4 +500,5 @@ function saveAndPrint(){
   document.getElementById('avr-form').submit();
 }
 </script>
+{% include "planfact/_doc_move.html" %}
 {% endblock %}

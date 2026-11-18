@@ -1,10 +1,13 @@
+from collections import defaultdict
 from decimal import Decimal
 from datetime import date
 
+from django.db import transaction
 from django.db.models import Max, Count, Sum, F, ExpressionWrapper, DecimalField
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.urls import reverse
 
 from django.contrib.auth.models import User
 from apps.projects.models import Block
@@ -12,7 +15,7 @@ from .models import (WorkCategory, FloorWork, LandscapingWork, BlockFloorConfig,
                      FloorBudget, AsmDocument, AsmItem, BlockAccess, BuilderProfile,
                      CalendarPlan, CalendarTask, CalendarMonthPlan,
                      AvrDocument, AvrItem, AvrPhoto, FloorCategoryAssignment,
-                     FloorLabel, MONTHS_RU, MONTHS_SHORT)
+                     FloorLabel, DocumentMove, MONTHS_RU, MONTHS_SHORT)
 
 
 def _default_floor_label(floor_number):
@@ -1306,6 +1309,7 @@ def asm_edit(request, asm_pk):
         'is_admin': is_admin,
         'photos': doc.photos.all() if hasattr(doc, 'photos') else [],
         'estimate_items': estimate_items,
+        **_move_context(request.user, doc, 'asm', is_admin),
     })
 
 
@@ -1742,6 +1746,7 @@ def avr_edit(request, avr_pk):
         'is_admin': is_admin,
         'photos': doc.photos.all(),
         'estimate_items': estimate_items,
+        **_move_context(request.user, doc, 'avr', is_admin),
     })
 
 
@@ -1775,6 +1780,194 @@ def avr_delete(request, avr_pk):
             messages.success(request, 'АВР удалён.')
         return redirect('avr_list', block_pk=blk_pk, floor_number=floor_number, category_id=cat_id)
     return redirect('avr_list', block_pk=blk_pk, floor_number=floor_number, category_id=cat_id)
+
+
+# ─── Перенос АСМ/АВР на другой этаж / вид работ / блок ──────────────────────
+# Исправление ошибок ввода: документ создали не на том этаже или не в том блоке.
+
+DOC_KINDS = {
+    'asm': {'model': AsmDocument, 'label': 'АСМ', 'edit': 'asm_edit', 'move': 'asm_move', 'pk_kw': 'asm_pk'},
+    'avr': {'model': AvrDocument, 'label': 'АВР', 'edit': 'avr_edit', 'move': 'avr_move', 'pk_kw': 'avr_pk'},
+}
+# Если у блока ещё нет BlockFloorConfig — те же значения, что создаёт planfact_block
+DEFAULT_FLOORS = (16, 0)
+
+
+def _floor_numbers(config):
+    """Номера этажей блока снизу вверх: подвалы (-N..-1), затем надземные 1..M."""
+    total, underground = (config.total_floors, config.underground_floors) if config else DEFAULT_FLOORS
+    return list(range(-underground, 0)) + list(range(1, total - underground + 1))
+
+
+def _place_label(blk, floor_number, category):
+    """«ЖК / Блок / Этаж / Вид работ» — для сообщений и журнала переносов."""
+    if floor_number is None:
+        floor = 'Общий'
+    else:
+        lm = {fl.floor_number: fl.label for fl in FloorLabel.objects.filter(block=blk, floor_number=floor_number)}
+        floor = _get_floor_label(lm, floor_number)
+    return f'{blk.residential_complex.name} / Блок {blk.name} / {floor} / {category.name}'
+
+
+def _move_context(user, doc, kind, is_admin):
+    """Данные для кнопки «Перенести» и журнала переносов на странице документа."""
+    can_move = is_admin or not doc.is_accepted
+    ctx = {
+        'can_move': can_move,
+        'doc_moves': list(DocumentMove.objects.filter(doc_type=kind, doc_id=doc.pk)
+                          .select_related('moved_by')[:20]),
+    }
+    if not can_move:
+        return ctx
+
+    blocks = Block.objects.select_related('residential_complex').order_by('residential_complex__name', 'name')
+    if not is_admin:
+        blocks = blocks.filter(pk__in=BlockAccess.objects.filter(user=user).values('block_id'))
+    blocks = list(blocks)
+    ids = [b.pk for b in blocks]
+    configs = {c.block_id: c for c in BlockFloorConfig.objects.filter(block_id__in=ids)}
+    labels = defaultdict(dict)
+    for fl in FloorLabel.objects.filter(block_id__in=ids):
+        labels[fl.block_id][fl.floor_number] = fl.label
+    assigned = defaultdict(lambda: defaultdict(list))
+    for a in FloorCategoryAssignment.objects.filter(block_id__in=ids).values('block_id', 'floor_number', 'category_id'):
+        assigned[a['block_id']][a['floor_number']].append(a['category_id'])
+
+    categories = list(WorkCategory.objects.filter(scope__in=['floor', 'general']))
+    if doc.category not in categories:
+        categories.append(doc.category)
+
+    ctx.update({
+        'move_kind': DOC_KINDS[kind]['label'],
+        'move_url': reverse(DOC_KINDS[kind]['move'], args=[doc.pk]),
+        'move_blocks': blocks,
+        'move_current_place': _place_label(doc.block, doc.floor_number, doc.category),
+        'move_data': {
+            'blocks': {
+                b.pk: {
+                    'floors': [{'n': n, 'label': _get_floor_label(labels[b.pk], n)}
+                               for n in _floor_numbers(configs.get(b.pk))],
+                    # этаж без назначений = доступны все виды работ (как в карточке этажа)
+                    'assigned': {n: cat_ids for n, cat_ids in assigned[b.pk].items()},
+                } for b in blocks
+            },
+            'categories': [{'id': c.pk, 'name': c.name} for c in categories],
+            'current': {'block': doc.block_id, 'floor': doc.floor_number, 'category': doc.category_id},
+        },
+    })
+    return ctx
+
+
+def _relink_estimate_items(doc, target_block):
+    """Документ ушёл в другой блок: переводим привязки строк на такие же позиции сметы нового блока.
+
+    Ищем позицию по коду + названию, затем по номенклатуре. Если однозначной пары нет — привязку
+    снимаем: иначе строка продолжала бы считаться фактом в смете старого блока.
+    """
+    from apps.estimates.models import EstimateItem
+    linked = list(doc.items.filter(estimate_item__isnull=False).select_related('estimate_item'))
+    if not linked:
+        return 0, 0
+    by_code_name, by_nom = defaultdict(list), defaultdict(list)
+    for ei in (EstimateItem.objects.filter(section__estimate__block=target_block)
+               .values('id', 'code', 'name', 'nomenclature_id')):
+        by_code_name[(ei['code'].strip(), ei['name'].strip().lower())].append(ei['id'])
+        if ei['nomenclature_id']:
+            by_nom[ei['nomenclature_id']].append(ei['id'])
+
+    moved = cleared = 0
+    for item in linked:
+        src = item.estimate_item
+        match = by_code_name.get((src.code.strip(), src.name.strip().lower()), [])
+        if len(match) != 1 and src.nomenclature_id:
+            match = by_nom.get(src.nomenclature_id, [])
+        item.estimate_item_id = match[0] if len(match) == 1 else None
+        item.save(update_fields=['estimate_item'])
+        if item.estimate_item_id:
+            moved += 1
+        else:
+            cleared += 1
+    return moved, cleared
+
+
+def _move_document(request, kind, pk):
+    meta = DOC_KINDS[kind]
+    doc = get_object_or_404(meta['model'].objects.select_related('block__residential_complex', 'category'), pk=pk)
+    back = redirect(meta['edit'], **{meta['pk_kw']: doc.pk})
+    if not _can_access_block(request.user, doc.block_id):
+        messages.error(request, 'Нет доступа к этому блоку.')
+        return redirect('planfact_index')
+    if request.method != 'POST':
+        return back
+    is_admin = _is_admin_user(request.user)
+    if doc.is_accepted and not is_admin:
+        messages.error(request, f'{meta["label"]} уже принят — перенести его может только администратор.')
+        return back
+
+    try:
+        block_id     = int(request.POST.get('target_block', ''))
+        floor_number = int(request.POST.get('target_floor', ''))
+        category_id  = int(request.POST.get('target_category', ''))
+    except ValueError:
+        messages.error(request, 'Выберите блок, этаж и вид работ.')
+        return back
+
+    target_block = Block.objects.select_related('residential_complex').filter(pk=block_id).first()
+    if target_block is None or not _can_access_block(request.user, block_id):
+        messages.error(request, 'Нет доступа к выбранному блоку.')
+        return back
+    if floor_number not in _floor_numbers(BlockFloorConfig.objects.filter(block=target_block).first()):
+        messages.error(request, 'В выбранном блоке нет такого этажа.')
+        return back
+    category = WorkCategory.objects.filter(pk=category_id).first()
+    if category is None or (category.scope not in ('floor', 'general') and category.pk != doc.category_id):
+        messages.error(request, 'Выберите вид работ из списка.')
+        return back
+    assigned = set(FloorCategoryAssignment.objects.filter(block=target_block, floor_number=floor_number)
+                   .values_list('category_id', flat=True))
+    if assigned and category.pk not in assigned:
+        messages.error(request, f'На выбранном этаже не включён вид работ «{category.name}».')
+        return back
+
+    if (target_block.pk, floor_number, category.pk) == (doc.block_id, doc.floor_number, doc.category_id):
+        messages.info(request, 'Документ уже находится здесь — ничего не изменилось.')
+        return back
+
+    from_block = doc.block
+    from_place = _place_label(from_block, doc.floor_number, doc.category)
+    to_place   = _place_label(target_block, floor_number, category)
+    with transaction.atomic():
+        doc.block, doc.floor_number, doc.category = target_block, floor_number, category
+        doc.save(update_fields=['block', 'floor_number', 'category'])
+        links_moved = links_cleared = 0
+        if target_block.pk != from_block.pk:
+            links_moved, links_cleared = _relink_estimate_items(doc, target_block)
+        DocumentMove.objects.create(
+            doc_type=kind, doc_id=doc.pk,
+            from_block=from_block, to_block=target_block,
+            from_place=from_place, to_place=to_place,
+            was_accepted=doc.is_accepted,
+            links_moved=links_moved, links_cleared=links_cleared,
+            moved_by=request.user,
+        )
+
+    msg = f'{meta["label"]} перенесён: {from_place} → {to_place}.'
+    if is_admin and (links_moved or links_cleared):
+        msg += f' Привязки к смете нового блока: перенесено {links_moved}, снято {links_cleared}.'
+        if links_cleared:
+            msg += ' Снятые привяжите вручную в разделе «Привязка к позициям сметы».'
+    messages.success(request, msg)
+    return back
+
+
+@production_required
+def asm_move(request, asm_pk):
+    return _move_document(request, 'asm', asm_pk)
+
+
+@production_required
+def avr_move(request, avr_pk):
+    return _move_document(request, 'avr', avr_pk)
 
 
 # ─── Builder user management (staff only) ───────────────────────────────────
